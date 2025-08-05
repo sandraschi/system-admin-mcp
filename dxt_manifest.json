@@ -1,0 +1,78 @@
+{
+  "name": "system-admin-mcp",
+  "version": "1.0.0",
+  "description": "System administration MCP with privilege separation for Windows systems",
+  "author": "Your Organization",
+  "license": "Proprietary",
+  "dxt_version": "1.0.0",
+  "type": "mcp",
+  "entry_point": "system_admin_mcp.user_bridge.bridge:SystemAdminMCP",
+  "permissions": [
+    "system:read",
+    "filesystem:read",
+    "process:read"
+  ],
+  "requirements": [
+    "pywin32>=300",
+    "psutil>=5.9.0",
+    "fastmcp>=2.10.0"
+  ],
+  "prompts": [
+    {
+      "name": "get_file_owner_prompt",
+      "description": "Get the owner of a file or directory",
+      "template": "Who owns the file or directory at {path}?"
+    },
+    {
+      "name": "list_volumes_prompt",
+      "description": "List all available volumes and their usage",
+      "template": "Show me all available disk volumes and their usage information"
+    },
+    {
+      "name": "get_disk_usage_prompt",
+      "description": "Get disk usage for a specific path",
+      "template": "How much disk space is used and available at {path}?"
+    },
+    {
+      "name": "get_process_info_prompt",
+      "description": "Get information about a running process",
+      "template": "Show me information about process with ID {pid}"
+    }
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "log_level": {
+        "type": "string",
+        "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        "default": "INFO",
+        "description": "Logging level for the MCP"
+      },
+      "max_retries": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10,
+        "default": 3,
+        "description": "Maximum number of retries for failed operations"
+      },
+      "timeout_seconds": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 300,
+        "default": 30,
+        "description": "Timeout in seconds for operations"
+      }
+    },
+    "additionalProperties": false
+  },
+  "documentation": {
+    "overview": "The System Admin MCP provides privileged system administration capabilities with proper privilege separation. It consists of a user-level bridge and an elevated Windows service.",
+    "installation": "Install the MSI package to set up the elevated service, then install the DXT package for the bridge component.",
+    "usage": "Interact with the MCP through the standard MCP interface. The bridge will automatically communicate with the elevated service when needed.",
+    "security_notes": [
+      "The elevated service runs with SYSTEM privileges. Ensure proper access controls are in place.",
+      "All operations are logged for audit purposes.",
+      "The service only accepts local connections by default."
+    ]
+  }
+}

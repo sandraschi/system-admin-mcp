@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=42.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "system-admin-mcp"
+version = "0.1.0"
+description = "System Admin MCP for elevated system operations"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+]
+dependencies = [
+    "fastmcp>=2.10.0",
+    "pywin32>=300; platform_system=='Windows'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+    "mypy>=0.900",
+    "pylint>=2.12.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["system_admin_mcp*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+include = '\.pyi?$'

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension"
+     xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension">
+    
+    <!-- Product information -->
+    <?define ProductName = "System Admin MCP" ?>
+    <?define ProductManufacturer = "Your Organization" ?>
+    <?define ProductVersion = "1.0.0" ?>
+    <?define ProductUpgradeCode = "YOUR-UPGRADE-CODE" ?>
+    <?define ProductId = "*" ?>
+    
+    <Product Id="$(var.ProductId)"
+             Name="$(var.ProductName)"
+             Language="1033"
+             Version="$(var.ProductVersion)"
+             Manufacturer="$(var.ProductManufacturer)"
+             UpgradeCode="$(var.ProductUpgradeCode)">
+        
+        <!-- Package information -->
+        <Package InstallerVersion="200"
+                 Compressed="yes"
+                 InstallScope="perMachine"
+                 Description="System Admin MCP Service Installer"
+                 InstallPrivileges="elevated"
+                 Platform="x64" />
+        
+        <!-- Major upgrade configuration -->
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+        
+        <!-- Media configuration -->
+        <MediaTemplate EmbedCab="yes" />
+        
+        <!-- Define the service installation -->
+        <Feature Id="ProductFeature" Title="System Admin MCP" Level="1">
+            <ComponentGroupRef Id="ServiceComponents" />
+            <ComponentGroupRef Id="ApplicationShortcuts" />
+        </Feature>
+        
+        <!-- UI configuration (minimal for service) -->
+        <UIRef Id="WixUI_Minimal" />
+        <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+        
+        <!-- Set installation directory -->
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFilesFolder">
+                <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)">
+                    <Component Id="InstallFolder" Guid="*">
+                        <CreateFolder />
+                    </Component>
+                </Directory>
+            </Directory>
+            <Directory Id="ProgramMenuFolder">
+                <Directory Id="ApplicationProgramsFolder" Name="$(var.ProductName)" />
+            </Directory>
+        </Directory>
+        
+        <!-- Add firewall exception for the service -->
+        <Feature Id="FirewallException" Title="Windows Firewall Exception" Level="1">
+            <ComponentGroupRef Id="FirewallException" />
+        </Feature>
+        
+        <!-- Custom actions for service installation -->
+        <CustomAction Id="InstallService"
+                      File="SystemAdminMCP.Service.exe"
+                      ExeCommand="install"
+                      Execute="deferred"
+                      Return="check"
+                      Impersonate="no" />
+                      
+        <CustomAction Id="UninstallService"
+                      File="SystemAdminMCP.Service.exe"
+                      ExeCommand="uninstall"
+                      Execute="deferred"
+                      Return="ignore"
+                      Impersonate="no" />
+        
+        <InstallExecuteSequence>
+            <Custom Action="InstallService" After="InstallFiles">NOT Installed</Custom>
+            <Custom Action="UninstallService" Before="RemoveFiles">REMOVE~="ALL"</Custom>
+        </InstallExecuteSequence>
+    </Product>
+    
+    <!-- Fragment for service components -->
+    <Fragment>
+        <ComponentGroup Id="ServiceComponents" Directory="INSTALLFOLDER">
+            <!-- Service executable -->
+            <Component Id="ServiceExecutable" Guid="*">
+                <File Id="SystemAdminMCP.Service.exe"
+                      Source="$(var.SourceDir)\SystemAdminMCP.Service.exe"
+                      KeyPath="yes"
+                      Checksum="yes" />
+                
+                <!-- Service installation -->
+                <ServiceInstall Id="ServiceInstaller"
+                              Type="ownProcess"
+                              Name="SystemAdminMCP"
+                              DisplayName="System Admin MCP Service"
+                              Description="Provides privileged system administration capabilities for the MCP framework."
+                              Start="auto"
+                              ErrorControl="normal"
+                              Account="LocalSystem"
+                              Vital="yes">
+                    <ServiceDependency Id="tcpip" />
+                </ServiceInstall>
+                
+                <!-- Service control -->
+                <ServiceControl Id="StartService"
+                              Name="SystemAdminMCP"
+                              Start="install"
+                              Stop="both"
+                              Remove="uninstall"
+                              Wait="yes" />
+                
+                <!-- Set permissions on the service -->
+                <util:PermissionEx User="Administrators" ServiceStart="1" ServiceStop="1" />
+                <util:PermissionEx User="SYSTEM" ServiceAllAccess="1" />
+            </Component>
+            
+            <!-- Configuration file -->
+            <Component Id="ServiceConfig" Guid="*">
+                <File Id="service_config.ini"
+                      Source="$(var.SourceDir)\service_config.ini"
+                      KeyPath="yes" />
+            </Component>
+            
+            <!-- Log directory -->
+            <Directory Id="LogsDir" Name="Logs">
+                <Component Id="LogsFolder" Guid="*">
+                    <CreateFolder>
+                        <util:PermissionEx User="Administrators" GenericAll="yes" />
+                        <util:PermissionEx User="SYSTEM" GenericAll="yes" />
+                        <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+                    </CreateFolder>
+                </Component>
+            </Directory>
+        </ComponentGroup>
+    </Fragment>
+    
+    <!-- Fragment for firewall exception -->
+    <Fragment>
+        <ComponentGroup Id="FirewallException">
+            <Component Id="FirewallRule" Directory="INSTALLFOLDER" Guid="*">
+                <fire:FirewallException Id="SystemAdminMCP_Firewall"
+                                     Name="System Admin MCP Service"
+                                     Scope="any"
+                                     IgnoreFailure="yes"
+                                     Protocol="tcp"
+                                     Port="[PORT_NUMBER]" />
+            </Component>
+        </ComponentGroup>
+    </Fragment>
+    
+    <!-- Fragment for shortcuts -->
+    <Fragment>
+        <ComponentGroup Id="ApplicationShortcuts">
+            <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
+                <Shortcut Id="ApplicationStartMenuShortcut"
+                         Name="$(var.ProductName)"
+                         Description="System Admin MCP Service"
+                         Target="[#SystemAdminMCP.Service.exe]"
+                         WorkingDirectory="INSTALLFOLDER" />
+                
+                <RemoveFolder Id="CleanUpShortcut" On="uninstall" />
+                <RegistryValue Root="HKCU"
+                             Key="Software\[Manufacturer]\[ProductName]"
+                             Name="installed"
+                             Type="integer"
+                             Value="1"
+                             KeyPath="yes" />
+            </Component>
+        </ComponentGroup>
+    </Fragment>
+    
+    <!-- UI configuration -->
+    <Fragment>
+        <UI>
+            <UIRef Id="WixUI_InstallDir" />
+            <Publish Dialog="ExitDialog"
+                    Control="Finish"
+                    Event="DoAction"
+                    Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed</Publish>
+        </UI>
+        
+        <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch System Admin MCP Control Panel" />
+        <Property Id="WixShellExecTarget" Value="[#SystemAdminMCP.Service.exe]" />
+        <CustomAction Id="LaunchApplication" BinaryKey="WixCA" DllEntry="WixShellExec" Impersonate="yes" />
+    </Fragment>
+</Wix>
