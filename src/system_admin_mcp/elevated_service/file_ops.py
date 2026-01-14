@@ -1,11 +1,10 @@
 """File operations for the elevated service."""
+
 import logging
-import os
 import win32security
-import win32file
-import win32api
 
 logger = logging.getLogger(__name__)
+
 
 def get_file_owner(file_path: str) -> dict:
     """Get the owner of a file or directory with elevated privileges.
@@ -22,10 +21,10 @@ def get_file_owner(file_path: str) -> dict:
             file_path, win32security.OWNER_SECURITY_INFORMATION
         )
         owner_sid = sd.GetSecurityDescriptorOwner()
-        
+
         # Look up the account name
         name, domain, _ = win32security.LookupAccountSid(None, owner_sid)
-        
+
         return {
             "path": file_path,
             "owner": f"{domain}\\{name}",
@@ -35,13 +34,14 @@ def get_file_owner(file_path: str) -> dict:
         logger.error(f"Error getting owner for {file_path}: {e}")
         raise
 
+
 def recover_file(source_path: str, destination_path: str) -> dict:
     """Recover a deleted file using NTFS features.
-    
+
     Args:
         source_path: Path to the deleted file
         destination_path: Where to save the recovered file
-        
+
     Returns:
         Dictionary with recovery status
     """

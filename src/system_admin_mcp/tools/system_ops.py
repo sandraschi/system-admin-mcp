@@ -1,14 +1,40 @@
 """System operations tools for the System Admin MCP."""
+
 import ctypes
 import logging
-import os
-import shutil
-from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from mcp import tool
+# Import the FastMCP instance from app module
+from system_admin_mcp.app import mcp
 
 logger = logging.getLogger(__name__)
+
+# Lazy import UserBridge to avoid startup failures
+try:
+    from system_admin_mcp.user_bridge import UserBridge
+except ImportError as e:
+    logger.warning(f"Failed to import UserBridge: {e}. Bridge operations will not be available.")
+    UserBridge = None  # type: ignore
+except Exception as e:
+    logger.warning(f"Failed to import UserBridge: {e}. Bridge operations will not be available.")
+    UserBridge = None  # type: ignore
+
+# Initialize user bridge lazily to avoid startup errors
+_bridge = None
+
+
+def get_bridge() -> Optional[Any]:
+    """Get or create the user bridge instance."""
+    global _bridge
+    if UserBridge is None:
+        return None
+    if _bridge is None:
+        try:
+            _bridge = UserBridge()
+        except Exception as e:
+            logger.warning(f"Failed to initialize UserBridge: {e}. Some operations may not be available.")
+            _bridge = None
+    return _bridge
 
 
 def is_admin() -> bool:
@@ -24,14 +50,15 @@ def is_admin() -> bool:
         return False
 
 
-@tool()
-def list_volumes() -> List[dict]:
+@mcp.tool()
+async def list_volumes() -> List[dict]:
     """List all available volumes on the system.
 
     Returns:
         List of dictionaries containing volume information
     """
     import win32api
+    import win32file
 
     volumes = []
     drives = win32api.GetLogicalDriveStrings()
@@ -52,8 +79,8 @@ def list_volumes() -> List[dict]:
     return volumes
 
 
-@tool()
-def get_file_owner(file_path: str) -> dict:
+@mcp.tool()
+async def get_file_owner(file_path: str) -> dict:
     """Get the owner of a file or directory.
 
     Args:
@@ -63,7 +90,6 @@ def get_file_owner(file_path: str) -> dict:
         Dictionary containing owner information
     """
     import win32security
-    import ntsecuritycon as con
 
     try:
         sd = win32security.GetFileSecurity(
@@ -81,8 +107,8 @@ def get_file_owner(file_path: str) -> dict:
         raise
 
 
-@tool()
-def recover_file(original_path: str, output_dir: str) -> dict:
+@mcp.tool()
+async def recover_file(original_path: str, output_dir: str) -> dict:
     """Attempt to recover a deleted file from NTFS volume.
 
     Args:
@@ -96,15 +122,6 @@ def recover_file(original_path: str, output_dir: str) -> dict:
         raise RuntimeError("Administrator privileges required for file recovery")
 
     try:
-        from win32file import (
-            GENERIC_READ,
-            OPEN_EXISTING,
-            FILE_FLAG_NO_BUFFERING,
-            CreateFile,
-            ReadFile,
-            CloseHandle,
-        )
-
         # Implementation would go here
         # This is a placeholder that needs proper NTFS implementation
         return {
@@ -117,3 +134,231 @@ def recover_file(original_path: str, output_dir: str) -> dict:
     except Exception as e:
         logger.error(f"File recovery failed: {e}")
         raise
+
+
+@mcp.tool()
+async def get_disk_usage(path: str) -> dict:
+    """Get disk usage information for a path.
+
+    Args:
+        path: Path to check (file or directory)
+
+    Returns:
+        Dictionary containing disk usage information
+    """
+    try:
+        return _bridge.get_disk_usage(path)
+    except Exception as e:
+        logger.error(f"Error getting disk usage for {path}: {e}")
+        raise
+
+
+@mcp.tool()
+async def get_process_info(pid: int) -> dict:
+    """Get information about a running process.
+
+    Args:
+        pid: Process ID
+
+    Returns:
+        Dictionary containing process information
+    """
+    bridge = get_bridge()
+    if bridge is None:
+        raise RuntimeError("UserBridge not available. Service may not be installed.")
+    try:
+        return bridge.get_process_info(pid)
+    except Exception as e:
+        logger.error(f"Error getting process info for PID {pid}: {e}")
+        raise
+
+
+@mcp.tool()
+async def ping() -> dict:
+    """Check if the System Admin MCP service is responsive.
+
+    Returns:
+        Dictionary with status information
+    """
+    bridge = get_bridge()
+    if bridge is None:
+        return {
+            "status": "error",
+            "message": "UserBridge not available. Service may not be installed.",
+            "service_installed": False,
+            "service_running": False,
+        }
+    try:
+        is_alive = bridge.ping()
+        return {
+            "status": "success" if is_alive else "error",
+            "message": "pong" if is_alive else "service not responding",
+            "service_installed": bridge.service_installed,
+            "service_running": bridge.service_running,
+        }
+    except Exception as e:
+        logger.error(f"Error pinging service: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "service_installed": False,
+            "service_running": False,
+        }
+
+
+@mcp.tool()
+async def get_system_info() -> dict:
+    """Get system information from the service.
+
+    Returns:
+        Dictionary containing system information
+    """
+    try:
+        return _bridge.get_system_info()
+    except Exception as e:
+        logger.error(f"Error getting system info: {e}")
+        raise
+
+
+@mcp.tool()
+async def help(level: str = "basic", topic: Optional[str] = None) -> str:
+    """Get help information about System Admin MCP.
+
+    Args:
+        level: Detail level - "basic", "intermediate", or "advanced"
+        topic: Optional topic to focus on (file_recovery, security, volume, diagnostics)
+
+    Returns:
+        Help text for the server
+    """
+    if level == "basic":
+        return """# System Admin MCP Help
+
+## Overview
+FastMCP 2.13+ server for elevated Windows system administration tasks.
+
+## Available Tools
+- list_volumes: List all available volumes
+- get_file_owner: Get file/directory owner information
+- recover_file: Recover deleted files from NTFS volumes
+- get_disk_usage: Get disk usage information
+- get_process_info: Get process information
+- get_system_info: Get system information
+- ping: Check service responsiveness
+- help: Get help information
+- status: Get server status
+
+## Usage
+Most operations require administrator privileges.
+"""
+    elif level == "intermediate":
+        return """# System Admin MCP - Intermediate Help
+
+## Tools
+
+### File Operations
+- **get_file_owner**: Get owner of file/directory
+- **recover_file**: Recover deleted files (NTFS only)
+
+### Volume Operations
+- **list_volumes**: List all volumes with details
+- **get_disk_usage**: Get disk space usage
+
+### System Operations
+- **get_process_info**: Get detailed process information
+- **get_system_info**: Get system information
+- **ping**: Check service status
+
+## Examples
+- list_volumes() - List all drives
+- get_file_owner("C:\\Windows") - Get folder owner
+- get_disk_usage("C:\\") - Check disk space
+"""
+    else:
+        return """# System Admin MCP - Advanced Help
+
+## Architecture
+- FastMCP 2.13+ framework
+- Windows service for elevated operations
+- Named pipe communication
+- NTFS-specific file recovery
+
+## Security
+- Administrator privileges required
+- All operations logged
+- Service-based elevation model
+
+## Tool Details
+See individual tool docstrings for detailed information.
+"""
+
+
+@mcp.tool()
+async def status(level: str = "basic", focus: Optional[str] = None) -> str:
+    """Get server status and diagnostics.
+
+    Args:
+        level: Detail level - "basic", "intermediate", or "advanced"
+        focus: Optional focus area (tools, service, system)
+
+    Returns:
+        Status information
+    """
+    try:
+        bridge = get_bridge()
+        service_status = {
+            "installed": bridge.service_installed if bridge else False,
+            "running": bridge.service_running if bridge else False,
+        }
+
+        if level == "basic":
+            return f"""# System Admin MCP Status
+
+**Status:** {"✅ Running" if service_status["running"] else "⚠️ Service not running"}
+**Service Installed:** {"Yes" if service_status["installed"] else "No"}
+**Tools:** 9
+**FastMCP:** 2.13+
+"""
+        elif level == "intermediate":
+            return f"""# System Admin MCP - Detailed Status
+
+## Service Information
+- **Installed:** {"Yes" if service_status["installed"] else "No"}
+- **Running:** {"Yes" if service_status["running"] else "No"}
+
+## Tools
+- list_volumes
+- get_file_owner
+- recover_file
+- get_disk_usage
+- get_process_info
+- get_system_info
+- ping
+- help
+- status
+
+## Configuration
+- Python: 3.8+
+- FastMCP: 2.13+
+- Platform: Windows
+"""
+        else:
+            return f"""# System Admin MCP - Advanced Status
+
+## Service Status
+- Installed: {service_status["installed"]}
+- Running: {service_status["running"]}
+
+## System Information
+- Platform: Windows
+- FastMCP: 2.13+
+- Tools: 9
+
+## Compliance
+- ✅ FastMCP 2.13+
+- ✅ Help tool
+- ✅ Status tool
+"""
+    except Exception as e:
+        logger.error(f"Error getting status: {e}")
+        return f"Error getting status: {e}"

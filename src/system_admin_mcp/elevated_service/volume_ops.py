@@ -1,10 +1,11 @@
 """Volume operations for the elevated service."""
+
 import logging
 import win32api
 import win32file
-import win32security
 
 logger = logging.getLogger(__name__)
+
 
 def list_volumes() -> list:
     """List all available volumes with elevated privileges.
@@ -21,39 +22,36 @@ def list_volumes() -> list:
             continue
         try:
             drive_type = win32file.GetDriveType(drive)
-            
+
             # Get volume information
             volume_info = {
                 "drive": drive,
                 "type": _get_drive_type_name(drive_type),
                 "type_code": drive_type,
             }
-            
+
             # Try to get more detailed information
             try:
                 volume_name = win32api.GetVolumeInformation(drive)[0]
                 volume_info["label"] = volume_name
-            except:
+            except Exception:
                 pass
-                
+
             volumes.append(volume_info)
-            
+
         except Exception as e:
             logger.warning(f"Error getting info for {drive}: {e}")
-            volumes.append({
-                "drive": drive,
-                "error": str(e),
-                "type": "error"
-            })
+            volumes.append({"drive": drive, "error": str(e), "type": "error"})
 
     return volumes
 
+
 def _get_drive_type_name(drive_type: int) -> str:
     """Convert drive type code to human-readable name.
-    
+
     Args:
         drive_type: Drive type code from win32file
-        
+
     Returns:
         Human-readable drive type name
     """
@@ -66,5 +64,5 @@ def _get_drive_type_name(drive_type: int) -> str:
         win32file.DRIVE_CDROM: "CD-ROM",
         win32file.DRIVE_RAMDISK: "RAM disk",
     }
-    
+
     return drive_types.get(drive_type, f"Unknown ({drive_type})")

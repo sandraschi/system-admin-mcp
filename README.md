@@ -21,6 +21,19 @@ A FastMCP 2.10+ compatible MCP service for elevated system administration tasks.
 
 ## Installation
 
+### Option 1: For Cursor IDE
+
+**Important:** Cursor uses system Python. Install dependencies in the Python that Cursor uses:
+
+```powershell
+cd d:\Dev\repos\system-admin-mcp
+python -m pip install -e .[dev]
+```
+
+See `CURSOR_SETUP.md` for detailed Cursor configuration instructions.
+
+### Option 2: For Claude Desktop / General Development
+
 1. Clone the repository:
 
    ```powershell
@@ -40,6 +53,27 @@ A FastMCP 2.10+ compatible MCP service for elevated system administration tasks.
    ```powershell
    pip install -e .[dev]
    ```
+
+### Option 3: For Claude Desktop Configuration
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "system-admin-mcp": {
+      "command": "python",
+      "args": ["-m", "system_admin_mcp.__main__"],
+      "env": {
+        "PYTHONPATH": "D:/Dev/repos/system-admin-mcp/src",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}
+```
+
+**Note:** Some JSON linters object to `cwd` parameter. Using `-m` module execution with `PYTHONPATH` avoids this issue.
 
 ## Usage
 

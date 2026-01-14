@@ -1,75 +1,63 @@
 {
   "name": "system-admin-mcp",
-  "display_name": "System Admin MCP",
-  "version": "0.1.0",
-  "description": "FastMCP 2.10+ service for elevated system administration tasks",
-  "author": "Your Name",
+  "version": "1.0.0",
+  "description": "Windows system administration MCP server for file recovery, security management, volume maintenance, and diagnostics with Austrian precision",
+  "author": "Sandra",
   "license": "MIT",
-  "homepage": "https://github.com/your-username/system-admin-mcp",
+  "homepage": "https://github.com/sandraschi/system-admin-mcp",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/system-admin-mcp.git"
+    "url": "https://github.com/sandraschi/system-admin-mcp"
   },
-  "categories": ["System", "Administration", "MCP"],
-  "keywords": ["mcp", "system", "admin", "elevated", "windows"],
-  "compatibility": {
-    "min_mcp_version": "2.10.0",
-    "platforms": ["windows"],
-    "python_versions": ["3.8", "3.9", "3.10", "3.11"]
-  },
-  "user_config": {
-    "auto_start_service": {
-      "type": "boolean",
-      "default": true,
-      "description": "Automatically start the elevated service when needed"
-    },
-    "log_level": {
-      "type": "string",
-      "default": "INFO",
-      "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-      "description": "Logging level for the MCP service"
+  "main": "server/server.py",
+  "mcp": {
+    "version": "1.0",
+    "capabilities": ["tools"],
+    "prompts": {
+      "system": "assets/prompts/system.md",
+      "file_recovery": "assets/prompts/file_recovery.md",
+      "security_management": "assets/prompts/security_management.md",
+      "volume_maintenance": "assets/prompts/volume_maintenance.md",
+      "system_diagnostics": "assets/prompts/system_diagnostics.md",
+      "troubleshooting": "assets/prompts/troubleshooting.md"
     }
   },
-  "tools": [
-    {
-      "name": "get_file_owner",
-      "description": "Get the owner of a file or directory",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "file_path": {
-            "type": "string",
-            "description": "Path to the file or directory"
-          }
-        },
-        "required": ["file_path"]
-      }
+  "runtime": {
+    "python": ">=3.8"
     },
-    {
-      "name": "list_volumes",
-      "description": "List all available volumes on the system",
-      "parameters": {
-        "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "recover_file",
-      "description": "Recover a deleted file from NTFS volume",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "source_path": {
-            "type": "string",
-            "description": "Original path of the deleted file"
+  "dependencies": {
+    "fastmcp": ">=2.10.0",
+    "pydantic": ">=2.0.0"
+  },
+  "features": [
+    "File recovery from NTFS volumes",
+    "Security and permission management",
+    "Volume maintenance and disk operations",
+    "System diagnostics and information collection",
+    "Elevated privilege operations",
+    "Windows-native integration",
+    "Safe operation validation",
+    "Austrian engineering quality"
+  ],
+  "requirements": {
+    "os": ["Windows 10/11", "Windows Server 2016+"],
+    "privileges": ["Administrator rights required for most operations"],
+    "software": ["PowerShell 5.1+", "NTFS file system"]
+  },
+  "security": {
+    "elevation": "Required for file recovery and security operations",
+    "validation": "All operations validated before execution",
+    "audit": "All privileged operations logged",
+    "permissions": "Strict permission checks enforced"
           },
-          "destination_path": {
-            "type": "string",
-            "description": "Where to save the recovered file"
-          }
-        },
-        "required": ["source_path", "destination_path"]
-      }
-    }
+  "keywords": [
+    "windows",
+    "system-administration",
+    "file-recovery",
+    "security",
+    "ntfs",
+    "permissions",
+    "diagnostics",
+    "austria"
   ]
 }

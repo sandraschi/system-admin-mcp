@@ -1,0 +1,27 @@
+{
+  "manifest_version": "0.2",
+  "name": "system-admin-mcp",
+  "version": "1.0.0",
+  "description": "Windows system administration MCP server for file recovery, security management, volume maintenance, and diagnostics with Austrian precision (SERVER IMPLEMENTATION PENDING)",
+  "author": {
+    "name": "Sandra",
+    "email": "sandra@example.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandraschi/system-admin-mcp"
+  },
+  "server": {
+    "type": "python",
+    "entry_point": "server/__main__.py",
+    "mcp_config": {
+      "command": "python",
+      "args": ["server/__main__.py"],
+      "env": {
+        "PYTHONPATH": "${__dirname}",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}

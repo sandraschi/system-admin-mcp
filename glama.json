@@ -1,0 +1,42 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": ["sandraschi"],
+  "name": "system-admin-mcp",
+  "description": "FastMCP 2.10+ server for elevated Windows system administration tasks. File recovery, security management, volume maintenance, and system diagnostics. Beta status.",
+  "type": "mcp_server",
+  "status": "beta",
+  "framework": "FastMCP 2.10+",
+  "tools": 8,
+  "transport": ["stdio"],
+  "keywords": [
+    "windows",
+    "system-admin",
+    "file-recovery",
+    "security",
+    "disk-maintenance",
+    "diagnostics",
+    "mcp-server",
+    "fastmcp"
+  ],
+  "features": {
+    "file_recovery": {
+      "enabled": true,
+      "filesystem": "NTFS"
+    },
+    "security_management": {
+      "enabled": true,
+      "operations": ["permissions", "access_control"]
+    },
+    "volume_maintenance": {
+      "enabled": true
+    },
+    "system_diagnostics": {
+      "enabled": true
+    },
+    "requires_admin": {
+      "enabled": true,
+      "note": "Administrator privileges required"
+    }
+  }
+}
+

@@ -18,18 +18,25 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
-    "fastmcp>=2.10.0",
+    "fastmcp>=2.14.0,<3.0.0",
     "pywin32>=300; platform_system=='Windows'",
+    "psutil>=5.9.0",
+    "wmi>=1.5.1; platform_system=='Windows'",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
     "black>=22.0.0",
     "isort>=5.0.0",
     "mypy>=0.900",
     "pylint>=2.12.0",
 ]
+
+[project.scripts]
+system-admin-mcp = "system_admin_mcp.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

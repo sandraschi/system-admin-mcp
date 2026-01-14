@@ -46,3 +46,6 @@ htmlcov/
 # System Files
 .DS_Store
 Thumbs.db
+
+# Private documentation (internal dev notes, not for public)
+docs-private/

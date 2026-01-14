@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "system-admin-mcp": {
+      "command": "python",
+      "args": [
+        "-m",
+        "system_admin_mcp.__main__"
+      ],
+      "env": {
+        "PYTHONPATH": "D:/Dev/repos/system-admin-mcp/src",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}
