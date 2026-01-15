@@ -1,0 +1,10 @@
+id = "system-admin-mcp"
+name = "SystemAdministration"
+version = "0.1.0"
+schema_version = 1
+authors = ["Sandra <sandraschipal@hotmail.com>"]
+description = "System monitoring and administration utilities"
+repository = "https://github.com/sandraschi/system-admin-mcp"
+
+[context_servers.system-admin-mcp]
+name = "System Admin Tools"
