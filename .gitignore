@@ -49,3 +49,5 @@ Thumbs.db
 
 # Private documentation (internal dev notes, not for public)
 docs-private/
+# Rust / Zed IDE — rust-analyzer may create target/ at repo root
+target/
