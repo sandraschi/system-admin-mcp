@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import psutil
 import win32api
@@ -17,9 +17,8 @@ import win32evtlog
 import win32evtlogutil
 import win32file
 import win32security
-import win32service
-import win32serviceutil
-import winreg
+
+from system_admin_mcp.app import mcp
 
 try:
     import wmi
@@ -44,9 +43,10 @@ def is_admin() -> bool:
 # ============================================================================
 
 
+@mcp.tool()
 def scan_volume(
-    drive: str, file_pattern: Optional[str] = None, max_results: int = 100
-) -> Dict[str, Any]:
+    drive: str, file_pattern: str | None = None, max_results: int = 100
+) -> dict[str, Any]:
     """Scan NTFS volume for deleted files using PowerShell and NTFS MFT.
 
     Args:
@@ -131,15 +131,11 @@ def scan_volume(
         return {"status": "error", "operation": "scan_volume", "error": str(e)}
 
 
-def recover_file_ntfs(source_path: str, destination_path: str) -> Dict[str, Any]:
+@mcp.tool()
+def recover_file_ntfs(source_path: str, destination_path: str) -> dict[str, Any]:
     """Recover a deleted file from NTFS volume.
 
-    This is a placeholder for actual NTFS recovery which requires:
-    - Direct MFT access
-    - Cluster reading
-    - File system driver access
-
-    For now, attempts to recover using available methods.
+    PORTMANTEAU TARGET: This tool is the primary recovery engine for NTFS.
     """
     try:
         source_path = os.path.abspath(source_path)
@@ -175,11 +171,7 @@ def recover_file_ntfs(source_path: str, destination_path: str) -> Dict[str, Any]
         )
 
         if "SUCCESS" in result.stdout:
-            file_size = (
-                os.path.getsize(destination_path)
-                if os.path.exists(destination_path)
-                else 0
-            )
+            file_size = os.path.getsize(destination_path) if os.path.exists(destination_path) else 0
             return {
                 "status": "success",
                 "operation": "recover_file",
@@ -202,7 +194,8 @@ def recover_file_ntfs(source_path: str, destination_path: str) -> Dict[str, Any]
         return {"status": "error", "operation": "recover_file", "error": str(e)}
 
 
-def validate_recovery(file_path: str) -> Dict[str, Any]:
+@mcp.tool()
+def validate_recovery(file_path: str) -> dict[str, Any]:
     """Validate recovered file integrity."""
     try:
         if not os.path.exists(file_path):
@@ -254,7 +247,8 @@ def validate_recovery(file_path: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-def get_permissions(path: str) -> Dict[str, Any]:
+@mcp.tool()
+def get_permissions(path: str) -> dict[str, Any]:
     """Get file/folder permissions and ACLs."""
     try:
         path = os.path.abspath(path)
@@ -269,16 +263,13 @@ def get_permissions(path: str) -> Dict[str, Any]:
         # Get security descriptor
         sd = win32security.GetFileSecurity(
             path,
-            win32security.DACL_SECURITY_INFORMATION
-            | win32security.OWNER_SECURITY_INFORMATION,
+            win32security.DACL_SECURITY_INFORMATION | win32security.OWNER_SECURITY_INFORMATION,
         )
 
         # Get owner
         owner_sid = sd.GetSecurityDescriptorOwner()
         try:
-            owner_name, owner_domain, _ = win32security.LookupAccountSid(
-                None, owner_sid
-            )
+            owner_name, owner_domain, _ = win32security.LookupAccountSid(None, owner_sid)
             owner = f"{owner_domain}\\{owner_name}"
         except Exception:
             owner = win32security.ConvertSidToStringSid(owner_sid)
@@ -338,9 +329,10 @@ def get_permissions(path: str) -> Dict[str, Any]:
         return {"status": "error", "operation": "get_permissions", "error": str(e)}
 
 
+@mcp.tool()
 def set_permissions(
-    path: str, principal: str, rights: str, inheritance: Optional[str] = None
-) -> Dict[str, Any]:
+    path: str, principal: str, rights: str, inheritance: str | None = None
+) -> dict[str, Any]:
     """Set file/folder permissions."""
     try:
         if not is_admin():
@@ -356,15 +348,11 @@ def set_permissions(
         access_mask = 0
         if "Read" in rights or "read" in rights:
             access_mask |= (
-                win32con.FILE_READ_DATA
-                | win32con.FILE_READ_ATTRIBUTES
-                | win32con.FILE_READ_EA
+                win32con.FILE_READ_DATA | win32con.FILE_READ_ATTRIBUTES | win32con.FILE_READ_EA
             )
         if "Write" in rights or "write" in rights:
             access_mask |= (
-                win32con.FILE_WRITE_DATA
-                | win32con.FILE_WRITE_ATTRIBUTES
-                | win32con.FILE_WRITE_EA
+                win32con.FILE_WRITE_DATA | win32con.FILE_WRITE_ATTRIBUTES | win32con.FILE_WRITE_EA
             )
         if "Execute" in rights or "execute" in rights:
             access_mask |= win32con.FILE_EXECUTE
@@ -373,9 +361,7 @@ def set_permissions(
 
         # Get account SID
         try:
-            domain, account = (
-                principal.split("\\", 1) if "\\" in principal else (None, principal)
-            )
+            domain, account = principal.split("\\", 1) if "\\" in principal else (None, principal)
             sid, _, _ = win32security.LookupAccountName(domain, account)
         except Exception as e:
             return {
@@ -385,9 +371,7 @@ def set_permissions(
             }
 
         # Set inheritance flags
-        inheritance_flags = (
-            win32security.CONTAINER_INHERIT_ACE | win32security.OBJECT_INHERIT_ACE
-        )
+        inheritance_flags = win32security.CONTAINER_INHERIT_ACE | win32security.OBJECT_INHERIT_ACE
         if inheritance and "only" in inheritance.lower():
             if "folder" in inheritance.lower():
                 inheritance_flags = win32security.CONTAINER_INHERIT_ACE
@@ -396,14 +380,10 @@ def set_permissions(
 
         # Create ACE with inheritance flags
         dacl = win32security.ACL()
-        dacl.AddAccessAllowedAceEx(
-            win32security.ACL_REVISION, inheritance_flags, access_mask, sid
-        )
+        dacl.AddAccessAllowedAceEx(win32security.ACL_REVISION, inheritance_flags, access_mask, sid)
 
         # Set security descriptor
-        sd = win32security.GetFileSecurity(
-            path, win32security.DACL_SECURITY_INFORMATION
-        )
+        sd = win32security.GetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION)
         sd.SetSecurityDescriptorDacl(1, dacl, 0)
         win32security.SetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION, sd)
 
@@ -420,7 +400,8 @@ def set_permissions(
         return {"status": "error", "operation": "set_permissions", "error": str(e)}
 
 
-def remove_permission(path: str, principal: str) -> Dict[str, Any]:
+@mcp.tool()
+def remove_permission(path: str, principal: str) -> dict[str, Any]:
     """Remove specific permission from file/folder."""
     try:
         if not is_admin():
@@ -434,9 +415,7 @@ def remove_permission(path: str, principal: str) -> Dict[str, Any]:
 
         # Get account SID
         try:
-            domain, account = (
-                principal.split("\\", 1) if "\\" in principal else (None, principal)
-            )
+            domain, account = principal.split("\\", 1) if "\\" in principal else (None, principal)
             sid, _, _ = win32security.LookupAccountName(domain, account)
         except Exception:
             return {
@@ -446,9 +425,7 @@ def remove_permission(path: str, principal: str) -> Dict[str, Any]:
             }
 
         # Get current DACL
-        sd = win32security.GetFileSecurity(
-            path, win32security.DACL_SECURITY_INFORMATION
-        )
+        sd = win32security.GetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION)
         dacl = sd.GetSecurityDescriptorDacl()
 
         if not dacl:
@@ -466,17 +443,13 @@ def remove_permission(path: str, principal: str) -> Dict[str, Any]:
             ace = dacl.GetAce(i)
             ace_sid = ace[0][2]
             if ace_sid != sid:
-                new_dacl.AddAccessAllowedAce(
-                    win32security.ACL_REVISION, ace[1], ace_sid
-                )
+                new_dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ace[1], ace_sid)
             else:
                 removed = True
 
         if removed:
             sd.SetSecurityDescriptorDacl(1, new_dacl, 0)
-            win32security.SetFileSecurity(
-                path, win32security.DACL_SECURITY_INFORMATION, sd
-            )
+            win32security.SetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION, sd)
             return {
                 "status": "success",
                 "operation": "remove_permission",
@@ -495,7 +468,8 @@ def remove_permission(path: str, principal: str) -> Dict[str, Any]:
         return {"status": "error", "operation": "remove_permission", "error": str(e)}
 
 
-def take_ownership(path: str) -> Dict[str, Any]:
+@mcp.tool()
+def take_ownership(path: str) -> dict[str, Any]:
     """Take ownership of file/folder."""
     try:
         if not is_admin():
@@ -514,9 +488,7 @@ def take_ownership(path: str) -> Dict[str, Any]:
         )
 
         # Enable SeTakeOwnershipPrivilege
-        privilege = win32security.LookupPrivilegeValue(
-            None, win32security.SE_TAKE_OWNERSHIP_NAME
-        )
+        privilege = win32security.LookupPrivilegeValue(None, win32security.SE_TAKE_OWNERSHIP_NAME)
         win32security.AdjustTokenPrivileges(
             token, False, [(privilege, win32security.SE_PRIVILEGE_ENABLED)]
         )
@@ -525,13 +497,9 @@ def take_ownership(path: str) -> Dict[str, Any]:
         user_sid = win32security.LookupAccountName(None, win32api.GetUserName())[0]
 
         # Set ownership
-        sd = win32security.GetFileSecurity(
-            path, win32security.OWNER_SECURITY_INFORMATION
-        )
+        sd = win32security.GetFileSecurity(path, win32security.OWNER_SECURITY_INFORMATION)
         sd.SetSecurityDescriptorOwner(user_sid, False)
-        win32security.SetFileSecurity(
-            path, win32security.OWNER_SECURITY_INFORMATION, sd
-        )
+        win32security.SetFileSecurity(path, win32security.OWNER_SECURITY_INFORMATION, sd)
 
         return {
             "status": "success",
@@ -545,7 +513,8 @@ def take_ownership(path: str) -> Dict[str, Any]:
         return {"status": "error", "operation": "take_ownership", "error": str(e)}
 
 
-def audit_permissions(path: str) -> Dict[str, Any]:
+@mcp.tool()
+def audit_permissions(path: str) -> dict[str, Any]:
     """Audit permissions and identify security issues."""
     try:
         perms = get_permissions(path)
@@ -560,9 +529,7 @@ def audit_permissions(path: str) -> Dict[str, Any]:
 
         # Check for Everyone with Full Control
         for perm in permissions_list:
-            if "Everyone" in perm.get("principal", "") and "FullControl" in perm.get(
-                "rights", []
-            ):
+            if "Everyone" in perm.get("principal", "") and "FullControl" in perm.get("rights", []):
                 issues.append("Everyone has Full Control - security risk!")
 
         # Check for weak permissions
@@ -591,7 +558,8 @@ def audit_permissions(path: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-def check_disk_health(drive: str) -> Dict[str, Any]:
+@mcp.tool()
+def check_disk_health(drive: str) -> dict[str, Any]:
     """Check disk SMART status and health using WMI."""
     try:
         if not WMI_AVAILABLE:
@@ -624,9 +592,7 @@ def check_disk_health(drive: str) -> Dict[str, Any]:
                     health_data["smart_available"] = True
 
                 # Get additional disk info
-                health_data["model"] = (
-                    disk.Model if hasattr(disk, "Model") else "Unknown"
-                )
+                health_data["model"] = disk.Model if hasattr(disk, "Model") else "Unknown"
                 health_data["serial"] = (
                     disk.SerialNumber if hasattr(disk, "SerialNumber") else "Unknown"
                 )
@@ -634,9 +600,7 @@ def check_disk_health(drive: str) -> Dict[str, Any]:
                     int(disk.Size) if hasattr(disk, "Size") and disk.Size else 0
                 )
                 health_data["size_gb"] = (
-                    health_data["size_bytes"] / (1024**3)
-                    if health_data["size_bytes"]
-                    else 0
+                    health_data["size_bytes"] / (1024**3) if health_data["size_bytes"] else 0
                 )
 
                 # Try to get SMART attributes via Win32_PhysicalMedia or Win32_DiskDrive
@@ -652,7 +616,8 @@ def check_disk_health(drive: str) -> Dict[str, Any]:
         return {"status": "error", "operation": "check_disk_health", "error": str(e)}
 
 
-def analyze_disk_usage_advanced(drive: str) -> Dict[str, Any]:
+@mcp.tool()
+def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
     """Advanced disk usage analysis with folder breakdown."""
     try:
         if not drive.endswith(":\\"):
@@ -716,9 +681,10 @@ def analyze_disk_usage_advanced(drive: str) -> Dict[str, Any]:
         return {"status": "error", "operation": "analyze_disk_usage", "error": str(e)}
 
 
+@mcp.tool()
 def disk_cleanup(
-    drive: str, cleanup_targets: Optional[List[str]] = None, dry_run: bool = True
-) -> Dict[str, Any]:
+    drive: str, cleanup_targets: list[str] | None = None, dry_run: bool = True
+) -> dict[str, Any]:
     """Clean up disk space by removing temp files and other cleanup targets."""
     try:
         if not is_admin():
@@ -743,7 +709,7 @@ def disk_cleanup(
                     temp_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), "*")
                     ps_script = f"""
                     $path = '{temp_path}'
-                    $size = (Get-ChildItem -Path $path -Recurse -ErrorAction SilentlyContinue | 
+                    $size = (Get-ChildItem -Path $path -Recurse -ErrorAction SilentlyContinue |
                             Measure-Object -Property Length -Sum).Sum
                     if (-not $dryRun) {{
                         Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
@@ -753,7 +719,7 @@ def disk_cleanup(
 
                 elif target == "recycle_bin":
                     ps_script = """
-                    $size = (Get-ChildItem 'C:\\$Recycle.Bin' -Recurse -Force -ErrorAction SilentlyContinue | 
+                    $size = (Get-ChildItem 'C:\\$Recycle.Bin' -Recurse -Force -ErrorAction SilentlyContinue |
                             Measure-Object -Property Length -Sum).Sum
                     if (-not $dryRun) {
                         Clear-RecycleBin -Force -ErrorAction SilentlyContinue
@@ -765,7 +731,7 @@ def disk_cleanup(
                     temp_path = os.path.join(drive, "Windows", "Temp", "*")
                     ps_script = f"""
                     $path = '{temp_path}'
-                    $size = (Get-ChildItem -Path $path -Recurse -ErrorAction SilentlyContinue | 
+                    $size = (Get-ChildItem -Path $path -Recurse -ErrorAction SilentlyContinue |
                             Measure-Object -Property Length -Sum).Sum
                     if (-not $dryRun) {{
                         Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
@@ -812,7 +778,8 @@ def disk_cleanup(
         return {"status": "error", "operation": "disk_cleanup", "error": str(e)}
 
 
-def defragment_disk(drive: str, thorough: bool = False) -> Dict[str, Any]:
+@mcp.tool()
+def defragment_disk(drive: str, thorough: bool = False) -> dict[str, Any]:
     """Defragment HDD (HDDs only - do not use on SSDs!)."""
     try:
         if not is_admin():
@@ -869,7 +836,8 @@ def defragment_disk(drive: str, thorough: bool = False) -> Dict[str, Any]:
         return {"status": "error", "operation": "defragment_disk", "error": str(e)}
 
 
-def optimize_ssd(drive: str) -> Dict[str, Any]:
+@mcp.tool()
+def optimize_ssd(drive: str) -> dict[str, Any]:
     """Optimize SSD with TRIM operation."""
     try:
         if not is_admin():
@@ -905,7 +873,8 @@ def optimize_ssd(drive: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-def get_hardware_info() -> Dict[str, Any]:
+@mcp.tool()
+def get_hardware_info() -> dict[str, Any]:
     """Get comprehensive hardware information using WMI and psutil."""
     try:
         hw_info = {"status": "success", "operation": "get_hardware_info"}
@@ -922,9 +891,7 @@ def get_hardware_info() -> Dict[str, Any]:
             try:
                 c = wmi.WMI()
                 cpu = c.Win32_Processor()[0]
-                hw_info["cpu"]["name"] = (
-                    cpu.Name.strip() if hasattr(cpu, "Name") else None
-                )
+                hw_info["cpu"]["name"] = cpu.Name.strip() if hasattr(cpu, "Name") else None
                 hw_info["cpu"]["manufacturer"] = (
                     cpu.Manufacturer if hasattr(cpu, "Manufacturer") else None
                 )
@@ -972,8 +939,7 @@ def get_hardware_info() -> Dict[str, Any]:
                 {
                     "interface": interface,
                     "addresses": [
-                        {"family": str(addr.family), "address": addr.address}
-                        for addr in addrs
+                        {"family": str(addr.family), "address": addr.address} for addr in addrs
                     ],
                 }
             )
@@ -988,9 +954,7 @@ def get_hardware_info() -> Dict[str, Any]:
                     hw_info["gpu"].append(
                         {
                             "name": gpu.Name if hasattr(gpu, "Name") else None,
-                            "adapter_ram": gpu.AdapterRAM
-                            if hasattr(gpu, "AdapterRAM")
-                            else None,
+                            "adapter_ram": gpu.AdapterRAM if hasattr(gpu, "AdapterRAM") else None,
                             "driver_version": gpu.DriverVersion
                             if hasattr(gpu, "DriverVersion")
                             else None,
@@ -1006,7 +970,8 @@ def get_hardware_info() -> Dict[str, Any]:
         return {"status": "error", "operation": "get_hardware_info", "error": str(e)}
 
 
-def get_os_info() -> Dict[str, Any]:
+@mcp.tool()
+def get_os_info() -> dict[str, Any]:
     """Get operating system information."""
     try:
         os_info = {"status": "success", "operation": "get_os_info"}
@@ -1030,12 +995,8 @@ def get_os_info() -> Dict[str, Any]:
                 try:
                     c = wmi.WMI()
                     os_wmi = c.Win32_OperatingSystem()[0]
-                    os_info["name"] = (
-                        os_wmi.Caption if hasattr(os_wmi, "Caption") else None
-                    )
-                    os_info["version"] = (
-                        os_wmi.Version if hasattr(os_wmi, "Version") else None
-                    )
+                    os_info["name"] = os_wmi.Caption if hasattr(os_wmi, "Caption") else None
+                    os_info["version"] = os_wmi.Version if hasattr(os_wmi, "Version") else None
                     os_info["build_number"] = (
                         os_wmi.BuildNumber if hasattr(os_wmi, "BuildNumber") else None
                     )
@@ -1043,9 +1004,7 @@ def get_os_info() -> Dict[str, Any]:
                         os_wmi.InstallDate if hasattr(os_wmi, "InstallDate") else None
                     )
                     os_info["last_boot"] = (
-                        os_wmi.LastBootUpTime
-                        if hasattr(os_wmi, "LastBootUpTime")
-                        else None
+                        os_wmi.LastBootUpTime if hasattr(os_wmi, "LastBootUpTime") else None
                     )
                     os_info["total_memory"] = (
                         int(os_wmi.TotalVisibleMemorySize) * 1024
@@ -1066,17 +1025,18 @@ def get_os_info() -> Dict[str, Any]:
         return {"status": "error", "operation": "get_os_info", "error": str(e)}
 
 
-def get_installed_software() -> Dict[str, Any]:
+@mcp.tool()
+def get_installed_software() -> dict[str, Any]:
     """Get list of installed software from registry."""
     try:
         # Query registry for installed software
         ps_script = """
-        $software = Get-ItemProperty "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*" | 
+        $software = Get-ItemProperty "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*" |
                     Where-Object { $_.DisplayName } |
                     Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, @{Name="Size";Expression={$_.EstimatedSize}} |
                     Sort-Object DisplayName |
                     ConvertTo-Json -Compress
-        
+
         $software
         """
 
@@ -1114,7 +1074,8 @@ def get_installed_software() -> Dict[str, Any]:
         }
 
 
-def get_performance_metrics() -> Dict[str, Any]:
+@mcp.tool()
+def get_performance_metrics() -> dict[str, Any]:
     """Get real-time performance metrics."""
     try:
         # CPU metrics
@@ -1133,9 +1094,7 @@ def get_performance_metrics() -> Dict[str, Any]:
 
         # Top processes
         processes = []
-        for proc in psutil.process_iter(
-            ["pid", "name", "cpu_percent", "memory_percent"]
-        ):
+        for proc in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
             try:
                 proc_info = proc.info
                 proc_info["cpu_percent"] = proc.cpu_percent(interval=0.1)
@@ -1143,12 +1102,8 @@ def get_performance_metrics() -> Dict[str, Any]:
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
-        top_cpu = sorted(
-            processes, key=lambda x: x.get("cpu_percent", 0), reverse=True
-        )[:10]
-        top_memory = sorted(
-            processes, key=lambda x: x.get("memory_percent", 0), reverse=True
-        )[:10]
+        top_cpu = sorted(processes, key=lambda x: x.get("cpu_percent", 0), reverse=True)[:10]
+        top_memory = sorted(processes, key=lambda x: x.get("memory_percent", 0), reverse=True)[:10]
 
         return {
             "status": "success",
@@ -1193,9 +1148,10 @@ def get_performance_metrics() -> Dict[str, Any]:
         }
 
 
+@mcp.tool()
 def get_event_log(
-    log_name: str = "System", level: Optional[str] = None, hours_back: int = 24
-) -> Dict[str, Any]:
+    log_name: str = "System", level: str | None = None, hours_back: int = 24
+) -> dict[str, Any]:
     """Query Windows event logs."""
     try:
         if not is_admin():
@@ -1231,10 +1187,7 @@ def get_event_log(
 
         events = []
         try:
-            flags = (
-                win32evtlog.EVENTLOG_BACKWARDS_READ
-                | win32evtlog.EVENTLOG_SEQUENTIAL_READ
-            )
+            flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
             events_read = win32evtlog.ReadEventLog(hand, flags, 0)
 
             for event in events_read:
@@ -1283,7 +1236,8 @@ def get_event_log(
         return {"status": "error", "operation": "get_event_log", "error": str(e)}
 
 
-def health_check() -> Dict[str, Any]:
+@mcp.tool()
+def health_check() -> dict[str, Any]:
     """Perform comprehensive system health check."""
     try:
         health = {
@@ -1331,7 +1285,8 @@ def health_check() -> Dict[str, Any]:
         return {"status": "error", "operation": "health_check", "error": str(e)}
 
 
-def get_volume_info(drive: str) -> Dict[str, Any]:
+@mcp.tool()
+def get_volume_info(drive: str) -> dict[str, Any]:
     """Get detailed volume information."""
     try:
         if not drive.endswith(":\\"):

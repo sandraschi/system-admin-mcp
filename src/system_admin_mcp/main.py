@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from typing import Any, Dict
+from typing import Any
 
 from fastmcp import FastMCP
 
@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 # Import the FastMCP instance
 from system_admin_mcp.app import mcp
+
+from .transport import run_server
 
 # Import tools to trigger @mcp.tool() decorators
 # Wrap imports in try/except to prevent startup failures
@@ -32,10 +34,12 @@ except Exception as e:
 try:
     from system_admin_mcp.tools import agentic_system_workflow  # noqa: F401
 except Exception as e:
-    logger.warning(f"Failed to import agentic_system_workflow: {e}. SEP-1577 tools may not be available.")
+    logger.warning(
+        f"Failed to import agentic_system_workflow: {e}. SEP-1577 tools may not be available."
+    )
 
 
-def create_app(config: Dict[str, Any] = None) -> FastMCP:
+def create_app(config: dict[str, Any] = None) -> FastMCP:
     """Create and configure the MCP application.
 
     Args:
@@ -57,7 +61,7 @@ async def main_async() -> None:
         app = create_app()
         # FastMCP 2.14+ requires run_stdio_async()
         logger.info("Starting MCP server with stdio transport...")
-        await app.run_stdio_async()
+        run_server(app, server_name="system-admin-mcp")
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
     except Exception as e:
@@ -67,8 +71,22 @@ async def main_async() -> None:
 
 def main() -> None:
     """Run the MCP server."""
-    import asyncio
-    asyncio.run(main_async())
+    import argparse
+    import os
+
+    import uvicorn
+
+    parser = argparse.ArgumentParser(description="System Admin MCP server")
+    parser.add_argument("--web", action="store_true", help="Start the FastAPI web server")
+    args = parser.parse_args()
+
+    if args.web:
+        port = int(os.getenv("WEBAPP_PORT", 10861))
+        logger.info(f"Starting FastAPI web server on port {port}...")
+        uvicorn.run("system_admin_mcp.server:app", host="0.0.0.0", port=port, reload=True)
+    else:
+        app = create_app()
+        run_server(app, server_name="system-admin-mcp")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """Portmanteau tools for System Admin MCP - consolidates related operations."""
 
 import logging
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from system_admin_mcp.app import mcp
 from system_admin_mcp.tools.implementations import (
@@ -61,7 +61,7 @@ except Exception as e:
 _bridge = None
 
 
-def get_bridge() -> Optional[Any]:
+def get_bridge() -> Any | None:
     """Get or create the user bridge instance."""
     global _bridge
     if UserBridge is None:
@@ -70,7 +70,9 @@ def get_bridge() -> Optional[Any]:
         try:
             _bridge = UserBridge()
         except Exception as e:
-            logger.warning(f"Failed to initialize UserBridge: {e}. Some operations may not be available.")
+            logger.warning(
+                f"Failed to initialize UserBridge: {e}. Some operations may not be available."
+            )
             _bridge = None
     return _bridge
 
@@ -126,46 +128,46 @@ async def system_admin(
         "set_taskbar_autohide",
     ],
     # File Recovery parameters
-    drive: Optional[str] = None,
-    file_pattern: Optional[str] = None,
-    mft_entry: Optional[int] = None,
-    source_path: Optional[str] = None,
-    destination_path: Optional[str] = None,
+    drive: str | None = None,
+    file_pattern: str | None = None,
+    mft_entry: int | None = None,
+    source_path: str | None = None,
+    destination_path: str | None = None,
     verify_integrity: bool = True,
     max_results: int = 100,
     # Security parameters
-    path: Optional[str] = None,
-    principal: Optional[str] = None,
-    rights: Optional[str] = None,
-    inheritance: Optional[str] = None,
+    path: str | None = None,
+    principal: str | None = None,
+    rights: str | None = None,
+    inheritance: str | None = None,
     # Volume parameters
-    cleanup_targets: Optional[List[str]] = None,
+    cleanup_targets: list[str] | None = None,
     dry_run: bool = True,
     thorough: bool = False,
     # Diagnostics parameters
-    log_name: Optional[str] = None,
-    level: Optional[str] = None,
+    log_name: str | None = None,
+    level: str | None = None,
     hours_back: int = 24,
     # Services parameters
-    service_name: Optional[str] = None,
-    filter_status: Optional[str] = None,
-    filter_name: Optional[str] = None,
+    service_name: str | None = None,
+    filter_status: str | None = None,
+    filter_name: str | None = None,
     include_system: bool = True,
     wait_timeout: int = 30,
-    startup_type: Optional[str] = None,
+    startup_type: str | None = None,
     # Process parameters
-    pid: Optional[int] = None,
-    filter_user: Optional[str] = None,
+    pid: int | None = None,
+    filter_user: str | None = None,
     sort_by: str = "cpu",
     force: bool = False,
     # Startup parameters
-    startup_name: Optional[str] = None,
-    startup_command: Optional[str] = None,
+    startup_name: str | None = None,
+    startup_command: str | None = None,
     startup_location: str = "HKCU",
     # Taskbar parameters
-    autohide: Optional[bool] = None,
-    process_names: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    autohide: bool | None = None,
+    process_names: list[str] | None = None,
+) -> dict[str, Any]:
     """Comprehensive system administration portmanteau tool.
 
     PORTMANTEAU PATTERN: Consolidates 20+ system admin operations into unified interface.
@@ -317,9 +319,7 @@ async def system_admin(
 
         elif operation == "recover_file":
             if not source_path or not destination_path:
-                raise ValueError(
-                    "source_path and destination_path required for recover_file"
-                )
+                raise ValueError("source_path and destination_path required for recover_file")
             return recover_file_ntfs(source_path, destination_path)
 
         elif operation == "validate_recovery":
@@ -330,9 +330,7 @@ async def system_admin(
         elif operation == "batch_recover":
             # Batch recovery - recover multiple files
             if not source_path or not destination_path:
-                raise ValueError(
-                    "source_path and destination_path required for batch_recover"
-                )
+                raise ValueError("source_path and destination_path required for batch_recover")
             # For now, attempt single file recovery
             # Full batch recovery would require a list of files
             return recover_file_ntfs(source_path, destination_path)
@@ -345,9 +343,7 @@ async def system_admin(
 
         elif operation == "set_permissions":
             if not path or not principal or not rights:
-                raise ValueError(
-                    "path, principal, and rights required for set_permissions"
-                )
+                raise ValueError("path, principal, and rights required for set_permissions")
             return set_permissions(path, principal, rights, inheritance)
 
         elif operation == "remove_permission":

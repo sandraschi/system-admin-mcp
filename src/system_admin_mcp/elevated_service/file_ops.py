@@ -1,6 +1,7 @@
 """File operations for the elevated service."""
 
 import logging
+
 import win32security
 
 logger = logging.getLogger(__name__)
@@ -17,9 +18,7 @@ def get_file_owner(file_path: str) -> dict:
     """
     try:
         # Get the security descriptor
-        sd = win32security.GetFileSecurity(
-            file_path, win32security.OWNER_SECURITY_INFORMATION
-        )
+        sd = win32security.GetFileSecurity(file_path, win32security.OWNER_SECURITY_INFORMATION)
         owner_sid = sd.GetSecurityDescriptorOwner()
 
         # Look up the account name

@@ -6,18 +6,19 @@ require elevated privileges. These tools are only accessible through the
 elevated service and are called by the user bridge.
 """
 
-from typing import Dict, Any
-import os
 import logging
-import win32security
+import os
+from typing import Any, Dict
+
+import psutil
 import win32api
 import win32file
-import psutil
+import win32security
 
 logger = logging.getLogger(__name__)
 
 
-def get_file_owner(path: str) -> Dict[str, Any]:
+def get_file_owner(path: str) -> dict[str, Any]:
     """Get the owner of a file or directory.
 
     Args:
@@ -31,9 +32,7 @@ def get_file_owner(path: str) -> Dict[str, Any]:
         path = os.path.abspath(path)
 
         # Get security descriptor
-        sd = win32security.GetFileSecurity(
-            path, win32security.OWNER_SECURITY_INFORMATION
-        )
+        sd = win32security.GetFileSecurity(path, win32security.OWNER_SECURITY_INFORMATION)
 
         # Get owner SID
         owner_sid = sd.GetSecurityDescriptorOwner()
@@ -63,7 +62,7 @@ def get_file_owner(path: str) -> Dict[str, Any]:
         }
 
 
-def list_volumes() -> Dict[str, Any]:
+def list_volumes() -> dict[str, Any]:
     """List all volumes on the system.
 
     Returns:
@@ -129,7 +128,7 @@ def list_volumes() -> Dict[str, Any]:
         }
 
 
-def get_disk_usage(path: str) -> Dict[str, Any]:
+def get_disk_usage(path: str) -> dict[str, Any]:
     """Get disk usage information for a path.
 
     Args:
@@ -169,7 +168,7 @@ def get_disk_usage(path: str) -> Dict[str, Any]:
         }
 
 
-def get_process_info(pid: int) -> Dict[str, Any]:
+def get_process_info(pid: int) -> dict[str, Any]:
     """Get information about a running process.
 
     Args:
@@ -194,9 +193,7 @@ def get_process_info(pid: int) -> Dict[str, Any]:
                 "memory_info": process.memory_info()._asdict(),
                 "num_threads": process.num_threads(),
                 "num_handles": process.num_handles(),
-                "io_counters": process.io_counters()._asdict()
-                if process.io_counters()
-                else None,
+                "io_counters": process.io_counters()._asdict() if process.io_counters() else None,
                 "cpu_affinity": process.cpu_affinity(),
                 "nice": process.nice(),
                 "ionice": process.ionice(),
@@ -205,9 +202,7 @@ def get_process_info(pid: int) -> Dict[str, Any]:
                 "parent": process.parent().pid if process.parent() else None,
                 "children": [p.pid for p in process.children(recursive=False)],
                 "is_running": process.is_running(),
-                "terminal": process.terminal()
-                if hasattr(process, "terminal")
-                else None,
+                "terminal": process.terminal() if hasattr(process, "terminal") else None,
                 "uids": process.uids()._asdict() if hasattr(process, "uids") else None,
                 "gids": process.gids()._asdict() if hasattr(process, "gids") else None,
             }
@@ -230,7 +225,7 @@ def get_process_info(pid: int) -> Dict[str, Any]:
         }
 
 
-def ping() -> Dict[str, Any]:
+def ping() -> dict[str, Any]:
     """Simple ping method to check if the service is responsive.
 
     Returns:

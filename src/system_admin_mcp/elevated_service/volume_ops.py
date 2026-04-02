@@ -1,6 +1,7 @@
 """Volume operations for the elevated service."""
 
 import logging
+
 import win32api
 import win32file
 

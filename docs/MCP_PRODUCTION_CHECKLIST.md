@@ -4,7 +4,7 @@ Use this checklist to audit any MCP server repo before marking it production-rea
 
 ## 🏗️ CORE MCP ARCHITECTURE
 
-- [ ] FastMCP 2.12+ framework implemented
+- [ ] FastMCP 3.1+ framework implemented
 - [ ] stdio protocol for Claude Desktop connection
 - [ ] Proper tool registration with `@mcp.tool()` multiline decorators
 - [ ] No `"""` inside `"""` delimited decorators

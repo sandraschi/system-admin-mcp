@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "system-admin-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "System Admin MCP for elevated system operations"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
@@ -18,10 +18,13 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
-    "fastmcp>=2.14.0,<3.0.0",
+    "fastmcp>=3.1.0,<4",
     "pywin32>=300; platform_system=='Windows'",
     "psutil>=5.9.0",
     "wmi>=1.5.1; platform_system=='Windows'",
+    "ruff>=0.15.2",
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
 ]
 
 [project.optional-dependencies]
@@ -29,10 +32,6 @@ dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
-    "black>=22.0.0",
-    "isort>=5.0.0",
-    "mypy>=0.900",
-    "pylint>=2.12.0",
 ]
 
 [project.scripts]
@@ -46,3 +45,16 @@ include = ["system_admin_mcp*"]
 line-length = 100
 target-version = ['py38']
 include = '\.pyi?$'
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "S"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

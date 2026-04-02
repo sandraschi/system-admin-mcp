@@ -16,17 +16,21 @@ SYSTEM ADMINISTRATION WORKFLOWS:
 - "Secure infrastructure" → autonomous security policy application, compliance checking
 """
 
-from typing import Any, Dict, List, Optional, Union
+import logging
+
 from fastmcp import Context
 
-import logging
 logger = logging.getLogger(__name__)
 
 # Conditional imports for advanced_memory integration
 try:
-    from advanced_memory.mcp.inter_server import sample_with_tools, create_tool_spec, SamplingResult
-    from advanced_memory.mcp.tools.content_manager import build_success_response, build_error_response
+    from advanced_memory.mcp.inter_server import SamplingResult, create_tool_spec, sample_with_tools
     from advanced_memory.mcp.mcp_instance import mcp
+    from advanced_memory.mcp.tools.content_manager import (
+        build_error_response,
+        build_success_response,
+    )
+
     _advanced_memory_available = True
 except ImportError:
     _advanced_memory_available = False
@@ -60,9 +64,9 @@ except ImportError:
 @mcp.tool()
 async def agentic_system_workflow(
     workflow_prompt: str,
-    available_tools: List[str],
+    available_tools: list[str],
     max_iterations: int = 5,
-    context: Optional[Context] = None
+    context: Context | None = None,
 ) -> dict:
     """
     Execute agentic system administration workflows using FastMCP 2.14.1+ sampling with tools.
@@ -105,9 +109,9 @@ async def agentic_system_workflow(
                 message="workflow_prompt is required to guide the system workflow",
                 recovery_options=[
                     "Provide a clear description of the system workflow to execute",
-                    "Include specific goals and available tools"
+                    "Include specific goals and available tools",
                 ],
-                urgency="medium"
+                urgency="medium",
             )
 
         if not available_tools:
@@ -117,13 +121,13 @@ async def agentic_system_workflow(
                 message="available_tools list cannot be empty",
                 recovery_options=[
                     "Specify which system tools the LLM can use",
-                    "Include at least one system tool for the workflow"
+                    "Include at least one system tool for the workflow",
                 ],
-                urgency="medium"
+                urgency="medium",
             )
 
         # Check if context has sampling capability
-        if not hasattr(context, 'sample_step'):
+        if not hasattr(context, "sample_step"):
             return build_error_response(
                 error="Sampling not available",
                 error_code="SAMPLING_UNAVAILABLE",
@@ -131,9 +135,9 @@ async def agentic_system_workflow(
                 recovery_options=[
                     "Ensure FastMCP 2.14.1+ is installed",
                     "Check that sampling handlers are configured",
-                    "Verify LLM provider supports tool calling"
+                    "Verify LLM provider supports tool calling",
                 ],
-                urgency="high"
+                urgency="high",
             )
 
         logger.info(f"Starting agentic system workflow: {workflow_prompt[:50]}...")
@@ -147,7 +151,7 @@ async def agentic_system_workflow(
         # In a real scenario, this would come from context.sample_step
         simulated_tool_call = {
             "tool_name": available_tools[0],
-            "parameters": {"operation": "health_check", "thorough": True}
+            "parameters": {"operation": "health_check", "thorough": True},
         }
 
         # Simulate tool execution
@@ -162,23 +166,23 @@ async def agentic_system_workflow(
             summary=f"System workflow '{workflow_prompt[:50]}...' completed successfully.",
             result={
                 "final_output": final_content,
-                "iterations": 1, # Placeholder
+                "iterations": 1,  # Placeholder
                 "executed_tools": [simulated_tool_call["tool_name"]],
                 "system_checks": tool_result["checks_passed"],
                 "warnings": tool_result["warnings"],
-                "issues_found": tool_result["issues_found"]
+                "issues_found": tool_result["issues_found"],
             },
             next_steps=[
                 "Review system health check results",
                 "Address any warnings or issues found",
                 "Schedule regular system maintenance",
-                "Configure automated monitoring alerts"
+                "Configure automated monitoring alerts",
             ],
             suggestions=[
-                "Try 'agentic_system_workflow(workflow_prompt=\"Set up monitoring stack\", available_tools=[\"system_admin\", \"monitoring_setup\"])'",
+                'Try \'agentic_system_workflow(workflow_prompt="Set up monitoring stack", available_tools=["system_admin", "monitoring_setup"])\'',
                 "Explore security hardening workflows for production servers",
-                "Consider automated backup and recovery testing"
-            ]
+                "Consider automated backup and recovery testing",
+            ],
         )
     except Exception as e:
         logger.error(f"Agentic system workflow failed: {e}", exc_info=True)
@@ -190,8 +194,8 @@ async def agentic_system_workflow(
                 "Check the workflow_prompt for clarity and valid system instructions",
                 "Ensure all system tools in available_tools are correctly implemented and registered",
                 "Review system permissions and administrator access",
-                "Check system resources and service availability"
+                "Check system resources and service availability",
             ],
             diagnostic_info={"exception": str(e), "workflow_type": "system_administration"},
-            urgency="high"
+            urgency="high",
         )

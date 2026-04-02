@@ -1,5 +1,5 @@
 [package]
-name = "SystemAdministration"
+name = "system_administration"
 version = "0.1.0"
 edition = "2021"
 authors = ["Sandra <sandraschipal@hotmail.com>"]

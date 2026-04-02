@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 import pywintypes
 import win32api
@@ -48,13 +48,9 @@ class UserBridge:
 
     def __init__(self):
         """Initialize the user bridge with service status checks."""
-        self.marker_path = os.path.expandvars(
-            r"%LOCALAPPDATA%\SystemAdminMCP\.bridge_disabled"
-        )
+        self.marker_path = os.path.expandvars(r"%LOCALAPPDATA%\SystemAdminMCP\.bridge_disabled")
         self._check_disabled_state()
-        self.service_installed = (
-            self._is_service_installed() if not self._disabled else False
-        )
+        self.service_installed = self._is_service_installed() if not self._disabled else False
         self.service_running = False
         self.pipe_handle = None
         self._check_service_status()
@@ -199,7 +195,7 @@ class UserBridge:
             logger.error(f"Unexpected error during installation: {e}")
             return False
 
-    def _get_service_status(self) -> Dict[str, Any]:
+    def _get_service_status(self) -> dict[str, Any]:
         """Get detailed service status information.
 
         Returns:
@@ -220,9 +216,7 @@ class UserBridge:
         except pywintypes.error as e:
             if e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
                 status["error"] = "System Admin MCP service is not installed"
-                status["solution"] = (
-                    "Install the service using the provided MSI installer"
-                )
+                status["solution"] = "Install the service using the provided MSI installer"
             else:
                 status["error"] = (
                     f"Error checking service status: {win32api.FormatMessage(e.winerror)}"
@@ -281,9 +275,7 @@ class UserBridge:
                         return False
                     return self._connect_to_service()
                 else:
-                    logger.error(
-                        f"Failed to set pipe state: {win32api.FormatMessage(error)}"
-                    )
+                    logger.error(f"Failed to set pipe state: {win32api.FormatMessage(error)}")
                     return False
 
             logger.debug("Successfully connected to service")
@@ -301,9 +293,7 @@ class UserBridge:
 
             return False
 
-    def _send_request(
-        self, action: str, params: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+    def _send_request(self, action: str, params: dict[str, Any] = None) -> dict[str, Any]:
         """Send a request to the elevated service via named pipe.
 
         Args:
@@ -434,7 +424,7 @@ class UserBridge:
                 self.pipe_handle = None
 
     # High-level API methods
-    def get_system_info(self) -> Dict[str, Any]:
+    def get_system_info(self) -> dict[str, Any]:
         """Get system information from the service.
 
         Returns:
@@ -479,7 +469,7 @@ class UserBridge:
         error = response.get("error", {})
         return f"Error: {error.get('message', 'Failed to get file owner')}"
 
-    def list_volumes(self) -> Dict[str, Any]:
+    def list_volumes(self) -> dict[str, Any]:
         """List all available volumes.
 
         Returns:
@@ -487,7 +477,7 @@ class UserBridge:
         """
         return self._send_request("list_volumes", {})
 
-    def recover_file(self, source_path: str, destination_path: str) -> Dict[str, Any]:
+    def recover_file(self, source_path: str, destination_path: str) -> dict[str, Any]:
         """Recover a deleted file.
 
         Args:
@@ -514,9 +504,7 @@ class SystemAdminMCP:
         self.version = "1.0.0"
         logger.info(f"Initialized {self.name} v{self.version}")
 
-    async def execute(
-        self, tool_name: str, parameters: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute(self, tool_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute a tool with the given parameters.
 
         Args:
@@ -555,7 +543,7 @@ class SystemAdminMCP:
             }
 
     # Tool implementations
-    async def tool_get_file_owner(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def tool_get_file_owner(self, params: dict[str, Any]) -> dict[str, Any]:
         """Get the owner of a file."""
         path = params.get("path")
         if not path or not isinstance(path, str):
@@ -564,11 +552,11 @@ class SystemAdminMCP:
         owner = self.bridge.get_file_owner(path)
         return {"path": path, "owner": owner}
 
-    async def tool_list_volumes(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def tool_list_volumes(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """List all volumes on the system."""
         return self.bridge.list_volumes()
 
-    async def tool_get_disk_usage(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def tool_get_disk_usage(self, params: dict[str, Any]) -> dict[str, Any]:
         """Get disk usage information for a path."""
         path = params.get("path")
         if not path or not isinstance(path, str):
@@ -576,17 +564,15 @@ class SystemAdminMCP:
 
         return self.bridge.get_disk_usage(path)
 
-    async def tool_get_process_info(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def tool_get_process_info(self, params: dict[str, Any]) -> dict[str, Any]:
         """Get information about a running process."""
         pid = params.get("pid")
         if not isinstance(pid, int) or pid <= 0:
-            raise ValueError(
-                "Missing or invalid 'pid' parameter (must be a positive integer)"
-            )
+            raise ValueError("Missing or invalid 'pid' parameter (must be a positive integer)")
 
         return self.bridge.get_process_info(pid)
 
-    async def tool_ping(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def tool_ping(self, params: dict[str, Any]) -> dict[str, Any]:
         """Check if the service is responsive."""
         is_alive = self.bridge.ping()
         return {"status": "pong" if is_alive else "error"}
@@ -614,9 +600,7 @@ if __name__ == "__main__":
                 sys_info = bridge.get_system_info()
                 if sys_info:
                     print(f"OS: {sys_info.get('os', {}).get('platform', 'Unknown')}")
-                    print(
-                        f"Python: {sys_info.get('python', {}).get('version', 'Unknown')}"
-                    )
+                    print(f"Python: {sys_info.get('python', {}).get('version', 'Unknown')}")
 
             # Test file owner
             test_file = os.path.abspath(__file__)

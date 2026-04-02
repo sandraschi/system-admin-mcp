@@ -1,0 +1,35 @@
+{
+    "name": "system-admin-mcp",
+    "version": "1.0.0",
+    "type": "server",
+    "runtime": "python",
+    "entry_point": "src/system_admin_mcp/server.py",
+    "dependencies": [
+        "fastmcp>=2.14.4,<3.0.0",
+        "psutil>=5.8.0"
+    ],
+    "build": {
+        "include": [
+            "src/**/*",
+            "README.md",
+            "LICENSE"
+        ],
+        "exclude": [
+            "tests/",
+            ".git/",
+            "__pycache__/",
+            "*.pyc",
+            ".venv/",
+            "dist/",
+            "build/",
+            "target/",
+            "docs/",
+            "scripts/"
+        ]
+    },
+    "scripts": {
+        "build": "mcpb build",
+        "pack": "mcpb pack . dist/system-admin-mcp.mcpb",
+        "test": "python -m pytest"
+    }
+}

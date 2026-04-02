@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 import pywintypes
 import win32api
@@ -144,9 +144,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
             self.pipe_handle = win32pipe.CreateNamedPipe(
                 PIPE_NAME,
                 win32pipe.PIPE_ACCESS_DUPLEX | win32file.FILE_FLAG_OVERLAPPED,
-                win32pipe.PIPE_TYPE_MESSAGE
-                | win32pipe.PIPE_READMODE_MESSAGE
-                | win32pipe.PIPE_WAIT,
+                win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
                 win32pipe.PIPE_UNLIMITED_INSTANCES,
                 BUFFER_SIZE,  # Output buffer size
                 BUFFER_SIZE,  # Input buffer size
@@ -225,9 +223,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
         os.makedirs(log_dir, exist_ok=True)
 
         # Set up file handler
-        file_handler = logging.FileHandler(
-            os.path.join(log_dir, "service.log"), encoding="utf-8"
-        )
+        file_handler = logging.FileHandler(os.path.join(log_dir, "service.log"), encoding="utf-8")
         file_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         )
@@ -264,7 +260,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
         except Exception as e:
             logger.error(f"Failed to send error response: {str(e)}")
 
-    def _handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_request(self, request: dict[str, Any]) -> dict[str, Any]:
         """Handle a request from the client.
 
         Args:
@@ -312,7 +308,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
         """Handle ping command (for testing)."""
         return "pong"
 
-    def _handle_get_system_info(self) -> Dict[str, Any]:
+    def _handle_get_system_info(self) -> dict[str, Any]:
         """Get system information."""
         return {
             "os": {
@@ -334,7 +330,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
 
         return file_ops.get_file_owner(path)
 
-    def _handle_list_volumes(self) -> List[str]:
+    def _handle_list_volumes(self) -> list[str]:
         """List available volumes."""
         from . import volume_ops
 

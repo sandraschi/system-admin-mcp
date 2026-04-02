@@ -1,22 +1,34 @@
 use zed_extension_api as zed;
 
-struct SystemAdministrationExtension;
+struct SystemAdminMcpExtension;
 
-impl zed::Extension for SystemAdministrationExtension {
-    fn context_server_command(
-        &mut self,
-        id: &zed::ContextServerId,
-        _project: &zed::Project,
-    ) -> zed::Result<zed::Command> {
-        match id.0.as_str() {
-            "system-admin-mcp" => Ok(zed::Command {
-                command: "uv".to_string(),
-                args: vec!["run".to_string(), "system_admin_mcp".to_string()],
-                env: Default::default(),
-            }),
-            _ => Err(format!("Unknown server: {}", id.0)),
-        }
+impl SystemAdminMcpExtension {
+    fn new() -> Self {
+        Self
     }
 }
 
-zed::register_extension!(SystemAdministrationExtension);
+impl zed::Extension for SystemAdminMcpExtension {
+    fn new() -> Self {
+        Self::new()
+    }
+
+    fn context_server_command(
+        &mut self,
+        _id: &zed::ContextServerId,
+        _project: &zed::Project,
+    ) -> zed::Result<zed::Command> {
+        Ok(zed::Command {
+            command: "uv".to_string(),
+            args: vec![
+                "run".to_string(),
+                "--project".to_string(),
+                ".".to_string(),
+                "--mcp".to_string(),
+            ],
+            env: Default::default(),
+        })
+    }
+}
+
+zed::register_extension!(SystemAdminMcpExtension);

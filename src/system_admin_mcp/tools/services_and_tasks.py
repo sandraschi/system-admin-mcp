@@ -5,18 +5,14 @@ import logging
 import os
 import subprocess
 import time
-from typing import Any, Dict, List, Optional
+import winreg
+from typing import Any
 
 import psutil
-import win32api
-import win32con
-import win32process
-import win32security
 import win32service
 import win32serviceutil
-import winreg
-import winerror
-import pywintypes
+
+from system_admin_mcp.app import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +28,7 @@ def is_admin() -> bool:
 # ============================================================================
 # WINDOWS SERVICES OPERATIONS
 # ============================================================================
+
 
 def _get_service_status_name(status_code: int) -> str:
     """Convert service status code to readable name."""
@@ -59,11 +56,12 @@ def _get_startup_type_name(startup_type: int) -> str:
     return startup_map.get(startup_type, f"Unknown ({startup_type})")
 
 
+@mcp.tool()
 def list_services(
-    filter_status: Optional[str] = None,
-    filter_name: Optional[str] = None,
+    filter_status: str | None = None,
+    filter_name: str | None = None,
     include_system: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List Windows services with filtering.
 
     Args:
@@ -83,9 +81,7 @@ def list_services(
             }
 
         services = []
-        manager = win32service.OpenSCManager(
-            None, None, win32service.SC_MANAGER_ENUMERATE_SERVICE
-        )
+        manager = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_ENUMERATE_SERVICE)
 
         try:
             services_list = win32service.EnumServicesStatus(manager)
@@ -153,7 +149,8 @@ def list_services(
         return {"status": "error", "operation": "list_services", "error": str(e)}
 
 
-def get_service_stats() -> Dict[str, Any]:
+@mcp.tool()
+def get_service_stats() -> dict[str, Any]:
     """Get statistics about Windows services.
 
     Returns:
@@ -167,9 +164,7 @@ def get_service_stats() -> Dict[str, Any]:
                 "error": "Administrator privileges required",
             }
 
-        manager = win32service.OpenSCManager(
-            None, None, win32service.SC_MANAGER_ENUMERATE_SERVICE
-        )
+        manager = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_ENUMERATE_SERVICE)
 
         try:
             services_list = win32service.EnumServicesStatus(manager)
@@ -222,7 +217,8 @@ def get_service_stats() -> Dict[str, Any]:
         return {"status": "error", "operation": "get_service_stats", "error": str(e)}
 
 
-def start_service(service_name: str, wait_timeout: int = 30) -> Dict[str, Any]:
+@mcp.tool()
+def start_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
     """Start a Windows service.
 
     Args:
@@ -279,7 +275,8 @@ def start_service(service_name: str, wait_timeout: int = 30) -> Dict[str, Any]:
         return {"status": "error", "operation": "start_service", "error": str(e)}
 
 
-def stop_service(service_name: str, wait_timeout: int = 30) -> Dict[str, Any]:
+@mcp.tool()
+def stop_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
     """Stop a Windows service.
 
     Args:
@@ -329,14 +326,15 @@ def stop_service(service_name: str, wait_timeout: int = 30) -> Dict[str, Any]:
         return {"status": "error", "operation": "stop_service", "error": str(e)}
 
 
-def get_service_info(service_name: str) -> Dict[str, Any]:
+@mcp.tool()
+def get_service_info(service_name: str) -> dict[str, Any]:
     """Get detailed information about a Windows service.
 
     Args:
-        service_name: Name of the service
+        service_name: Name of the service to query
 
     Returns:
-        Dictionary with service information
+        Dictionary with service details
     """
     try:
         if not is_admin():
@@ -346,46 +344,40 @@ def get_service_info(service_name: str) -> Dict[str, Any]:
                 "error": "Administrator privileges required",
             }
 
-        # Get status
-        status_info = win32serviceutil.QueryServiceStatus(service_name)
-        status_code = status_info[1]
-        status_name = _get_service_status_name(status_code)
+        service_info = {}
+        manager = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_ENUMERATE_SERVICE)
 
-        # Get configuration
-        config = win32serviceutil.QueryServiceConfig(service_name)
-        startup_type = config[1]
-        startup_name = _get_startup_type_name(startup_type)
-        binary_path = config[3]
-        service_type = config[0]
-        dependencies = config[4] if len(config) > 4 else []
+        try:
+            handle = win32service.OpenService(
+                manager,
+                service_name,
+                win32service.SERVICE_QUERY_CONFIG | win32service.SERVICE_QUERY_STATUS,
+            )
 
-        return {
-            "status": "success",
-            "operation": "get_service_info",
-            "service_name": service_name,
-            "service_status": status_name,
-            "status_code": status_code,
-            "startup_type": startup_name,
-            "startup_code": startup_type,
-            "binary_path": binary_path,
-            "service_type": service_type,
-            "dependencies": dependencies,
-        }
+            # Implementation...
+            status = win32service.QueryServiceStatusEx(handle)
+            config = win32service.QueryServiceConfig(handle)
 
-    except pywintypes.error as e:
-        if e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
-            return {
-                "status": "error",
-                "operation": "get_service_info",
-                "error": f"Service '{service_name}' does not exist",
+            service_info = {
+                "name": service_name,
+                "display_name": config[2],
+                "status": _get_service_status_name(status["CurrentState"]),
+                "startup_type": _get_startup_type_name(config[1]),
+                "binary_path": config[3],
+                "account": config[6],
+                "pid": status["ProcessId"],
             }
-        raise
+
+            return {"status": "success", "service": service_info}
+        finally:
+            win32service.CloseServiceHandle(manager)
     except Exception as e:
         logger.exception(f"Error getting service info for {service_name}")
         return {"status": "error", "operation": "get_service_info", "error": str(e)}
 
 
-def set_service_startup(service_name: str, startup_type: str) -> Dict[str, Any]:
+@mcp.tool()
+def set_service_startup(service_name: str, startup_type: str) -> dict[str, Any]:
     """Set service startup type.
 
     Args:
@@ -446,11 +438,13 @@ def set_service_startup(service_name: str, startup_type: str) -> Dict[str, Any]:
 # TASKS/PROCESSES OPERATIONS
 # ============================================================================
 
+
+@mcp.tool()
 def list_processes(
-    filter_name: Optional[str] = None,
-    filter_user: Optional[str] = None,
+    filter_name: str | None = None,
+    filter_user: str | None = None,
     sort_by: str = "cpu",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List running processes with filtering and sorting.
 
     Args:
@@ -464,7 +458,9 @@ def list_processes(
     try:
         processes = []
 
-        for proc in psutil.process_iter(["pid", "name", "username", "cpu_percent", "memory_percent"]):
+        for proc in psutil.process_iter(
+            ["pid", "name", "username", "cpu_percent", "memory_percent"]
+        ):
             try:
                 proc_info = proc.info
                 proc_info["cpu_percent"] = proc.cpu_percent(interval=0.1)
@@ -506,14 +502,12 @@ def list_processes(
         return {"status": "error", "operation": "list_processes", "error": str(e)}
 
 
-def analyze_process(pid: int) -> Dict[str, Any]:
-    """Analyze a specific process in detail.
+@mcp.tool()
+def analyze_process(pid: int) -> dict[str, Any]:
+    """Analyze a specific process in detail including CPU, Memory, and IO metrics.
 
     Args:
         pid: Process ID
-
-    Returns:
-        Dictionary with detailed process information
     """
     try:
         process = psutil.Process(pid)
@@ -568,7 +562,8 @@ def analyze_process(pid: int) -> Dict[str, Any]:
         return {"status": "error", "operation": "analyze_process", "error": str(e)}
 
 
-def kill_process(pid: int, force: bool = False) -> Dict[str, Any]:
+@mcp.tool()
+def kill_process(pid: int, force: bool = False) -> dict[str, Any]:
     """Kill a process.
 
     Args:
@@ -624,7 +619,9 @@ def kill_process(pid: int, force: bool = False) -> Dict[str, Any]:
 # WINDOWS STARTUP OPERATIONS
 # ============================================================================
 
-def list_startup_programs() -> Dict[str, Any]:
+
+@mcp.tool()
+def list_startup_programs() -> dict[str, Any]:
     """List programs that start with Windows.
 
     Returns:
@@ -653,7 +650,9 @@ def list_startup_programs() -> Dict[str, Any]:
                                 {
                                     "name": name,
                                     "command": value,
-                                    "location": "HKCU" if hkey == winreg.HKEY_CURRENT_USER else "HKLM",
+                                    "location": "HKCU"
+                                    if hkey == winreg.HKEY_CURRENT_USER
+                                    else "HKLM",
                                     "path": path,
                                 }
                             )
@@ -695,9 +694,8 @@ def list_startup_programs() -> Dict[str, Any]:
         return {"status": "error", "operation": "list_startup_programs", "error": str(e)}
 
 
-def add_startup_program(
-    name: str, command: str, location: str = "HKCU"
-) -> Dict[str, Any]:
+@mcp.tool()
+def add_startup_program(name: str, command: str, location: str = "HKCU") -> dict[str, Any]:
     """Add a program to Windows startup.
 
     Args:
@@ -716,11 +714,7 @@ def add_startup_program(
                 "error": "Administrator privileges required for HKLM",
             }
 
-        hkey = (
-            winreg.HKEY_CURRENT_USER
-            if location == "HKCU"
-            else winreg.HKEY_LOCAL_MACHINE
-        )
+        hkey = winreg.HKEY_CURRENT_USER if location == "HKCU" else winreg.HKEY_LOCAL_MACHINE
         path = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
         key = winreg.OpenKey(hkey, path, 0, winreg.KEY_WRITE)
@@ -742,7 +736,8 @@ def add_startup_program(
         return {"status": "error", "operation": "add_startup_program", "error": str(e)}
 
 
-def remove_startup_program(name: str, location: str = "HKCU") -> Dict[str, Any]:
+@mcp.tool()
+def remove_startup_program(name: str, location: str = "HKCU") -> dict[str, Any]:
     """Remove a program from Windows startup.
 
     Args:
@@ -760,11 +755,7 @@ def remove_startup_program(name: str, location: str = "HKCU") -> Dict[str, Any]:
                 "error": "Administrator privileges required for HKLM",
             }
 
-        hkey = (
-            winreg.HKEY_CURRENT_USER
-            if location == "HKCU"
-            else winreg.HKEY_LOCAL_MACHINE
-        )
+        hkey = winreg.HKEY_CURRENT_USER if location == "HKCU" else winreg.HKEY_LOCAL_MACHINE
         path = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
         key = winreg.OpenKey(hkey, path, 0, winreg.KEY_WRITE)
@@ -795,7 +786,9 @@ def remove_startup_program(name: str, location: str = "HKCU") -> Dict[str, Any]:
 # TASKBAR OPERATIONS
 # ============================================================================
 
-def get_taskbar_settings() -> Dict[str, Any]:
+
+@mcp.tool()
+def get_taskbar_settings() -> dict[str, Any]:
     """Get current taskbar settings.
 
     Returns:
@@ -831,7 +824,8 @@ def get_taskbar_settings() -> Dict[str, Any]:
         return {"status": "error", "operation": "get_taskbar_settings", "error": str(e)}
 
 
-def set_taskbar_autohide(enabled: bool) -> Dict[str, Any]:
+@mcp.tool()
+def set_taskbar_autohide(enabled: bool) -> dict[str, Any]:
     """Set taskbar autohide setting.
 
     Args:
@@ -845,11 +839,11 @@ def set_taskbar_autohide(enabled: bool) -> Dict[str, Any]:
         ps_script = f"""
         $regPath = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3"
         $regName = "Settings"
-        
+
         try {{
             $settings = Get-ItemProperty -Path $regPath -Name $regName -ErrorAction Stop
             $bytes = $settings.Settings
-            
+
             # Modify byte 8 (0-indexed) to set autohide flag
             if ($bytes.Length -gt 8) {{
                 if ({str(enabled).lower()}) {{
@@ -857,14 +851,14 @@ def set_taskbar_autohide(enabled: bool) -> Dict[str, Any]:
                 }} else {{
                     $bytes[8] = $bytes[8] -band 0xFE
                 }}
-                
+
                 Set-ItemProperty -Path $regPath -Name $regName -Value $bytes -Type Binary
                 
                 # Restart Explorer to apply changes
                 Stop-Process -Name explorer -Force
                 Start-Sleep -Seconds 2
                 Start-Process explorer
-                
+
                 Write-Output "SUCCESS"
             }} else {{
                 Write-Output "ERROR: Invalid settings format"
@@ -900,7 +894,7 @@ def set_taskbar_autohide(enabled: bool) -> Dict[str, Any]:
         return {"status": "error", "operation": "set_taskbar_autohide", "error": str(e)}
 
 
-def find_taskbar_blocking_processes() -> Dict[str, Any]:
+def find_taskbar_blocking_processes() -> dict[str, Any]:
     """Find processes that prevent taskbar autohide.
 
     These are typically processes with windows that extend to the screen edge.
@@ -968,8 +962,8 @@ def find_taskbar_blocking_processes() -> Dict[str, Any]:
 
 
 def kill_taskbar_blocking_processes(
-    process_names: Optional[List[str]] = None, force: bool = False
-) -> Dict[str, Any]:
+    process_names: list[str] | None = None, force: bool = False
+) -> dict[str, Any]:
     """Kill processes that prevent taskbar autohide.
 
     Args:
@@ -1016,11 +1010,3 @@ def kill_taskbar_blocking_processes(
             "operation": "kill_taskbar_blocking_processes",
             "error": str(e),
         }
-
-
-
-
-
-
-
-

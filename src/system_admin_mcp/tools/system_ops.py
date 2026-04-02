@@ -2,7 +2,7 @@
 
 import ctypes
 import logging
-from typing import Any, List, Optional
+from typing import Any
 
 # Import the FastMCP instance from app module
 from system_admin_mcp.app import mcp
@@ -23,7 +23,7 @@ except Exception as e:
 _bridge = None
 
 
-def get_bridge() -> Optional[Any]:
+def get_bridge() -> Any | None:
     """Get or create the user bridge instance."""
     global _bridge
     if UserBridge is None:
@@ -32,7 +32,9 @@ def get_bridge() -> Optional[Any]:
         try:
             _bridge = UserBridge()
         except Exception as e:
-            logger.warning(f"Failed to initialize UserBridge: {e}. Some operations may not be available.")
+            logger.warning(
+                f"Failed to initialize UserBridge: {e}. Some operations may not be available."
+            )
             _bridge = None
     return _bridge
 
@@ -51,7 +53,7 @@ def is_admin() -> bool:
 
 
 @mcp.tool()
-async def list_volumes() -> List[dict]:
+async def list_volumes() -> list[dict]:
     """List all available volumes on the system.
 
     Returns:
@@ -92,9 +94,7 @@ async def get_file_owner(file_path: str) -> dict:
     import win32security
 
     try:
-        sd = win32security.GetFileSecurity(
-            file_path, win32security.OWNER_SECURITY_INFORMATION
-        )
+        sd = win32security.GetFileSecurity(file_path, win32security.OWNER_SECURITY_INFORMATION)
         owner_sid = sd.GetSecurityDescriptorOwner()
         name, domain, _ = win32security.LookupAccountSid(None, owner_sid)
         return {
@@ -221,7 +221,7 @@ async def get_system_info() -> dict:
 
 
 @mcp.tool()
-async def help(level: str = "basic", topic: Optional[str] = None) -> str:
+async def help(level: str = "basic", topic: str | None = None) -> str:
     """Get help information about System Admin MCP.
 
     Args:
@@ -294,7 +294,7 @@ See individual tool docstrings for detailed information.
 
 
 @mcp.tool()
-async def status(level: str = "basic", focus: Optional[str] = None) -> str:
+async def status(level: str = "basic", focus: str | None = None) -> str:
     """Get server status and diagnostics.
 
     Args:
