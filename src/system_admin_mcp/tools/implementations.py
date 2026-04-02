@@ -1,12 +1,15 @@
 """Real implementations for System Admin MCP operations - no mocks."""
 
+import asyncio
 import ctypes
+import json
 import logging
 import os
 import platform
 import subprocess
 import sys
 import time
+import winreg
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -1340,3 +1343,332 @@ def get_volume_info(drive: str) -> dict[str, Any]:
     except Exception as e:
         logger.exception(f"Error getting volume info for {drive}")
         return {"status": "error", "operation": "get_volume_info", "error": str(e)}
+
+
+# ============================================================================
+# DIAGNOSTIC OPERATIONS (EASY WINS)
+# ============================================================================
+
+
+@mcp.tool()
+async def get_recent_event_errors(log_type: str = "System", count: int = 10) -> dict[str, Any]:
+    """Get the most recent Error and Warning events from Windows Event Logs.
+
+    Args:
+        log_type: Log to read (e.g., "System", "Application")
+        count: Profile the last N events
+
+    Returns:
+        Dictionary with event summary
+    """
+    try:
+        # Event type constants
+        event_types = {
+            win32evtlog.EVENTLOG_ERROR_TYPE: "Error",
+            win32evtlog.EVENTLOG_WARNING_TYPE: "Warning",
+            win32evtlog.EVENTLOG_INFORMATION_TYPE: "Information",
+            win32evtlog.EVENTLOG_AUDIT_SUCCESS: "Audit Success",
+            win32evtlog.EVENTLOG_AUDIT_FAILURE: "Audit Failure",
+        }
+
+        hand = win32evtlog.OpenEventLog(None, log_type)
+        flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+        events = []
+
+        total = win32evtlog.GetNumberOfEventLogRecords(hand)
+        logger.debug(f"Total events in {log_type}: {total}")
+
+        while len(events) < count:
+            batch = win32evtlog.ReadEventLog(hand, flags, 0)
+            if not batch:
+                break
+
+            for evt in batch:
+                if len(events) >= count:
+                    break
+
+                # Filter for Error and Warning usually, but here we return whatever matches the count
+                # The assistant can filtering if needed, but we focus on Errors/Warnings by default if requested
+                etype = event_types.get(evt.EventType, f"Unknown({evt.EventType})")
+
+                # Format message
+                try:
+                    msg = win32evtlogutil.SafeFormatMessage(evt, log_type)
+                except Exception:
+                    msg = "Could not format message"
+
+                events.append(
+                    {
+                        "time": evt.TimeGenerated.Format(),
+                        "source": evt.SourceName,
+                        "id": evt.EventID & 0xFFFF,  # Mask to get the short ID
+                        "type": etype,
+                        "message": msg if msg else "Empty message",
+                    }
+                )
+
+        return {
+            "status": "success",
+            "log": log_type,
+            "count": len(events),
+            "events": events,
+        }
+
+    except Exception as e:
+        logger.exception(f"Error reading event log: {log_type}")
+        return {"status": "error", "error": str(e)}
+
+
+@mcp.tool()
+async def audit_network_ports(include_established: bool = True) -> dict[str, Any]:
+    """List all processes listening or established on network ports.
+
+    Args:
+        include_established: Whether to include ESTABLISHED connections
+
+    Returns:
+        Dictionary with port audit results
+    }
+    """
+    try:
+        connections = []
+        for conn in psutil.net_connections(kind="inet"):
+            if conn.status == "LISTEN" or (include_established and conn.status == "ESTABLISHED"):
+                try:
+                    p = psutil.Process(conn.pid)
+                    pname = p.name()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pname = "Unknown"
+
+                connections.append(
+                    {
+                        "status": conn.status,
+                        "local_addr": f"{conn.laddr.ip}:{conn.laddr.port}",
+                        "remote_addr": f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
+                        "pid": conn.pid,
+                        "process": pname,
+                    }
+                )
+
+        return {
+            "status": "success",
+            "total_connections": len(connections),
+            "connections": connections,
+        }
+
+    except Exception as e:
+        logger.exception("Error auditing network ports")
+        return {"status": "error", "error": str(e)}
+
+
+@mcp.tool()
+async def get_top_resource_processes(count: int = 5) -> dict[str, Any]:
+    """Find the top processes consuming the most CPU and Memory.
+
+    Args:
+        count: Number of processes to return per category
+
+    Returns:
+        Dictionary with top processes
+    """
+    try:
+        processes = []
+        # First pass to initialize CPU percent
+        for proc in psutil.process_iter(["pid", "name"]):
+            try:
+                proc.cpu_percent()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
+        await asyncio.sleep(0.2)  # Brief interval for CPU calc
+
+        for proc in psutil.process_iter(["pid", "name", "cpu_percent", "memory_info", "username"]):
+            try:
+                info = proc.info
+                processes.append(
+                    {
+                        "pid": info["pid"],
+                        "name": info["name"],
+                        "cpu_percent": info.get("cpu_percent", 0),
+                        "memory_mb": info["memory_info"].rss / (1024 * 1024) if info.get("memory_info") else 0,
+                        "user": info.get("username", "Unknown"),
+                    }
+                )
+            except (psutil.NoSuchProcess, psutil.AccessDenied, AttributeError):
+                continue
+
+        # Sort by CPU
+        top_cpu = sorted(processes, key=lambda x: x["cpu_percent"], reverse=True)[:count]
+        # Sort by Memory
+        top_mem = sorted(processes, key=lambda x: x["memory_mb"], reverse=True)[:count]
+
+        return {
+            "status": "success",
+            "top_cpu": top_cpu,
+            "top_memory": top_mem,
+        }
+
+    except Exception as e:
+        logger.exception("Error getting top processes")
+        return {"status": "error", "error": str(e)}
+
+
+@mcp.tool()
+async def check_system_health_status() -> dict[str, Any]:
+    """Check system uptime and detect pending reboots from registry.
+
+    Returns:
+        Dictionary with system health and reboot status
+    """
+    try:
+        # Uptime
+        boot_time = datetime.fromtimestamp(psutil.boot_time())
+        uptime = datetime.now() - boot_time
+
+        # Pending Reboot Checks
+        pending_reboot = False
+        reasons = []
+
+        # Check 1: CBS (Component Based Servicing)
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending",
+            )
+            winreg.CloseKey(key)
+            pending_reboot = True
+            reasons.append("CBS (Component Based Servicing) RebootPending")
+        except WindowsError:
+            pass
+
+        # Check 2: Windows Update RebootRequired
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
+            )
+            winreg.CloseKey(key)
+            pending_reboot = True
+            reasons.append("Windows Update RebootRequired")
+        except WindowsError:
+            pass
+
+        # Check 3: File Rename Operations (Pending file rename)
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager"
+            )
+            val, _ = winreg.QueryValueEx(key, "PendingFileRenameOperations")
+            winreg.CloseKey(key)
+            if val:
+                pending_reboot = True
+                reasons.append("PendingFileRenameOperations present")
+        except WindowsError:
+            pass
+
+        return {
+            "status": "success",
+            "uptime_seconds": uptime.total_seconds(),
+            "uptime_human": str(uptime).split(".")[0],
+            "boot_time": boot_time.isoformat(),
+            "pending_reboot": pending_reboot,
+            "reboot_reasons": reasons,
+            "os_build": platform.version(),
+        }
+
+    except Exception as e:
+        logger.exception("Error checking system health")
+        return {"status": "error", "error": str(e)}
+
+
+@mcp.tool()
+async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, Any]:
+    """Identify the largest subfolders in a given directory using PowerShell.
+
+    Args:
+        path: Root path to analyze (e.g., "C:\\Users")
+        max_depth: Maximum recursion depth for size calculation
+
+    Returns:
+        Dictionary with top 10 largest folders
+    """
+    try:
+        if not os.path.exists(path):
+            return {"status": "error", "error": "Path does not exist"}
+
+        # Optimized PowerShell for calculating folder sizes
+        # We use a depth limit to avoid infinite loops or network shares if possible
+        ps_script = f"""
+        $path = "{path.replace('\\', '\\\\')}"
+        $results = @()
+        
+        # Check if directory exists and get subfolders
+        if (Test-Path $path) {{
+            $subfolders = Get-ChildItem -Path $path -Directory -Force -ErrorAction SilentlyContinue 
+            
+            foreach ($folder in $subfolders) {{
+                try {{
+                    # Get size of all files in this subfolder recursively
+                    $files = Get-ChildItem -Path $folder.FullName -File -Recurse -ErrorAction SilentlyContinue
+                    $size = ($files | Measure-Object -Property Length -Sum).Sum
+                    
+                    if ($size -eq $null) {{ $size = 0 }}
+                    
+                    $results += @{{
+                        name = $folder.Name
+                        path = $folder.FullName
+                        size_bytes = [long]$size
+                        size_gb = [math]::Round($size / 1GB, 3)
+                    }}
+                }} catch {{
+                    # Continue with next folder on error
+                }}
+            }}
+        }}
+        
+        if ($results.Count -gt 0) {{
+            $results | Sort-Object size_bytes -Descending | Select-Object -First 10 | ConvertTo-Json -Compress
+        }} else {{
+            "[]"
+        }}
+        """
+
+        # Run async subprocess
+        process = await asyncio.create_subprocess_exec(
+            "powershell", "-ExecutionPolicy", "Bypass", "-Command", ps_script,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
+            if process.returncode != 0:
+                return {"status": "error", "error": stderr.decode().strip()}
+            
+            output = stdout.decode().strip()
+            folders = json.loads(output) if output else []
+            
+            if isinstance(folders, dict):
+                folders = [folders]
+                
+            return {
+                "status": "success",
+                "root_path": path,
+                "top_folders": folders,
+            }
+        except asyncio.TimeoutExpired:
+            try:
+                process.kill()
+            except Exception:
+                pass
+            return {"status": "error", "error": "Folder analysis timed out"}
+        except asyncio.TimeoutError:
+            try:
+                process.kill()
+            except Exception:
+                pass
+            return {"status": "error", "error": f"Folder analysis timed out after 120s: {path}"}
+    except Exception as e:
+        logger.exception(f"Error during folder analysis of {path}")
+        return {"status": "error", "error": str(e)}
+

@@ -1,21 +1,28 @@
 """Portmanteau tools for System Admin MCP - consolidates related operations."""
 
 import logging
+import os
+from datetime import datetime
 from typing import Any, Literal
 
 from system_admin_mcp.app import mcp
 from system_admin_mcp.tools.implementations import (
     analyze_disk_usage_advanced,
+    analyze_top_folder_sizes,
+    audit_network_ports,
     audit_permissions,
     check_disk_health,
+    check_system_health_status,
     defragment_disk,
     disk_cleanup,
     get_event_log,
+    get_recent_event_errors,
     get_hardware_info,
     get_installed_software,
     get_os_info,
     get_performance_metrics,
     get_permissions,
+    get_top_resource_processes,
     get_volume_info,
     health_check,
     optimize_ssd,
@@ -105,7 +112,13 @@ async def system_admin(
         "get_installed_software",
         "get_performance_metrics",
         "get_event_log",
+        "get_recent_event_errors",
         "health_check",
+        "check_system_health_status",
+        "get_top_resource_processes",
+        "audit_network_ports",
+        "analyze_top_folder_sizes",
+        "get_comprehensive_diagnostics",
         # Windows Services
         "list_services",
         "get_service_stats",
@@ -419,8 +432,28 @@ async def system_admin(
                 log_name = "System"
             return get_event_log(log_name, level, hours_back)
 
+        elif operation == "get_recent_event_errors":
+            return await get_recent_event_errors(log_name or "System", max_results)
+
         elif operation == "health_check":
             return health_check()
+
+        elif operation == "check_system_health_status":
+            return await check_system_health_status()
+
+        elif operation == "get_top_resource_processes":
+            return await get_top_resource_processes(max_results if max_results < 50 else 5)
+
+        elif operation == "audit_network_ports":
+            return await audit_network_ports(include_system)
+
+        elif operation == "analyze_top_folder_sizes":
+            if not path:
+                raise ValueError("path parameter required for analyze_top_folder_sizes")
+            return await analyze_top_folder_sizes(path)
+
+        elif operation == "get_comprehensive_diagnostics":
+            return await get_comprehensive_diagnostics()
 
         # Windows Services operations
         elif operation == "list_services":
@@ -507,3 +540,37 @@ async def system_admin(
             "operation": operation,
             "error": str(e),
         }
+
+
+@mcp.tool()
+async def get_comprehensive_diagnostics() -> dict[str, Any]:
+    """Perform a comprehensive system health and resource audit.
+    
+    Consolidates:
+    - System health and reboot status
+    - Top resource consumers (CPU/Memory)
+    - Recent system event errors
+    - Critical volume usage
+    """
+    try:
+        health = await check_system_health_status()
+        top_procs = await get_top_resource_processes(count=5)
+        events = await get_recent_event_errors(log_type="System", count=5)
+        
+        # Get primary volume usage
+        primary_drive = os.environ.get("SystemDrive", "C:")
+        if not primary_drive.endswith("\\"):
+            primary_drive += "\\"
+        volume_info = get_volume_info(primary_drive)
+
+        return {
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "health": health,
+            "top_processes": top_procs,
+            "recent_errors": events,
+            "volume_usage": volume_info,
+        }
+    except Exception as e:
+        logger.exception("Error during comprehensive diagnostics")
+        return {"status": "error", "error": str(e)}
