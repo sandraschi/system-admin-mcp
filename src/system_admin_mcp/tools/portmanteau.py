@@ -1,9 +1,10 @@
-"""Portmanteau tools for System Admin MCP - consolidates related operations."""
-
+import json
 import logging
 import os
 from datetime import datetime
 from typing import Any, Literal
+
+from fastmcp import Context
 
 from system_admin_mcp.app import mcp
 from system_admin_mcp.tools.implementations import (
@@ -16,12 +17,12 @@ from system_admin_mcp.tools.implementations import (
     defragment_disk,
     disk_cleanup,
     get_event_log,
-    get_recent_event_errors,
     get_hardware_info,
     get_installed_software,
     get_os_info,
     get_performance_metrics,
     get_permissions,
+    get_recent_event_errors,
     get_top_resource_processes,
     get_volume_info,
     health_check,
@@ -33,6 +34,7 @@ from system_admin_mcp.tools.implementations import (
     take_ownership,
     validate_recovery,
 )
+from system_admin_mcp.tools.monitoring import watcher_manager
 from system_admin_mcp.tools.services_and_tasks import (
     add_startup_program,
     analyze_process,
@@ -51,6 +53,74 @@ from system_admin_mcp.tools.services_and_tasks import (
     start_service,
     stop_service,
 )
+
+
+@mcp.tool(task=True)
+async def manage_filesystem_watch(
+    operation: str,
+    path: str | None = None,
+    recursive: bool = True,
+    auto_sample: bool = False,
+    ctx: Context | None = None,
+) -> dict[str, Any]:
+    """Manage background filesystem monitoring.
+
+    Operations:
+    - start: Begin monitoring a directory (recursive by default).
+    - stop: Stop monitoring a directory.
+    - list: List all active watches.
+    - get_events: Retrieve captured filesystem events.
+
+    Args:
+        operation: start, stop, list, get_events.
+        path: Path to monitor (required for start/stop).
+        recursive: Whether to monitor subdirectories.
+        auto_sample: (Experimental) Use ctx.sample() to analyze events.
+    """
+    try:
+        if operation == "start":
+            if not path:
+                raise ValueError("Path is required for start operation")
+            watcher_manager.start_watch(path)
+            return {"status": "success", "message": f"Started watching {path}", "path": path}
+
+        elif operation == "stop":
+            if not path:
+                raise ValueError("Path is required for stop operation")
+            watcher_manager.stop_watch(path)
+            return {"status": "success", "message": f"Stopped watching {path}", "path": path}
+
+        elif operation == "list":
+            return {
+                "status": "success",
+                "active_watches": list(watcher_manager.watches.keys())
+            }
+
+        elif operation == "get_events":
+            events = watcher_manager.get_events(path)
+
+            # Agentic Sampling Logic (FastMCP 3.2)
+            if auto_sample and events and ctx:
+                await ctx.sample(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"I've detected {len(events)} filesystem events: {json.dumps(events[:5])}. Please summarize if any of these are critical security or system integrity risks."
+                        }
+                    ]
+                )
+
+            return {
+                "status": "success",
+                "count": len(events),
+                "events": events
+            }
+
+        else:
+            raise ValueError(f"Unknown operation: {operation}")
+
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 logger = logging.getLogger(__name__)
 
@@ -545,7 +615,7 @@ async def system_admin(
 @mcp.tool()
 async def get_comprehensive_diagnostics() -> dict[str, Any]:
     """Perform a comprehensive system health and resource audit.
-    
+
     Consolidates:
     - System health and reboot status
     - Top resource consumers (CPU/Memory)
@@ -556,7 +626,7 @@ async def get_comprehensive_diagnostics() -> dict[str, Any]:
         health = await check_system_health_status()
         top_procs = await get_top_resource_processes(count=5)
         events = await get_recent_event_errors(log_type="System", count=5)
-        
+
         # Get primary volume usage
         primary_drive = os.environ.get("SystemDrive", "C:")
         if not primary_drive.endswith("\\"):

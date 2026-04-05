@@ -21,15 +21,15 @@ A FastMCP 3.1+ compatible MCP service for elevated system administration tasks o
 - [uv](https://docs.astral.sh/uv/) (RECOMMENDED)
 - Administrator privileges (for elevated operations)
 
-## 🚀 Installation
+##  Installation
 
-### 📦 Quick Start
+###  Quick Start
 Run immediately via `uvx`:
 ```bash
 uvx system-admin-mcp
 ```
 
-### 🎯 Claude Desktop Integration
+###  Claude Desktop Integration
 Add to your `claude_desktop_config.json`:
 ```json
 {
@@ -76,7 +76,7 @@ uv run pytest
 uv run pytest --cov=system_admin_mcp --cov-report=html
 ```
 
-## 🌐 Webapp Dashboard
+##  Webapp Dashboard
 
 This MCP server includes a premium web interface for monitoring and control.
 By default, the web dashboard runs on port **10860**.
