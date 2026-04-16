@@ -1,10 +1,11 @@
-"""System Admin MCP - FastMCP 2.13+ service for elevated system operations.
+"""
+System Admin MCP — FastMCP 3.2 SOTA Implementation
 
-This module provides system administration tools that require elevated privileges.
+Elevated Windows system operations: diagnostics, security, file recovery,
+volume maintenance, services, processes. Full FastMCP 3.2 conformance:
+sampling, skills (SkillsDirectoryProvider), prompts, prefab UI.
 """
 
-__version__ = "0.1.0"
-
-# Note: Tools are registered in tools/system_ops.py using @mcp.tool()
-# The FastMCP instance is in app.py
-# UserBridge is only used by tools, not at module level
+__version__ = "0.3.0"
+__author__ = "Sandra Schipal"
+__email__ = "sandra@schipal.at"

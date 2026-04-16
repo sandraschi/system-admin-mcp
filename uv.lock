@@ -838,6 +838,20 @@ wheels = [
 ]
 
 [[package]]
+name = "prefab-ui"
+version = "0.19.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cyclopts" },
+    { name = "pydantic" },
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/64/d1/c4459a29b85e411846da69c6c96f43d62d8e2ac9f57391186dc668771641/prefab_ui-0.19.0.tar.gz", hash = "sha256:e735b00207e85e3c9de67df22fa8da2073ec158abd6337b6d092b23cf9cbd9f6", size = 4078835, upload-time = "2026-04-10T00:16:34.743Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/03/badf1b950f00353eee2e58c2357533412faa24ed8b3cf6b7643bdd24fc87/prefab_ui-0.19.0-py3-none-any.whl", hash = "sha256:37be5995241de6f5483a670675a764c428897aff4b4cf3ef88ca630c3e119d6e", size = 1848525, upload-time = "2026-04-10T00:16:32.365Z" },
+]
+
+[[package]]
 name = "prometheus-client"
 version = "0.24.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1427,20 +1441,25 @@ wheels = [
 
 [[package]]
 name = "system-admin-mcp"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "fastmcp", extra = ["tasks"] },
+    { name = "prefab-ui" },
     { name = "psutil" },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "ruff" },
+    { name = "starlette" },
     { name = "uvicorn" },
     { name = "watchdog" },
     { name = "wmi", marker = "sys_platform == 'win32'" },
 ]
 
 [package.optional-dependencies]
+apps = [
+    { name = "prefab-ui" },
+]
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1451,17 +1470,20 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.109.0" },
     { name = "fastmcp", extras = ["tasks"], specifier = ">=3.2.0,<4" },
+    { name = "prefab-ui", specifier = ">=0.14.0" },
+    { name = "prefab-ui", marker = "extra == 'apps'", specifier = ">=0.18.0" },
     { name = "psutil", specifier = ">=5.9.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=300" },
     { name = "ruff", specifier = ">=0.15.2" },
+    { name = "starlette", specifier = ">=0.36.0" },
     { name = "uvicorn", specifier = ">=0.27.0" },
     { name = "watchdog", specifier = ">=4.0.0" },
     { name = "wmi", marker = "sys_platform == 'win32'", specifier = ">=1.5.1" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["apps", "dev"]
 
 [[package]]
 name = "typer"

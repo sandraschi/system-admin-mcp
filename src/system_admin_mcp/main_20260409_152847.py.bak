@@ -22,12 +22,6 @@ from .transport import run_server
 # Import tools to trigger @mcp.tool() decorators
 # Wrap imports in try/except to prevent startup failures
 try:
-    from system_admin_mcp.prompts import register_all_prompts
-    register_all_prompts(mcp)
-except Exception as e:
-    logger.warning(f"Failed to register prompts: {e}")
-
-try:
     from system_admin_mcp.tools import system_ops  # noqa: F401
 except Exception as e:
     logger.warning(f"Failed to import system_ops: {e}. Some tools may not be available.")

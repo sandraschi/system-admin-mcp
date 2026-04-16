@@ -227,15 +227,22 @@ async def run_server_async(
     try:
         if transport == "stdio":
             logger.info("Running in STDIO mode - Ready for Claude Desktop!")
-            await mcp_app.run_async(transport="stdio")
+            await mcp_app.run_stdio_async()
 
-        elif transport in ("http", "sse"):
+        elif transport == "http":
             host = config["host"]
             port = config["port"]
-            if transport == "sse":
-                logger.warning("SSE transport removed in FastMCP 3.2 — using streamable-http instead.")
-            logger.info(f"Running HTTP mode: http://{host}:{port}")
-            await mcp_app.run_async(transport="streamable-http", host=host, port=port)
+            path = config["path"]
+            endpoint = f"http://{host}:{port}{path}"
+            logger.info(f"Running in HTTP Streamable mode: {endpoint}")
+            await mcp_app.run_http_async(host=host, port=port, path=path)
+
+        elif transport == "sse":
+            host = config["host"]
+            port = config["port"]
+            logger.warning("SSE mode is deprecated. Migrate to HTTP Streamable (--http).")
+            logger.info(f"Running in SSE mode: http://{host}:{port}")
+            await mcp_app.run_sse_async(host=host, port=port)
 
     except asyncio.CancelledError:
         logger.info(f"{server_name} task cancelled")

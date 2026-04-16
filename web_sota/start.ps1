@@ -1,4 +1,4 @@
-﻿# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
+# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
 $WebPort = 10860
 $BackendPort = 10861
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
@@ -19,7 +19,7 @@ if (-not (Test-Path "node_modules")) { npm install }
 Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
 
 # Use TRIPLE backtick to ensure $env:PYTHONPATH reaches the REAL shell
-$backendCmd = "`$env:PYTHONPATH = '$PSScriptRoot;$PSScriptRoot\src'; Set-Location '$PSScriptRoot'; uv run uvicorn system_admin_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
+$backendCmd = "`$env:PYTHONPATH = '$ProjectRoot\src'; Set-Location '$ProjectRoot'; uv run uvicorn system_admin_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
 

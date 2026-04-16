@@ -84,6 +84,9 @@ app.add_middleware(
 START_TIME = time.time()
 
 
+registered_tools = _get_registered_tools()
+logger.info(f"FastAPI Backend: Initialized with {len(registered_tools)} registered tools: {registered_tools}")
+
 @app.get("/api/health")
 async def health_check() -> dict[str, Any]:
     """Basic health check."""

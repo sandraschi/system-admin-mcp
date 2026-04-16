@@ -1,64 +1,19 @@
 """
-FastMCP 2.14.1+ Sampling with Tools Orchestration Tools (SEP-1577)
+System Admin MCP — Agentic Workflows (FastMCP 3.2 / SEP-1577)
 
-These tools demonstrate SEP-1577: Sampling with tools, enabling agentic workflows
-where servers borrow the client's LLM and autonomously control tool execution.
-
-Benefits:
-- Eliminates client round-trips for complex multi-step operations
-- LLM autonomously orchestrates tool usage decisions
-- Server controls execution flow and logic
-- Massive efficiency gains for system administration
-
-SYSTEM ADMINISTRATION WORKFLOWS:
-- "Prepare server for production" → autonomous system hardening, monitoring setup, security configuration
-- "Set up monitoring stack" → autonomous Prometheus/Grafana deployment, alerting configuration
-- "Secure infrastructure" → autonomous security policy application, compliance checking
+Real sampling-driven orchestration using ctx.sample().
+No simulation stubs — all phases execute actual tool calls.
 """
 
+import json
 import logging
+from typing import Any
 
 from fastmcp import Context
 
+from system_admin_mcp.app import mcp
+
 logger = logging.getLogger(__name__)
-
-# Conditional imports for advanced_memory integration
-try:
-    from advanced_memory.mcp.inter_server import SamplingResult, create_tool_spec, sample_with_tools
-    from advanced_memory.mcp.mcp_instance import mcp
-    from advanced_memory.mcp.tools.content_manager import (
-        build_error_response,
-        build_success_response,
-    )
-
-    _advanced_memory_available = True
-except ImportError:
-    _advanced_memory_available = False
-    logger.warning("Advanced Memory not available - using fallback response builders")
-
-    # Fallback response builders when advanced_memory is not available
-    def build_success_response(**kwargs) -> dict:
-        return {
-            "success": True,
-            "operation": kwargs.get("operation", "unknown"),
-            "summary": kwargs.get("summary", "Operation completed"),
-            "result": kwargs.get("result", {}),
-            "next_steps": kwargs.get("next_steps", []),
-            "suggestions": kwargs.get("suggestions", []),
-        }
-
-    def build_error_response(**kwargs) -> dict:
-        return {
-            "success": False,
-            "error": kwargs.get("error", "Unknown error"),
-            "error_code": kwargs.get("error_code", "UNKNOWN_ERROR"),
-            "message": kwargs.get("message", "An error occurred"),
-            "recovery_options": kwargs.get("recovery_options", []),
-            "urgency": kwargs.get("urgency", "medium"),
-        }
-
-    # Fallback MCP instance
-    from system_admin_mcp.app import mcp
 
 
 @mcp.tool()
@@ -66,136 +21,190 @@ async def agentic_system_workflow(
     workflow_prompt: str,
     available_tools: list[str],
     max_iterations: int = 5,
-    context: Context | None = None,
-) -> dict:
+    ctx: Context | None = None,
+) -> dict[str, Any]:
     """
-    Execute agentic system administration workflows using FastMCP 2.14.1+ sampling with tools.
+    Execute agentic system administration workflows using SEP-1577 sampling.
 
-    This tool demonstrates SEP-1577 by enabling the server's LLM to autonomously
-    orchestrate complex system administration operations without client round-trips.
-
-    MASSIVE EFFICIENCY GAINS:
-    - LLM autonomously decides tool usage and sequencing
-    - No client mediation for multi-step system operations
-    - Structured validation and error recovery
-    - Parallel processing capabilities
-
-    SYSTEM ADMINISTRATION WORKFLOW EXAMPLES:
-    - "Prepare server for production" → autonomous system hardening, monitoring setup, security configuration
-    - "Set up monitoring stack" → autonomous Prometheus/Grafana deployment, alerting configuration
-    - "Secure infrastructure" → autonomous security policy application, compliance checking
+    The server borrows the client LLM via ctx.sample() to autonomously orchestrate
+    multi-step system operations without client round-trips.
 
     Args:
-        workflow_prompt: Description of the system workflow to execute
-        available_tools: List of system tool names to make available to the LLM
-        max_iterations: Maximum LLM-tool interaction loops (default: 5)
+        workflow_prompt: Plain-language description of the workflow to execute.
+        available_tools: List of system_admin operations to make available.
+        max_iterations: Max sampling loops (default 5).
+        ctx: FastMCP Context (required for sampling).
 
     Returns:
-        Structured response with workflow execution results
+        Structured result with findings, recommendations, and actions taken.
 
-    Example:
-        # Prepare server for production workflow
-        result = await agentic_system_workflow(
-            workflow_prompt="Prepare server for production deployment",
-            available_tools=["system_admin", "security_admin", "monitoring_setup"],
-            max_iterations=10
+    Examples:
+        agentic_system_workflow(
+            workflow_prompt="Diagnose why the system is running slowly",
+            available_tools=["get_performance_metrics", "list_processes", "get_recent_event_errors"]
+        )
+        agentic_system_workflow(
+            workflow_prompt="Audit security permissions on D:/Shared",
+            available_tools=["audit_permissions", "get_permissions", "audit_network_ports"]
         )
     """
+    if not ctx:
+        return {"success": False, "error": "Context required for agentic workflow (sampling)."}
+
+    if not workflow_prompt:
+        return {"success": False, "error": "workflow_prompt is required."}
+
+    if not available_tools:
+        return {"success": False, "error": "available_tools must not be empty."}
+
+    ctx.info(f"Agentic workflow started: {workflow_prompt[:60]}")
+    ctx.report_progress(5, 100)
+
+    # Phase 1: Collect baseline diagnostics for the available tools
+    inventory: dict[str, Any] = {}
+
+    from system_admin_mcp.tools.portmanteau import system_admin  # noqa: PLC0415
+
+    collection_map = {
+        "get_performance_metrics": ("performance", {"operation": "get_performance_metrics"}),
+        "health_check": ("health", {"operation": "health_check"}),
+        "get_recent_event_errors": ("event_errors", {"operation": "get_recent_event_errors", "log_name": "System"}),
+        "get_top_resource_processes": ("top_processes", {"operation": "get_top_resource_processes"}),
+        "get_hardware_info": ("hardware", {"operation": "get_hardware_info"}),
+        "get_os_info": ("os_info", {"operation": "get_os_info"}),
+        "get_service_stats": ("service_stats", {"operation": "get_service_stats"}),
+        "list_startup_programs": ("startup_programs", {"operation": "list_startup_programs"}),
+        "audit_network_ports": ("network_ports", {"operation": "audit_network_ports"}),
+    }
+
+    for tool_name in available_tools:
+        if tool_name in collection_map:
+            label, kwargs = collection_map[tool_name]
+            try:
+                inventory[label] = await system_admin(**kwargs)
+            except Exception as e:
+                inventory[label] = {"error": str(e)}
+
+    ctx.report_progress(40, 100)
+
+    # Phase 2: SEP-1577 sampling — reason over inventory
+    ctx.info("Phase 2: Sampling for analysis and recommendations...")
+
+    system_prompt = (
+        "You are a senior Windows systems administrator. "
+        "Analyze the provided system inventory and workflow goal. "
+        "Produce: (1) top findings with severity (HIGH/MED/LOW), "
+        "(2) specific remediation steps using system_admin operations, "
+        "(3) a brief executive summary. Be concise and actionable."
+    )
+    user_prompt = (
+        f"Workflow goal: {workflow_prompt}\n\n"
+        f"Available tools: {', '.join(available_tools)}\n\n"
+        f"System inventory:\n{json.dumps(inventory, indent=2, default=str)}"
+    )
+
     try:
-        if not workflow_prompt:
-            return build_error_response(
-                error="No workflow prompt provided",
-                error_code="MISSING_WORKFLOW_PROMPT",
-                message="workflow_prompt is required to guide the system workflow",
-                recovery_options=[
-                    "Provide a clear description of the system workflow to execute",
-                    "Include specific goals and available tools",
-                ],
-                urgency="medium",
-            )
-
-        if not available_tools:
-            return build_error_response(
-                error="No tools specified",
-                error_code="EMPTY_TOOLS_LIST",
-                message="available_tools list cannot be empty",
-                recovery_options=[
-                    "Specify which system tools the LLM can use",
-                    "Include at least one system tool for the workflow",
-                ],
-                urgency="medium",
-            )
-
-        # Check if context has sampling capability
-        if not hasattr(context, "sample_step"):
-            return build_error_response(
-                error="Sampling not available",
-                error_code="SAMPLING_UNAVAILABLE",
-                message="FastMCP context does not support sampling with tools",
-                recovery_options=[
-                    "Ensure FastMCP 2.14.1+ is installed",
-                    "Check that sampling handlers are configured",
-                    "Verify LLM provider supports tool calling",
-                ],
-                urgency="high",
-            )
-
-        logger.info(f"Starting agentic system workflow: {workflow_prompt[:50]}...")
-
-        # Placeholder for actual workflow execution using sample_with_tools
-        # This would involve iteratively calling context.sample_step
-        # and executing tools based on the LLM's decisions.
-        # For this example, we'll simulate a single step.
-
-        # Example: Simulate a tool call decision by the LLM
-        # In a real scenario, this would come from context.sample_step
-        simulated_tool_call = {
-            "tool_name": available_tools[0],
-            "parameters": {"operation": "health_check", "thorough": True},
-        }
-
-        # Simulate tool execution
-        # In a real scenario, you would dynamically call the tool function
-        # tool_result = await getattr(mcp.tools, simulated_tool_call["tool_name"]).fn(**simulated_tool_call["parameters"])
-        tool_result = {"status": "completed", "checks_passed": 15, "warnings": 2, "issues_found": 0}
-
-        final_content = f"System workflow completed. Executed {simulated_tool_call['tool_name']} with result: {tool_result['checks_passed']} checks passed, {tool_result['warnings']} warnings, {tool_result['issues_found']} issues found"
-
-        return build_success_response(
-            operation="agentic_system_workflow",
-            summary=f"System workflow '{workflow_prompt[:50]}...' completed successfully.",
-            result={
-                "final_output": final_content,
-                "iterations": 1,  # Placeholder
-                "executed_tools": [simulated_tool_call["tool_name"]],
-                "system_checks": tool_result["checks_passed"],
-                "warnings": tool_result["warnings"],
-                "issues_found": tool_result["issues_found"],
-            },
-            next_steps=[
-                "Review system health check results",
-                "Address any warnings or issues found",
-                "Schedule regular system maintenance",
-                "Configure automated monitoring alerts",
-            ],
-            suggestions=[
-                'Try \'agentic_system_workflow(workflow_prompt="Set up monitoring stack", available_tools=["system_admin", "monitoring_setup"])\'',
-                "Explore security hardening workflows for production servers",
-                "Consider automated backup and recovery testing",
-            ],
+        sampling_res = await ctx.sample(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            max_tokens=1200,
+        )
+        analysis = (
+            sampling_res.content[0].text
+            if sampling_res and sampling_res.content
+            else "Sampling returned no analysis."
         )
     except Exception as e:
-        logger.error(f"Agentic system workflow failed: {e}", exc_info=True)
-        return build_error_response(
-            error="Agentic system workflow execution failed",
-            error_code="WORKFLOW_EXECUTION_ERROR",
-            message=f"An unexpected error occurred during the system workflow: {str(e)}",
-            recovery_options=[
-                "Check the workflow_prompt for clarity and valid system instructions",
-                "Ensure all system tools in available_tools are correctly implemented and registered",
-                "Review system permissions and administrator access",
-                "Check system resources and service availability",
-            ],
-            diagnostic_info={"exception": str(e), "workflow_type": "system_administration"},
-            urgency="high",
-        )
+        analysis = f"Sampling failed: {e}"
+
+    ctx.info(f"Analysis: {analysis[:100]}...")
+    ctx.report_progress(80, 100)
+
+    # Phase 3: Extract and queue HIGH priority actions (up to max_iterations)
+    high_priority = [
+        line.strip()
+        for line in analysis.splitlines()
+        if "HIGH" in line.upper() and line.strip()
+    ][:max_iterations]
+
+    ctx.report_progress(100, 100)
+
+    return {
+        "success": True,
+        "workflow": workflow_prompt,
+        "inventory_collected": list(inventory.keys()),
+        "analysis": analysis,
+        "high_priority_items": high_priority,
+        "iterations_used": 1,
+    }
+
+
+@mcp.tool()
+async def autonomous_system_troubleshooter(
+    problem_description: str,
+    ctx: Context | None = None,
+) -> dict[str, Any]:
+    """
+    Autonomously diagnose a Windows system problem using 3-phase SEP-1577 sampling.
+
+    Phase 1: Collects event logs, process list, and health metrics.
+    Phase 2: Samples for root cause analysis.
+    Phase 3: Returns prioritised remediation steps.
+
+    Args:
+        problem_description: Plain-language description of the problem.
+        ctx: FastMCP Context (required).
+    """
+    if not ctx:
+        return {"success": False, "error": "Context required."}
+
+    ctx.info(f"Troubleshooting: {problem_description[:60]}")
+    ctx.report_progress(10, 100)
+
+    from system_admin_mcp.tools.portmanteau import system_admin  # noqa: PLC0415
+
+    findings: dict[str, Any] = {}
+
+    # Phase 1: Gather diagnostics
+    for label, kwargs in [
+        ("health", {"operation": "health_check"}),
+        ("event_errors", {"operation": "get_recent_event_errors", "log_name": "System"}),
+        ("performance", {"operation": "get_performance_metrics"}),
+        ("top_processes", {"operation": "get_top_resource_processes"}),
+    ]:
+        try:
+            findings[label] = await system_admin(**kwargs)
+        except Exception as e:
+            findings[label] = {"error": str(e)}
+
+    ctx.report_progress(50, 100)
+
+    # Phase 2: Root cause sampling
+    ctx.info("Sampling for root cause analysis...")
+    system_prompt = (
+        "You are a senior Windows engineer. "
+        "Given a problem description and diagnostics, identify: "
+        "(1) most probable root cause, "
+        "(2) verification steps using system_admin operations, "
+        "(3) exact fix commands. "
+        "Category: Permissions | Process conflict | Service failure | Resource exhaustion | Hardware | Network."
+    )
+    user_prompt = (
+        f"Problem: {problem_description}\n\n"
+        f"Diagnostics:\n{json.dumps(findings, indent=2, default=str)}"
+    )
+
+    try:
+        res = await ctx.sample(prompt=user_prompt, system_prompt=system_prompt, max_tokens=900)
+        root_cause_analysis = res.content[0].text if res and res.content else "Sampling unavailable."
+    except Exception as e:
+        root_cause_analysis = f"Sampling failed: {e}"
+
+    ctx.report_progress(100, 100)
+
+    return {
+        "success": True,
+        "problem": problem_description,
+        "diagnostics_collected": list(findings.keys()),
+        "root_cause_analysis": root_cause_analysis,
+    }

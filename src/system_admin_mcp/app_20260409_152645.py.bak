@@ -1,0 +1,20 @@
+from contextlib import asynccontextmanager
+from fastmcp import FastMCP
+
+# Create lifespan for the FastMCP server
+@asynccontextmanager
+async def lifespan(app: FastMCP):
+    from system_admin_mcp.tools.monitoring import watcher_manager
+    logger = app.logger
+    logger.info("Initializing System Admin Monitoring Services...")
+    # The watcher_manager handles its own observer start in __init__
+    # but we ensure it's loaded here.
+    _ = watcher_manager
+    
+    yield
+    
+    logger.info("Shutting down System Admin Monitoring Services...")
+    watcher_manager.shutdown()
+
+# Create FastMCP instance at module level with lifespan
+mcp = FastMCP("system-admin-mcp", lifespan=lifespan)
