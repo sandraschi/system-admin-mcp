@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "system-admin-mcp"
 version = "0.3.0"
-description = "System Admin MCP — elevated Windows system operations, diagnostics, security, file recovery. FastMCP 3.2 full conformance."
+description = "System Admin MCP — elevated Windows system operations, diagnostics, security, file recovery. FastMCP 3.2.0 full conformance."
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
