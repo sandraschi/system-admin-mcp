@@ -1,0 +1,59 @@
+# System Admin MCP
+
+> FastMCP 3.2 server for elevated Windows system administration. Run as Administrator.
+
+## Quick start
+
+```
+uvx system-admin-mcp
+```
+
+Or from source: `uv sync && uv run system-admin-mcp`
+
+## Key files
+
+- [README.md](README.md) — overview, features, FastMCP 3.2 capabilities table
+- [AGENTS.md](AGENTS.md) — architecture, tool list, agent rules, file patterns
+- [justfile](justfile) — task runner: `just dev`, `just test`, `just lint`, `just mcpb-pack`
+- [pyproject.toml](pyproject.toml) — deps: `fastmcp[tasks]>=3.2.0,<4`, `pywin32`, `psutil`, `wmi`, `prefab-ui>=0.14.0`
+- [docs/quickstart.md](docs/quickstart.md) — end-user setup guide
+- [docs/api/README.md](docs/api/README.md) — REST API endpoints
+
+## Source structure
+
+- `src/system_admin_mcp/app.py` — FastMCP 3.2 instance, lifespan, providers
+- `src/system_admin_mcp/main.py` — entry point, `--web` flag
+- `src/system_admin_mcp/server.py` — FastAPI backend (20+ REST endpoints on /api/*)
+- `src/system_admin_mcp/transport.py` — stdio + streamable-http dual transport
+- `src/system_admin_mcp/prompts.py` — 4 `@mcp.prompt()` templates
+- `src/system_admin_mcp/tools/portmanteau.py` — `system_admin` tool (40+ ops dispatcher)
+- `src/system_admin_mcp/tools/implementations.py` — file recovery, ACLs, disk ops, WMI
+- `src/system_admin_mcp/tools/services_and_tasks.py` — services, processes, startup, taskbar
+- `src/system_admin_mcp/tools/agentic_system_workflow.py` — SEP-1577 sampling workflows
+- `src/system_admin_mcp/tools/monitoring.py` — watchdog file watcher
+- `src/system_admin_mcp/tools/prefab/` — 4 Prefab UI cards
+- `web_sota/` — React 19 + Vite dashboard (14 pages)
+
+## Portmanteau pattern
+
+Everything goes through one tool:
+
+```
+system_admin(operation="<op>", ...)
+```
+
+Operations: scan_volume, recover_file, get_permissions, set_permissions, check_disk_health, disk_cleanup, defragment_disk, optimize_ssd, get_hardware_info, get_os_info, get_installed_software, get_performance_metrics, get_event_log, health_check, list_services, start_service, stop_service, set_service_startup, list_processes, analyze_process, kill_process, list_startup_programs, add_startup_program, remove_startup_program, get_taskbar_settings, set_taskbar_autohide, and more.
+
+## API endpoints
+
+- `GET /api/health` — basic health check
+- `GET /api/status` — system status (CPU, RAM, disk, uptime)
+- `GET /api/processes?sort_by=cpu&page=1&page_size=50` — paginated process list
+- `GET /api/processes/{pid}` — detailed process info
+- `GET /api/services?page=1&page_size=50` — paginated service list
+- `GET /api/volumes` — drive listing
+- `POST /api/disk_usage` — check disk usage for a path
+- `POST /api/file_owner` — get file owner
+- `GET /api/logs` — system log viewer
+- `GET /api/tools` — list registered MCP tools
+- `POST /api/tools/call` — execute any MCP tool

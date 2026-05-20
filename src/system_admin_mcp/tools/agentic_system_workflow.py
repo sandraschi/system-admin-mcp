@@ -63,7 +63,7 @@ async def agentic_system_workflow(
     # Phase 1: Collect baseline diagnostics for the available tools
     inventory: dict[str, Any] = {}
 
-    from system_admin_mcp.tools.portmanteau import system_admin  # noqa: PLC0415
+    from system_admin_mcp.tools.portmanteau import system_admin
 
     collection_map = {
         "get_performance_metrics": ("performance", {"operation": "get_performance_metrics"}),
@@ -110,9 +110,7 @@ async def agentic_system_workflow(
             max_tokens=1200,
         )
         analysis = (
-            sampling_res.content[0].text
-            if sampling_res and sampling_res.content
-            else "Sampling returned no analysis."
+            sampling_res.content[0].text if sampling_res and sampling_res.content else "Sampling returned no analysis."
         )
     except Exception as e:
         analysis = f"Sampling failed: {e}"
@@ -121,11 +119,9 @@ async def agentic_system_workflow(
     ctx.report_progress(80, 100)
 
     # Phase 3: Extract and queue HIGH priority actions (up to max_iterations)
-    high_priority = [
-        line.strip()
-        for line in analysis.splitlines()
-        if "HIGH" in line.upper() and line.strip()
-    ][:max_iterations]
+    high_priority = [line.strip() for line in analysis.splitlines() if "HIGH" in line.upper() and line.strip()][
+        :max_iterations
+    ]
 
     ctx.report_progress(100, 100)
 
@@ -161,7 +157,7 @@ async def autonomous_system_troubleshooter(
     ctx.info(f"Troubleshooting: {problem_description[:60]}")
     ctx.report_progress(10, 100)
 
-    from system_admin_mcp.tools.portmanteau import system_admin  # noqa: PLC0415
+    from system_admin_mcp.tools.portmanteau import system_admin
 
     findings: dict[str, Any] = {}
 
@@ -189,10 +185,7 @@ async def autonomous_system_troubleshooter(
         "(3) exact fix commands. "
         "Category: Permissions | Process conflict | Service failure | Resource exhaustion | Hardware | Network."
     )
-    user_prompt = (
-        f"Problem: {problem_description}\n\n"
-        f"Diagnostics:\n{json.dumps(findings, indent=2, default=str)}"
-    )
+    user_prompt = f"Problem: {problem_description}\n\nDiagnostics:\n{json.dumps(findings, indent=2, default=str)}"
 
     try:
         res = await ctx.sample(prompt=user_prompt, system_prompt=system_prompt, max_tokens=900)

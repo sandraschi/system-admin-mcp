@@ -100,10 +100,7 @@ class UserBridge:
             self.service_installed = True
             self.service_running = status[1] == win32service.SERVICE_RUNNING
 
-            logger.debug(
-                f"Service status - installed: {self.service_installed}, "
-                f"running: {self.service_running}"
-            )
+            logger.debug(f"Service status - installed: {self.service_installed}, running: {self.service_running}")
 
         except pywintypes.error as e:
             if e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
@@ -218,9 +215,7 @@ class UserBridge:
                 status["error"] = "System Admin MCP service is not installed"
                 status["solution"] = "Install the service using the provided MSI installer"
             else:
-                status["error"] = (
-                    f"Error checking service status: {win32api.FormatMessage(e.winerror)}"
-                )
+                status["error"] = f"Error checking service status: {win32api.FormatMessage(e.winerror)}"
                 status["solution"] = "Verify service installation and permissions"
 
         return status
@@ -262,9 +257,7 @@ class UserBridge:
             )
 
             # Set read mode to message mode
-            res = win32pipe.SetNamedPipeHandleState(
-                self.pipe_handle, win32pipe.PIPE_READMODE_MESSAGE, None, None
-            )
+            res = win32pipe.SetNamedPipeHandleState(self.pipe_handle, win32pipe.PIPE_READMODE_MESSAGE, None, None)
 
             if res is None:
                 error = win32api.GetLastError()
@@ -293,7 +286,7 @@ class UserBridge:
 
             return False
 
-    def _send_request(self, action: str, params: dict[str, Any] = None) -> dict[str, Any]:
+    def _send_request(self, action: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Send a request to the elevated service via named pipe.
 
         Args:
@@ -392,7 +385,7 @@ class UserBridge:
                 }
 
             except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON response from service: {str(e)}")
+                logger.error(f"Invalid JSON response from service: {e!s}")
                 return {
                     "status": "error",
                     "error": {
@@ -407,7 +400,7 @@ class UserBridge:
                     "status": "error",
                     "error": {
                         "code": "unexpected_error",
-                        "message": f"An unexpected error occurred: {str(e)}",
+                        "message": f"An unexpected error occurred: {e!s}",
                     },
                 }
 
@@ -419,7 +412,7 @@ class UserBridge:
                 win32file.CloseHandle(self.pipe_handle)
                 logger.debug("Closed connection to service")
             except Exception as e:
-                logger.error(f"Error during cleanup: {str(e)}")
+                logger.error(f"Error during cleanup: {e!s}")
             finally:
                 self.pipe_handle = None
 
@@ -538,7 +531,7 @@ class SystemAdminMCP:
                 "status": "error",
                 "error": {
                     "code": "execution_error",
-                    "message": f"Error executing {tool_name}: {str(e)}",
+                    "message": f"Error executing {tool_name}: {e!s}",
                 },
             }
 
@@ -612,10 +605,7 @@ if __name__ == "__main__":
             print("\nListing volumes...")
             volumes = bridge.list_volumes()
             for vol in volumes:
-                print(
-                    f"- {vol.get('name')}: {vol.get('label', 'No label')} "
-                    f"({vol.get('size_gb', 0):.2f} GB)"
-                )
+                print(f"- {vol.get('name')}: {vol.get('label', 'No label')} ({vol.get('size_gb', 0):.2f} GB)")
 
     # Run the test
     asyncio.run(main())

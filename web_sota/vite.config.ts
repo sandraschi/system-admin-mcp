@@ -1,4 +1,4 @@
-import path from "path";
+import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -11,10 +11,11 @@ export default defineConfig({
   },
   server: {
     port: 10860,
+    strictPort: true,
     host: "127.0.0.1",
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:10861',
+      "/api": {
+        target: "http://127.0.0.1:10861",
         changeOrigin: true,
       },
     },

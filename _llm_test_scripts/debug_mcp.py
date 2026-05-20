@@ -1,11 +1,10 @@
-import sys
 import os
+import sys
 
 # Add src to path
 sys.path.append(os.path.join(os.getcwd(), "src"))
 
 from system_admin_mcp.app import mcp
-from system_admin_mcp.tools import system_ops, portmanteau, services_and_tasks
 
 print(f"MCP Instance: {mcp}")
 print(f"Attributes: {dir(mcp)}")

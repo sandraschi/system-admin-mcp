@@ -1,16 +1,46 @@
-# MCPB Pack Exclusion List
-tests/
-.git/
+# MCPB Pack Exclusion List — SOTA v2.0
+
+# Logic/Dev Bloat
+.venv/
+node_modules/
 __pycache__/
 *.pyc
-.venv/
+.ruff_cache/
+.pytest_cache/
+tests/
+
+# Discovery & Fleet Metadata
+glama.json
+llms.txt
+llms-full.txt
+.git/
+.github/
+.vscode/
+.cursor/
+.windsurf/
+
+# Build Artifacts
 dist/
 build/
 target/
-docs/
-scripts/
-.cursor/
-.windsurf/
-.pytest_cache/
+htmlcov/
+*.bak
+*.mcpb
 .coverage
+coverage.xml
+
+# Documents (not needed for runtime)
+docs/
+docs-private/
+scripts/
+installer/
+_llm_test_scripts/
+
+# Webapp source (standalone)
+web_sota/node_modules/
+web_sota/dist/
+
+# Rust artifacts (Zed extension, not needed for MCPB)
 Cargo.lock
+Cargo.toml
+target/

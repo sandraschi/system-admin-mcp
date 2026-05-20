@@ -1,6 +1,7 @@
 """Tests for the system_admin portmanteau tool."""
 
 import pytest
+
 from tests.test_portmanteau_helper import system_admin_test as system_admin
 
 
@@ -273,4 +274,3 @@ class TestErrorHandling:
         result = await system_admin("scan_volume", drive="C:")
         assert result["status"] == "error"
         assert "error" in result
-

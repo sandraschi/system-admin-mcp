@@ -2,7 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
 from system_admin_mcp.tools.implementations import (
     analyze_disk_usage_advanced,
     audit_permissions,
@@ -206,4 +205,3 @@ class TestErrorHandling:
             result = check_disk_health("C:")
             assert result["status"] == "error"
             assert "WMI not available" in result["error"]
-

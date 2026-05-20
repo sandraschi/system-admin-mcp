@@ -1,11 +1,11 @@
 {
   "manifest_version": "0.2",
   "name": "system-admin-mcp",
-  "version": "1.0.0",
-  "description": "Windows system administration MCP server for file recovery, security management, volume maintenance, and diagnostics with Austrian precision (SERVER IMPLEMENTATION PENDING)",
+  "version": "0.4.0",
+  "description": "FastMCP 3.2 server for elevated Windows system administration: NTFS file recovery, security/ACL management, disk maintenance, service orchestration, process diagnostics, and system health monitoring with a React web dashboard.",
   "author": {
-    "name": "Sandra",
-    "email": "sandra@example.com"
+    "name": "Sandra Schipal",
+    "email": "sandra@schipal.at"
   },
   "license": "MIT",
   "repository": {
@@ -16,12 +16,33 @@
     "type": "python",
     "entry_point": "server/__main__.py",
     "mcp_config": {
-      "command": "python",
-      "args": ["server/__main__.py"],
+      "command": "uv",
+      "args": ["run", "system-admin-mcp"],
       "env": {
         "PYTHONPATH": "${__dirname}",
         "PYTHONUNBUFFERED": "1"
       }
     }
-  }
+  },
+  "tools": [
+    {"name": "system_admin", "description": "Consolidated portmanteau for 40+ Windows system operations: file recovery, security/permissions, disk maintenance, diagnostics, services, processes, startup, taskbar."},
+    {"name": "manage_filesystem_watch", "description": "Manage background filesystem monitoring via watchdog. Start/stop/list watches and retrieve captured events."},
+    {"name": "get_comprehensive_diagnostics", "description": "Perform a full system health audit: CPU/RAM/disk metrics, top processes, event log errors, volume usage."},
+    {"name": "agentic_system_workflow", "description": "SEP-1577 sampling-driven multi-step admin workflow. Uses ctx.sample() to orchestrate autonomous diagnostics."},
+    {"name": "autonomous_system_troubleshooter", "description": "Three-phase autonomous diagnosis: health/events/processes scan, sampling analysis, root cause identification."},
+    {"name": "list_volumes", "description": "List all available volumes with drive letter and type."},
+    {"name": "get_file_owner", "description": "Get the owner of a file or directory including SID."},
+    {"name": "recover_file", "description": "Attempt NTFS file recovery for a deleted file."},
+    {"name": "get_disk_usage", "description": "Get disk usage information for a path."},
+    {"name": "get_process_info", "description": "Get information about a running process by PID."},
+    {"name": "ping", "description": "Basic connectivity check for the MCP server."},
+    {"name": "get_system_info", "description": "Get comprehensive system information (OS, hardware, environment)."},
+    {"name": "help", "description": "Get help on available tools and their usage."},
+    {"name": "status", "description": "Get server status and health information."},
+    {"name": "list_startup_programs", "description": "List programs that start with Windows from registry and startup folder."},
+    {"name": "add_startup_program", "description": "Add a program to Windows startup (HKCU or HKLM)."},
+    {"name": "remove_startup_program", "description": "Remove a program from Windows startup."},
+    {"name": "get_taskbar_settings", "description": "Get current taskbar autohide and lock settings."},
+    {"name": "set_taskbar_autohide", "description": "Enable or disable taskbar autohide via PowerShell."}
+  ]
 }

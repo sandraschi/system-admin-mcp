@@ -39,6 +39,7 @@ from system_admin_mcp.tools.services_and_tasks import (
     add_startup_program,
     analyze_process,
     find_taskbar_blocking_processes,
+    forensic_scan,
     get_service_info,
     get_service_stats,
     get_taskbar_settings,
@@ -91,10 +92,7 @@ async def manage_filesystem_watch(
             return {"status": "success", "message": f"Stopped watching {path}", "path": path}
 
         elif operation == "list":
-            return {
-                "status": "success",
-                "active_watches": list(watcher_manager.watches.keys())
-            }
+            return {"status": "success", "active_watches": list(watcher_manager.watches.keys())}
 
         elif operation == "get_events":
             events = watcher_manager.get_events(path)
@@ -105,22 +103,22 @@ async def manage_filesystem_watch(
                     messages=[
                         {
                             "role": "user",
-                            "content": f"I've detected {len(events)} filesystem events: {json.dumps(events[:5])}. Please summarize if any of these are critical security or system integrity risks."
+                            "content": (
+                                f"I've detected {len(events)} filesystem events: {json.dumps(events[:5])}. "
+                                "Please summarize if any of these are critical security or system integrity risks."
+                            ),
                         }
                     ]
                 )
 
-            return {
-                "status": "success",
-                "count": len(events),
-                "events": events
-            }
+            return {"status": "success", "count": len(events), "events": events}
 
         else:
             raise ValueError(f"Unknown operation: {operation}")
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
 
 logger = logging.getLogger(__name__)
 
@@ -147,9 +145,7 @@ def get_bridge() -> Any | None:
         try:
             _bridge = UserBridge()
         except Exception as e:
-            logger.warning(
-                f"Failed to initialize UserBridge: {e}. Some operations may not be available."
-            )
+            logger.warning(f"Failed to initialize UserBridge: {e}. Some operations may not be available.")
             _bridge = None
     return _bridge
 
@@ -189,6 +185,7 @@ async def system_admin(
         "audit_network_ports",
         "analyze_top_folder_sizes",
         "get_comprehensive_diagnostics",
+        "forensic_scan",
         # Windows Services
         "list_services",
         "get_service_stats",
@@ -242,6 +239,8 @@ async def system_admin(
     pid: int | None = None,
     filter_user: str | None = None,
     sort_by: str = "cpu",
+    page: int = 1,
+    page_size: int = 50,
     force: bool = False,
     # Startup parameters
     startup_name: str | None = None,
@@ -525,9 +524,12 @@ async def system_admin(
         elif operation == "get_comprehensive_diagnostics":
             return await get_comprehensive_diagnostics()
 
+        elif operation == "forensic_scan":
+            return forensic_scan()
+
         # Windows Services operations
         elif operation == "list_services":
-            return list_services(filter_status, filter_name, include_system)
+            return list_services(filter_status, filter_name, include_system, page, page_size)
 
         elif operation == "get_service_stats":
             return get_service_stats()
@@ -554,7 +556,7 @@ async def system_admin(
 
         # Process/Task operations
         elif operation == "list_processes":
-            return list_processes(filter_name, filter_user, sort_by)
+            return list_processes(filter_name, filter_user, sort_by, page, page_size)
 
         elif operation == "analyze_process":
             if not pid:
@@ -572,9 +574,7 @@ async def system_admin(
 
         elif operation == "add_startup_program":
             if not startup_name or not startup_command:
-                raise ValueError(
-                    "startup_name and startup_command parameters required for add_startup_program"
-                )
+                raise ValueError("startup_name and startup_command parameters required for add_startup_program")
             return add_startup_program(startup_name, startup_command, startup_location)
 
         elif operation == "remove_startup_program":

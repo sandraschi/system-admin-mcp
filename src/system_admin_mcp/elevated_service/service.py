@@ -68,7 +68,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
     _svc_name_ = "SystemAdminMCP"
     _svc_display_name_ = "System Admin MCP Service"
     _svc_description_ = "Handles elevated system operations for System Admin MCP"
-    _svc_deps_ = ["EventLog"]
+    _svc_deps_ = ["EventLog"]  # type: ignore  # noqa: RUF012
 
     def __init__(self, args):
         """Initialize the service with proper error handling."""
@@ -80,7 +80,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
             self._setup_logging()
             logger.info("Service initialized")
         except Exception as e:
-            logger.error(f"Failed to initialize service: {str(e)}")
+            logger.error(f"Failed to initialize service: {e!s}")
             raise
 
     def SvcStop(self):
@@ -100,7 +100,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
                 win32file.CloseHandle(self.pipe_handle)
                 self.pipe_handle = None
             except Exception as e:
-                logger.error(f"Error cleaning up pipe: {str(e)}")
+                logger.error(f"Error cleaning up pipe: {e!s}")
         logger.info("Service stopped")
 
     def SvcDoRun(self):
@@ -153,7 +153,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
             )
             logger.info(f"Created named pipe: {PIPE_NAME}")
         except Exception as e:
-            logger.error(f"Failed to create named pipe: {str(e)}")
+            logger.error(f"Failed to create named pipe: {e!s}")
             raise
 
     def _run_pipe_server(self) -> None:
@@ -179,9 +179,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
                 )
 
                 if result != 0:
-                    raise RuntimeError(
-                        f"Failed to read from pipe: {win32api.FormatMessage(result)}"
-                    )
+                    raise RuntimeError(f"Failed to read from pipe: {win32api.FormatMessage(result)}")
 
                 request = json.loads(data.decode("utf-8"))
                 logger.debug(f"Received request: {json.dumps(request, indent=2)}")
@@ -195,7 +193,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
                 logger.debug("Response sent successfully")
 
             except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON received: {str(e)}")
+                logger.error(f"Invalid JSON received: {e!s}")
                 self._send_error("invalid_json", "Invalid JSON format")
             except Exception as e:
                 logger.exception("Error processing request")
@@ -224,9 +222,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
 
         # Set up file handler
         file_handler = logging.FileHandler(os.path.join(log_dir, "service.log"), encoding="utf-8")
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        )
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
 
         # Configure root logger
         root_logger = logging.getLogger()
@@ -236,9 +232,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
         # Log to console when running interactively
         if sys.stderr:
             console_handler = logging.StreamHandler()
-            console_handler.setFormatter(
-                logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-            )
+            console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
             root_logger.addHandler(console_handler)
 
     def _send_error(self, error_code: str, message: str) -> None:
@@ -258,7 +252,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
             }
             win32file.WriteFile(self.pipe_handle, json.dumps(response).encode("utf-8"))
         except Exception as e:
-            logger.error(f"Failed to send error response: {str(e)}")
+            logger.error(f"Failed to send error response: {e!s}")
 
     def _handle_request(self, request: dict[str, Any]) -> dict[str, Any]:
         """Handle a request from the client.
@@ -370,7 +364,7 @@ def main() -> None:
             win32serviceutil.HandleCommandLine(ElevatedService)
         except Exception as e:
             logger.exception("Command line handling failed")
-            print(f"Error: {str(e)}", file=sys.stderr)
+            print(f"Error: {e!s}", file=sys.stderr)
             sys.exit(1)
 
 

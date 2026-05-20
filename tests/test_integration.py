@@ -1,8 +1,9 @@
 """Integration tests for System Admin MCP."""
 
 import pytest
+
 from system_admin_mcp.app import mcp
-from system_admin_mcp.tools import portmanteau, system_ops
+from system_admin_mcp.tools import system_ops
 
 
 class TestToolRegistration:
@@ -113,4 +114,3 @@ class TestErrorRecovery:
         mock_bridge.service_installed = False
         result = await system_ops.ping()
         assert result["status"] in ["success", "error"]
-

@@ -12,6 +12,7 @@ from watchdog.observers import Observer
 
 logger = logging.getLogger("system_admin_mcp.monitoring")
 
+
 @dataclass
 class WatchEvent:
     timestamp: float
@@ -19,6 +20,7 @@ class WatchEvent:
     src_path: str
     is_directory: bool
     dest_path: str | None = None
+
 
 class BufferedEventHandler(FileSystemEventHandler):
     def __init__(self, manager: "FileWatcherManager", path: str):
@@ -31,9 +33,10 @@ class BufferedEventHandler(FileSystemEventHandler):
             event_type=event.event_type,
             src_path=event.src_path,
             is_directory=event.is_directory,
-            dest_path=getattr(event, "dest_path", None)
+            dest_path=getattr(event, "dest_path", None),
         )
         self.manager.add_event(self.path, watch_event)
+
 
 class FileWatcherManager:
     _instance = None
@@ -53,7 +56,9 @@ class FileWatcherManager:
         self.observer = Observer()
         self.watches: dict[str, BufferedEventHandler] = {}
         self.events: dict[str, deque] = {}
-        self.state_file = Path(os.environ.get("USERPROFILE", ".")) / ".gemini" / "antigravity" / "system-admin-mcp" / "watches.json"
+        self.state_file = (
+            Path(os.environ.get("USERPROFILE", ".")) / ".gemini" / "antigravity" / "system-admin-mcp" / "watches.json"
+        )
         self._initialized = True
         self.observer.start()
         self._load_state()
@@ -92,7 +97,7 @@ class FileWatcherManager:
         handler = BufferedEventHandler(self, path)
         self.observer.schedule(handler, path, recursive=True)
         self.watches[path] = handler
-        self.events[path] = deque(maxlen=100) # Keep last 100 events
+        self.events[path] = deque(maxlen=100)  # Keep last 100 events
 
         if persist:
             self._save_state()
@@ -109,7 +114,7 @@ class FileWatcherManager:
         # For simplicity in this SOTA implementation, we'll unschedule the specific handler.
         for search_path, _handler in list(self.watches.items()):
             if search_path == path:
-                self.observer.unschedule_all() # Brute force for now, and reschedule others
+                self.observer.unschedule_all()  # Brute force for now, and reschedule others
                 del self.watches[path]
                 # Reschedule remaining
                 for p, h in self.watches.items():
@@ -140,6 +145,7 @@ class FileWatcherManager:
     def shutdown(self):
         self.observer.stop()
         self.observer.join()
+
 
 # Global manager instance
 watcher_manager = FileWatcherManager()

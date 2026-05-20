@@ -1,10 +1,9 @@
 """Pytest configuration and fixtures for System Admin MCP tests."""
 
-import os
 import sys
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -239,4 +238,3 @@ def mock_is_not_admin():
     """Mock is_admin function returning False."""
     with patch("system_admin_mcp.tools.implementations.is_admin", return_value=False):
         yield
-

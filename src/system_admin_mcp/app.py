@@ -10,11 +10,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastmcp import FastMCP
+from fastmcp.server import create_proxy
 
 
 @asynccontextmanager
 async def lifespan(app: FastMCP):
     from system_admin_mcp.tools.monitoring import watcher_manager
+
     app.logger.info("Initializing System Admin MCP v0.3.0...")
 
     _ = watcher_manager  # ensure loaded
@@ -22,6 +24,7 @@ async def lifespan(app: FastMCP):
     # Register Skills provider
     try:
         from fastmcp.server.providers.skills import SkillsDirectoryProvider
+
         skills_dir = Path(__file__).resolve().parent.parent.parent / "skills"
         if skills_dir.is_dir():
             app.add_provider(SkillsDirectoryProvider(roots=[skills_dir]))
@@ -37,6 +40,7 @@ async def lifespan(app: FastMCP):
     if os.getenv("SYSADMIN_PREFAB_APPS", "1") != "0":
         try:
             from system_admin_mcp.tools.prefab import register_prefab_tools
+
             register_prefab_tools(app)
             app.logger.info("Prefab tools registered")
         except ImportError:
@@ -64,3 +68,16 @@ mcp = FastMCP(
     mask_error_details=True,
     client_log_level="info",
 )
+
+# MCP Bridge: proxy tools from remote MCP servers via MCP_BRIDGE_URLS
+_bridge_proxies = []
+bridge_urls = os.getenv("MCP_BRIDGE_URLS", "")
+if bridge_urls:
+    for url in bridge_urls.split(","):
+        url = url.strip()
+        if url:
+            try:
+                mcp.add_provider(create_proxy(url))
+                _bridge_proxies.append(url)
+            except Exception:
+                pass

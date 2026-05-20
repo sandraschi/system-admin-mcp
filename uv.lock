@@ -1441,7 +1441,7 @@ wheels = [
 
 [[package]]
 name = "system-admin-mcp"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
@@ -1457,9 +1457,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-apps = [
-    { name = "prefab-ui" },
-]
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1471,7 +1468,6 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.109.0" },
     { name = "fastmcp", extras = ["tasks"], specifier = ">=3.2.0,<4" },
     { name = "prefab-ui", specifier = ">=0.14.0" },
-    { name = "prefab-ui", marker = "extra == 'apps'", specifier = ">=0.18.0" },
     { name = "psutil", specifier = ">=5.9.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
@@ -1483,7 +1479,7 @@ requires-dist = [
     { name = "watchdog", specifier = ">=4.0.0" },
     { name = "wmi", marker = "sys_platform == 'win32'", specifier = ">=1.5.1" },
 ]
-provides-extras = ["apps", "dev"]
+provides-extras = ["dev"]
 
 [[package]]
 name = "typer"

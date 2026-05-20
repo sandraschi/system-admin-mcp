@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-15
+
+### SOTA Quality, Packaging & Prefab Expansion
+
+- **justfile rewrite**: Full SOTA Industrial Dashboard per JUSTFILE_STANDARDS.md — added `test`, `build`, `check`, `dev`, `serve`, `web`, `web-frontend`, `mcpb-pack`, `mcpb-validate`, `clean`, `clean-all` recipes. Every mandatory SOTA recipe (test, check, build, default) present with categorized groups (Quality, Testing, Build, Development, MCPB, Housekeeping, Hardening).
+- **MCPB packaging v0.2**: Fixed `manifest.json` to proper v0.2 standard with tools array (19 tool entries), correct `uv run system-admin-mcp` entry point. Created `mcpb/server/__main__.py` as runtime entry. Updated `.mcpbignore` per MCPB_PACKAGING_STANDARDS.md. Updated `mcpb_build.py` to include all prompts and examples. Created `mcpb/assets/prompts/user.md` (13-section tutorial guide, 4000+ words) and `mcpb/assets/prompts/examples.json` (100+ structured tool call mappings).
+- **Prefab UI expansion**: Added `list_services_card` (rich card for Windows services with filtering) and `volume_status_card` (volume list with ASCII bar charts). Both registered via `@mcp.tool(app=True)` with `ToolResult` + `PrefabApp`. Removed redundant `prefab-ui` from `[apps]` optional extras (already a core dependency).
+- **API endpoint fix**: `GET /api/services`, `GET /api/processes`, `GET /api/processes/{pid}` now correctly route through the `system_admin` portmanteau tool instead of calling non-existent standalone tools.
+- **Version bump**: 0.3.0 → 0.4.0 (pyproject.toml, `__init__.py`, mcpb/manifest.json).
+
+---
+
 ## [0.3.0] - 2026-04-09
 
 ### FastMCP 3.2 Full Conformance

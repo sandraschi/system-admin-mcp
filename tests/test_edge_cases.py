@@ -1,6 +1,7 @@
 """Tests for edge cases and boundary conditions."""
 
 import pytest
+
 from tests.test_portmanteau_helper import system_admin_test as system_admin
 
 
@@ -110,9 +111,7 @@ class TestParameterValidation:
     @pytest.mark.asyncio
     async def test_extra_parameters(self):
         """Test operations with extra parameters (should be ignored)."""
-        result = await system_admin(
-            "get_hardware_info", extra_param="should_be_ignored", another_extra=123
-        )
+        result = await system_admin("get_hardware_info", extra_param="should_be_ignored", another_extra=123)
         assert result["status"] in ["success", "error"]
 
 
@@ -144,9 +143,6 @@ class TestBoundaryConditions:
     @pytest.mark.asyncio
     async def test_dry_run_flag(self):
         """Test operations with dry_run flag."""
-        result = await system_admin(
-            "disk_cleanup", drive="C:", cleanup_targets=["temp_files"], dry_run=True
-        )
+        result = await system_admin("disk_cleanup", drive="C:", cleanup_targets=["temp_files"], dry_run=True)
         assert result["status"] in ["success", "error"]
         assert result.get("dry_run") is True
-

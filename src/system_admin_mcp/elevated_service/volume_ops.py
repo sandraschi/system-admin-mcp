@@ -36,7 +36,7 @@ def list_volumes() -> list:
                 volume_name = win32api.GetVolumeInformation(drive)[0]
                 volume_info["label"] = volume_name
             except Exception:
-                pass
+                logger.debug("No volume label for %s", drive)
 
             volumes.append(volume_info)
 

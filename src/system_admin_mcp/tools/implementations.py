@@ -47,9 +47,7 @@ def is_admin() -> bool:
 
 
 @mcp.tool()
-def scan_volume(
-    drive: str, file_pattern: str | None = None, max_results: int = 100
-) -> dict[str, Any]:
+def scan_volume(drive: str, file_pattern: str | None = None, max_results: int = 100) -> dict[str, Any]:
     """Scan NTFS volume for deleted files using PowerShell and NTFS MFT.
 
     Args:
@@ -72,15 +70,15 @@ def scan_volume(
         $drive = '{drive}'
         $pattern = '{file_pattern or "*"}'
         $maxResults = {max_results}
-        
+
         $results = @()
         try {{
             # Get deleted files using Get-ChildItem with -Force and -ErrorAction SilentlyContinue
             # Note: This is a simplified approach - real NTFS MFT scanning requires specialized tools
-            $files = Get-ChildItem -Path $drive -Recurse -Force -ErrorAction SilentlyContinue | 
+            $files = Get-ChildItem -Path $drive -Recurse -Force -ErrorAction SilentlyContinue |
                      Where-Object {{ $_.Name -like $pattern -and $_.Attributes -match 'Deleted' }} |
                      Select-Object -First $maxResults -Property Name, FullName, Length, LastWriteTime, CreationTime
-            
+
             foreach ($file in $files) {{
                 $results += @{{
                     name = $file.Name
@@ -94,7 +92,7 @@ def scan_volume(
         }} catch {{
             # If direct scanning fails, return empty results
         }}
-        
+
         $results | ConvertTo-Json -Compress
         """
 
@@ -126,7 +124,7 @@ def scan_volume(
                 "pattern": file_pattern,
                 "files_found": 0,
                 "files": [],
-                "note": "NTFS MFT scanning requires specialized tools. Use professional recovery software for best results.",
+                "note": "NTFS MFT scanning requires specialized tools. Use professional software.",
             }
 
     except Exception as e:
@@ -152,7 +150,7 @@ def recover_file_ntfs(source_path: str, destination_path: str) -> dict[str, Any]
         ps_script = f"""
         $source = '{source_path}'
         $dest = '{destination_path}'
-        
+
         try {{
             # Check if source exists (might be in recycle bin or shadow copy)
             if (Test-Path $source) {{
@@ -311,9 +309,7 @@ def get_permissions(path: str) -> dict[str, Any]:
                         "sid": win32security.ConvertSidToStringSid(sid),
                         "rights": rights,
                         "access_mask": mask,
-                        "type": "Allow"
-                        if ace_type == win32security.ACCESS_ALLOWED_ACE_TYPE
-                        else "Deny",
+                        "type": "Allow" if ace_type == win32security.ACCESS_ALLOWED_ACE_TYPE else "Deny",
                         "inheritance": ace_flags,
                     }
                 )
@@ -333,9 +329,7 @@ def get_permissions(path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def set_permissions(
-    path: str, principal: str, rights: str, inheritance: str | None = None
-) -> dict[str, Any]:
+def set_permissions(path: str, principal: str, rights: str, inheritance: str | None = None) -> dict[str, Any]:
     """Set file/folder permissions."""
     try:
         if not is_admin():
@@ -350,13 +344,9 @@ def set_permissions(
         # Parse rights
         access_mask = 0
         if "Read" in rights or "read" in rights:
-            access_mask |= (
-                win32con.FILE_READ_DATA | win32con.FILE_READ_ATTRIBUTES | win32con.FILE_READ_EA
-            )
+            access_mask |= win32con.FILE_READ_DATA | win32con.FILE_READ_ATTRIBUTES | win32con.FILE_READ_EA
         if "Write" in rights or "write" in rights:
-            access_mask |= (
-                win32con.FILE_WRITE_DATA | win32con.FILE_WRITE_ATTRIBUTES | win32con.FILE_WRITE_EA
-            )
+            access_mask |= win32con.FILE_WRITE_DATA | win32con.FILE_WRITE_ATTRIBUTES | win32con.FILE_WRITE_EA
         if "Execute" in rights or "execute" in rights:
             access_mask |= win32con.FILE_EXECUTE
         if "FullControl" in rights or "full" in rights.lower():
@@ -370,7 +360,7 @@ def set_permissions(
             return {
                 "status": "error",
                 "operation": "set_permissions",
-                "error": f"Invalid principal: {principal} - {str(e)}",
+                "error": f"Invalid principal: {principal} - {e!s}",
             }
 
         # Set inheritance flags
@@ -492,9 +482,7 @@ def take_ownership(path: str) -> dict[str, Any]:
 
         # Enable SeTakeOwnershipPrivilege
         privilege = win32security.LookupPrivilegeValue(None, win32security.SE_TAKE_OWNERSHIP_NAME)
-        win32security.AdjustTokenPrivileges(
-            token, False, [(privilege, win32security.SE_PRIVILEGE_ENABLED)]
-        )
+        win32security.AdjustTokenPrivileges(token, False, [(privilege, win32security.SE_PRIVILEGE_ENABLED)])
 
         # Get current user SID
         user_sid = win32security.LookupAccountName(None, win32api.GetUserName())[0]
@@ -596,20 +584,14 @@ def check_disk_health(drive: str) -> dict[str, Any]:
 
                 # Get additional disk info
                 health_data["model"] = disk.Model if hasattr(disk, "Model") else "Unknown"
-                health_data["serial"] = (
-                    disk.SerialNumber if hasattr(disk, "SerialNumber") else "Unknown"
-                )
-                health_data["size_bytes"] = (
-                    int(disk.Size) if hasattr(disk, "Size") and disk.Size else 0
-                )
-                health_data["size_gb"] = (
-                    health_data["size_bytes"] / (1024**3) if health_data["size_bytes"] else 0
-                )
+                health_data["serial"] = disk.SerialNumber if hasattr(disk, "SerialNumber") else "Unknown"
+                health_data["size_bytes"] = int(disk.Size) if hasattr(disk, "Size") and disk.Size else 0
+                health_data["size_gb"] = health_data["size_bytes"] / (1024**3) if health_data["size_bytes"] else 0
 
                 # Try to get SMART attributes via Win32_PhysicalMedia or Win32_DiskDrive
                 # Note: Full SMART data requires admin and may not be available on all systems
                 break
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
         return health_data
@@ -631,19 +613,19 @@ def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
         # Get largest directories using PowerShell
         ps_script = f"""
         $drive = '{drive}'
-        $topDirs = Get-ChildItem -Path $drive -Directory -ErrorAction SilentlyContinue | 
+        $topDirs = Get-ChildItem -Path $drive -Directory -ErrorAction SilentlyContinue |
                    ForEach-Object {{
-                       $size = (Get-ChildItem $_.FullName -Recurse -ErrorAction SilentlyContinue | 
+                       $size = (Get-ChildItem $_.FullName -Recurse -ErrorAction SilentlyContinue |
                                Measure-Object -Property Length -Sum).Sum
                        [PSCustomObject]@{{
                            Path = $_.FullName
                            Size = $size
                            SizeGB = [math]::Round($size / 1GB, 2)
                        }}
-                   }} | 
-                   Sort-Object -Property Size -Descending | 
+                   }} |
+                   Sort-Object -Property Size -Descending |
                    Select-Object -First 10
-        
+
         $topDirs | ConvertTo-Json -Compress
         """
 
@@ -662,7 +644,7 @@ def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
                 top_dirs = json.loads(result.stdout)
                 if not isinstance(top_dirs, list):
                     top_dirs = [top_dirs]
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
         return {
@@ -685,9 +667,7 @@ def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def disk_cleanup(
-    drive: str, cleanup_targets: list[str] | None = None, dry_run: bool = True
-) -> dict[str, Any]:
+def disk_cleanup(drive: str, cleanup_targets: list[str] | None = None, dry_run: bool = True) -> dict[str, Any]:
     """Clean up disk space by removing temp files and other cleanup targets."""
     try:
         if not is_admin():
@@ -798,7 +778,10 @@ def defragment_disk(drive: str, thorough: bool = False) -> dict[str, Any]:
         # Check if drive is SSD (don't defrag SSDs!)
         disk_letter = drive[0].upper()
         ps_check = f"""
-        $disk = Get-PhysicalDisk | Where-Object {{ $_.DeviceID -eq (Get-Partition -DriveLetter {disk_letter}).DiskNumber }}
+        $disk = Get-PhysicalDisk |
+            Where-Object {{
+                $_.DeviceID -eq (Get-Partition -DriveLetter {disk_letter}).DiskNumber
+            }}
         $disk.MediaType
         """
 
@@ -854,9 +837,7 @@ def optimize_ssd(drive: str) -> dict[str, Any]:
             drive = drive + ":"
 
         # Run SSD optimization (TRIM)
-        result = subprocess.run(
-            ["defrag", drive, "/O"], capture_output=True, text=True, timeout=300
-        )
+        result = subprocess.run(["defrag", drive, "/O"], capture_output=True, text=True, timeout=300)
 
         return {
             "status": "success",
@@ -895,10 +876,8 @@ def get_hardware_info() -> dict[str, Any]:
                 c = wmi.WMI()
                 cpu = c.Win32_Processor()[0]
                 hw_info["cpu"]["name"] = cpu.Name.strip() if hasattr(cpu, "Name") else None
-                hw_info["cpu"]["manufacturer"] = (
-                    cpu.Manufacturer if hasattr(cpu, "Manufacturer") else None
-                )
-            except Exception:
+                hw_info["cpu"]["manufacturer"] = cpu.Manufacturer if hasattr(cpu, "Manufacturer") else None
+            except Exception:  # noqa: S110
                 pass
 
         # Memory Info
@@ -932,7 +911,7 @@ def get_hardware_info() -> dict[str, Any]:
                         "percent": usage.percent,
                     }
                 )
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
         # Network Info
@@ -941,9 +920,7 @@ def get_hardware_info() -> dict[str, Any]:
             hw_info["network"].append(
                 {
                     "interface": interface,
-                    "addresses": [
-                        {"family": str(addr.family), "address": addr.address} for addr in addrs
-                    ],
+                    "addresses": [{"family": str(addr.family), "address": addr.address} for addr in addrs],
                 }
             )
 
@@ -958,12 +935,10 @@ def get_hardware_info() -> dict[str, Any]:
                         {
                             "name": gpu.Name if hasattr(gpu, "Name") else None,
                             "adapter_ram": gpu.AdapterRAM if hasattr(gpu, "AdapterRAM") else None,
-                            "driver_version": gpu.DriverVersion
-                            if hasattr(gpu, "DriverVersion")
-                            else None,
+                            "driver_version": gpu.DriverVersion if hasattr(gpu, "DriverVersion") else None,
                         }
                     )
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
         return hw_info
@@ -989,9 +964,7 @@ def get_os_info() -> dict[str, Any]:
 
             os_info["windows_version"] = platform.version()
             os_info["windows_release"] = platform.release()
-            os_info["windows_edition"] = (
-                platform.win32_edition() if hasattr(platform, "win32_edition") else None
-            )
+            os_info["windows_edition"] = platform.win32_edition() if hasattr(platform, "win32_edition") else None
 
             # Get detailed Windows info via WMI
             if WMI_AVAILABLE:
@@ -1000,21 +973,13 @@ def get_os_info() -> dict[str, Any]:
                     os_wmi = c.Win32_OperatingSystem()[0]
                     os_info["name"] = os_wmi.Caption if hasattr(os_wmi, "Caption") else None
                     os_info["version"] = os_wmi.Version if hasattr(os_wmi, "Version") else None
-                    os_info["build_number"] = (
-                        os_wmi.BuildNumber if hasattr(os_wmi, "BuildNumber") else None
-                    )
-                    os_info["install_date"] = (
-                        os_wmi.InstallDate if hasattr(os_wmi, "InstallDate") else None
-                    )
-                    os_info["last_boot"] = (
-                        os_wmi.LastBootUpTime if hasattr(os_wmi, "LastBootUpTime") else None
-                    )
+                    os_info["build_number"] = os_wmi.BuildNumber if hasattr(os_wmi, "BuildNumber") else None
+                    os_info["install_date"] = os_wmi.InstallDate if hasattr(os_wmi, "InstallDate") else None
+                    os_info["last_boot"] = os_wmi.LastBootUpTime if hasattr(os_wmi, "LastBootUpTime") else None
                     os_info["total_memory"] = (
-                        int(os_wmi.TotalVisibleMemorySize) * 1024
-                        if hasattr(os_wmi, "TotalVisibleMemorySize")
-                        else None
+                        int(os_wmi.TotalVisibleMemorySize) * 1024 if hasattr(os_wmi, "TotalVisibleMemorySize") else None
                     )
-                except Exception:
+                except Exception:  # noqa: S110
                     pass
 
         # Boot time
@@ -1035,8 +1000,8 @@ def get_installed_software() -> dict[str, Any]:
         # Query registry for installed software
         ps_script = """
         $software = Get-ItemProperty "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*" |
-                    Where-Object { $_.DisplayName } |
-                    Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, @{Name="Size";Expression={$_.EstimatedSize}} |
+                    Where-Object { $_.DisplayName } | Select-Object DisplayName, DisplayVersion,
+                    Publisher, InstallDate, @{Name="Size";Expression={$_.EstimatedSize}} |
                     Sort-Object DisplayName |
                     ConvertTo-Json -Compress
 
@@ -1058,7 +1023,7 @@ def get_installed_software() -> dict[str, Any]:
                 software_list = json.loads(result.stdout)
                 if not isinstance(software_list, list):
                     software_list = [software_list]
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
         return {
@@ -1152,9 +1117,7 @@ def get_performance_metrics() -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_event_log(
-    log_name: str = "System", level: str | None = None, hours_back: int = 24
-) -> dict[str, Any]:
+def get_event_log(log_name: str = "System", level: str | None = None, hours_back: int = 24) -> dict[str, Any]:
     """Query Windows event logs."""
     try:
         if not is_admin():
@@ -1259,7 +1222,7 @@ def health_check() -> dict[str, Any]:
                     "percent_used": usage.percent,
                     "free_gb": usage.free / (1024**3),
                 }
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
         # Check memory
@@ -1299,9 +1262,9 @@ def get_volume_info(drive: str) -> dict[str, Any]:
         try:
             (
                 volume_name,
-                serial_number,
-                max_component_length,
-                file_system_flags,
+                _serial_number,
+                _max_component_length,
+                _file_system_flags,
                 file_system_name,
             ) = win32api.GetVolumeInformation(drive)
         except Exception:
@@ -1538,7 +1501,7 @@ async def check_system_health_status() -> dict[str, Any]:
             winreg.CloseKey(key)
             pending_reboot = True
             reasons.append("CBS (Component Based Servicing) RebootPending")
-        except WindowsError:
+        except OSError:
             pass
 
         # Check 2: Windows Update RebootRequired
@@ -1550,20 +1513,18 @@ async def check_system_health_status() -> dict[str, Any]:
             winreg.CloseKey(key)
             pending_reboot = True
             reasons.append("Windows Update RebootRequired")
-        except WindowsError:
+        except OSError:
             pass
 
         # Check 3: File Rename Operations (Pending file rename)
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager"
-            )
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager")
             val, _ = winreg.QueryValueEx(key, "PendingFileRenameOperations")
             winreg.CloseKey(key)
             if val:
                 pending_reboot = True
                 reasons.append("PendingFileRenameOperations present")
-        except WindowsError:
+        except OSError:
             pass
 
         return {
@@ -1599,21 +1560,21 @@ async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, A
         # Optimized PowerShell for calculating folder sizes
         # We use a depth limit to avoid infinite loops or network shares if possible
         ps_script = f"""
-        $path = "{path.replace('\\', '\\\\')}"
+        $path = "{path.replace("\\", "\\\\")}"
         $results = @()
-        
+
         # Check if directory exists and get subfolders
         if (Test-Path $path) {{
-            $subfolders = Get-ChildItem -Path $path -Directory -Force -ErrorAction SilentlyContinue 
-            
+            $subfolders = Get-ChildItem -Path $path -Directory -Force -ErrorAction SilentlyContinue
+
             foreach ($folder in $subfolders) {{
                 try {{
                     # Get size of all files in this subfolder recursively
                     $files = Get-ChildItem -Path $folder.FullName -File -Recurse -ErrorAction SilentlyContinue
                     $size = ($files | Measure-Object -Property Length -Sum).Sum
-                    
+
                     if ($size -eq $null) {{ $size = 0 }}
-                    
+
                     $results += @{{
                         name = $folder.Name
                         path = $folder.FullName
@@ -1625,7 +1586,7 @@ async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, A
                 }}
             }}
         }}
-        
+
         if ($results.Count -gt 0) {{
             $results | Sort-Object size_bytes -Descending | Select-Object -First 10 | ConvertTo-Json -Compress
         }} else {{
@@ -1635,22 +1596,26 @@ async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, A
 
         # Run async subprocess
         process = await asyncio.create_subprocess_exec(
-            "powershell", "-ExecutionPolicy", "Bypass", "-Command", ps_script,
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            ps_script,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
 
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
             if process.returncode != 0:
                 return {"status": "error", "error": stderr.decode().strip()}
-            
+
             output = stdout.decode().strip()
             folders = json.loads(output) if output else []
-            
+
             if isinstance(folders, dict):
                 folders = [folders]
-                
+
             return {
                 "status": "success",
                 "root_path": path,
@@ -1659,16 +1624,15 @@ async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, A
         except asyncio.TimeoutExpired:
             try:
                 process.kill()
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
             return {"status": "error", "error": "Folder analysis timed out"}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             try:
                 process.kill()
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
             return {"status": "error", "error": f"Folder analysis timed out after 120s: {path}"}
     except Exception as e:
         logger.exception(f"Error during folder analysis of {path}")
         return {"status": "error", "error": str(e)}
-

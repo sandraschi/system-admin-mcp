@@ -1,177 +1,84 @@
-# 💻 Development Documentation
+# Development
 
-**Guides, best practices, and lessons learned for developing notepadpp-mcp**
+How to hack on System Admin MCP.
 
----
+## Setup
 
-## 📚 **Documentation Index**
+```powershell
+git clone https://github.com/sandraschi/system-admin-mcp
+cd system-admin-mcp
+uv sync --all-extras
+```
 
-### **1. AI Development Rules**
-📄 [AI_DEVELOPMENT_RULES.md](AI_DEVELOPMENT_RULES.md)
+## Project Layout
 
-**Guidelines for AI-assisted development**
-- Best practices for working with AI
-- Code quality standards
-- Testing requirements
-- Documentation expectations
+```
+src/system_admin_mcp/
+├── app.py                 # FastMCP 3.2 instance — lifespan, providers, config
+├── main.py                # CLI entry with --web flag
+├── server.py              # FastAPI backend (15+ REST endpoints)
+├── transport.py           # stdio / streamable-http transport
+├── prompts.py             # @mcp.prompt() templates
+├── __init__.py            # Package marker
+├── __main__.py            # python -m support
+└── tools/
+    ├── portmanteau.py     # system_admin — the big dispatcher
+    ├── implementations.py # Core logic: file recovery, ACLs, disk, diagnostics
+    ├── services_and_tasks.py  # Services, processes, startup, taskbar
+    ├── agentic_system_workflow.py  # SEP-1577 sampling workflows
+    ├── monitoring.py      # Watchdog file watcher
+    ├── system_ops.py      # Standalone tools (list_volumes, ping, etc.)
+    └── prefab/            # Prefab UI cards
+        ├── __init__.py
+        └── system_cards.py
+```
 
----
+## Adding a New Operation
 
-### **2. AI Development Tools Comparison**
-📄 [AI_DEVELOPMENT_TOOLS_COMPARISON.md](AI_DEVELOPMENT_TOOLS_COMPARISON.md)
+1. Add the implementation function in `tools/implementations.py` or `tools/services_and_tasks.py`
+2. Add the operation name to the `Literal` type in `portmanteau.py`
+3. Add the dispatch branch in the `system_admin()` function body
+4. Add documentation examples
 
-**Comparison of AI coding assistants**
-- Windsurf vs Cursor vs Claude Code
-- Feature comparisons
-- Strengths and weaknesses
-- Use case recommendations
+## Adding a Prefab Tool
 
----
+1. Write the function in `tools/prefab/system_cards.py` returning `ToolResult` with `structured_content=PrefabApp(...)`
+2. Register in `tools/prefab/__init__.py` via `mcp.tool(app=True)(fn)`
 
-### **3. Debugging Lessons Learned**
-📄 [DEBUGGING_LESSONS_LEARNED.md](DEBUGGING_LESSONS_LEARNED.md)
+## Adding a REST Endpoint
 
-**Real-world debugging experiences**
-- Common issues encountered
-- Solutions that worked
-- Debugging strategies
-- Troubleshooting tips
+1. Add the handler in `server.py`
+2. Use `_run_tool("system_admin", operation="<op>", ...)` to delegate to the MCP layer
+3. Follow existing patterns for error handling
 
----
+## Code Quality
 
-### **4. Development Pain Points**
-📄 [DEVELOPMENT_PAIN_POINTS.md](DEVELOPMENT_PAIN_POINTS.md)
+```powershell
+just lint       # ruff + Biome check
+just fix        # auto-fix everything
+just test       # pytest
+just check-sec  # bandit security audit
+```
 
-**Challenges and how we overcame them**
-- Technical challenges
-- Solutions implemented
-- Lessons learned
-- Best practices evolved
+Rules:
+- No `print()` in handlers (ruff T201)
+- No `console.log` in webapp (Biome enforces)
+- Docstrings: no `Args:` blocks — use `Annotated[T, Field(description="...")]`
+- Type hints: `X | None` over `Optional[X]`, `dict` over `Dict`
 
----
+## Transport Modes
 
-### **5. Python Snippets Usage Guide**
-📄 [PYTHON_SNIPPETS_USAGE_GUIDE.md](PYTHON_SNIPPETS_USAGE_GUIDE.md)
+| Mode | Env / Flag | Use Case |
+|------|-----------|----------|
+| stdio | `MCP_TRANSPORT=stdio` (default) | Claude Desktop |
+| HTTP | `MCP_TRANSPORT=http` or `--http` | Web clients, testing |
+| Port | `MCP_PORT=10861` (default) | HTTP binding port |
 
-**Reusable Python code patterns**
-- Common code snippets
-- FastMCP patterns
-- Windows API integration
-- Error handling patterns
+## Publishing
 
----
-
-### **6. Systematic Project Updates**
-📄 [SYSTEMATIC_PROJECT_UPDATES.md](SYSTEMATIC_PROJECT_UPDATES.md)
-
-**Structured approach to project maintenance**
-- Update procedures
-- Version management
-- Dependency updates
-- Documentation synchronization
-
----
-
-### **7. Python Dependency Hell Fix** ⚠️ **CRITICAL**
-📄 [PYTHON_DEPENDENCY_HELL_FIX.md](PYTHON_DEPENDENCY_HELL_FIX.md)
-
-**The Great Python 3.13 Catastrophe of October 2025**
-- How Python 3.13 broke all MCP servers
-- The fix (version constraints)
-- Quick reference card
-- "Dependency hell was not invented on a whim!"
-
----
-
-## 🎯 **Purpose**
-
-This directory contains **development-focused documentation** including:
-
-✅ **Best Practices** - How to develop quality MCP servers  
-✅ **AI Collaboration** - Working effectively with AI assistants  
-✅ **Debugging** - Real-world problem solving  
-✅ **Code Patterns** - Reusable Python snippets  
-✅ **Lessons Learned** - Avoiding common pitfalls  
-✅ **Project Management** - Systematic updates and maintenance  
-
----
-
-## 👥 **Target Audience**
-
-- **MCP Server Developers** - Building similar servers
-- **AI-Assisted Developers** - Using AI for coding
-- **Python Developers** - FastMCP applications
-- **Contributors** - Want to contribute to this project
-- **Learners** - Understanding development practices
-
----
-
-## 🔧 **Key Topics Covered**
-
-### **AI-Assisted Development**
-- Rules for effective AI collaboration
-- Tool comparisons (Windsurf, Cursor, Claude)
-- Best practices for prompts
-- Code review with AI
-
-### **Python & FastMCP**
-- FastMCP 2.12+ patterns
-- Windows API integration
-- Async/await best practices
-- Error handling decorators
-
-### **Quality & Testing**
-- Test-driven development
-- Mocking Windows API
-- CI/CD integration
-- Coverage reporting
-
-### **Project Management**
-- Systematic updates
-- Version control
-- Documentation maintenance
-- Dependency management
-
----
-
-## 📋 **Quick Reference**
-
-| Need | Document | Time |
-|------|----------|------|
-| **AI guidelines** | [AI Development Rules](AI_DEVELOPMENT_RULES.md) | 10 min |
-| **Tool choice** | [Tools Comparison](AI_DEVELOPMENT_TOOLS_COMPARISON.md) | 15 min |
-| **Debug help** | [Debugging Lessons](DEBUGGING_LESSONS_LEARNED.md) | 10 min |
-| **Python patterns** | [Python Snippets](PYTHON_SNIPPETS_USAGE_GUIDE.md) | 15 min |
-| **Update process** | [Project Updates](SYSTEMATIC_PROJECT_UPDATES.md) | 10 min |
-| **Dependency fix** | [Dependency Hell Fix](PYTHON_DEPENDENCY_HELL_FIX.md) | 5 min |
-
----
-
-## 🏆 **Development Quality**
-
-**This documentation reflects**:
-- ✅ Real-world experience from building notepadpp-mcp
-- ✅ Lessons learned achieving Gold Status (85/100 → 90/100)
-- ✅ Best practices for MCP server development
-- ✅ Effective AI collaboration techniques
-- ✅ Production-ready code patterns
-
----
-
-## 🔗 **Related Documentation**
-
-- [Repository Protection](../repository-protection/README.md) - Safe development workflow
-- [MCP Technical](../mcp-technical/README.md) - MCP server specifics
-- [MCPB Packaging](../mcpb-packaging/README.md) - Distribution
-- [Main Documentation Index](../DOCUMENTATION_INDEX.md) - All docs
-
----
-
-*Development Documentation*  
-*Location: `docs/development/`*  
-*Files: 7*  
-*Focus: Best practices & lessons learned*  
-*Target: Developers & Contributors*
-
-**Learn from our development journey!** 💻✨
-
+```powershell
+just mcpb-pack      # Build MCPB bundle
+# then upload to PyPI:
+uv build
+uv publish
+```

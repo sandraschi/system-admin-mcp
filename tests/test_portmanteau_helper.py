@@ -7,7 +7,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import the module before the decorator is applied
-import system_admin_mcp.tools.portmanteau as portmanteau_module
 
 # The function is defined in the module, we need to get it before decoration
 # Since FastMCP decorator wraps it, we'll create a test helper that calls the implementation directly
@@ -37,22 +36,22 @@ from system_admin_mcp.tools.implementations import (
 
 async def system_admin_test(
     operation: str,
-    drive: str = None,
-    file_pattern: str = None,
-    mft_entry: int = None,
-    source_path: str = None,
-    destination_path: str = None,
+    drive: str | None = None,
+    file_pattern: str | None = None,
+    mft_entry: int | None = None,
+    source_path: str | None = None,
+    destination_path: str | None = None,
     verify_integrity: bool = True,
     max_results: int = 100,
-    path: str = None,
-    principal: str = None,
-    rights: str = None,
-    inheritance: str = None,
-    cleanup_targets: list = None,
+    path: str | None = None,
+    principal: str | None = None,
+    rights: str | None = None,
+    inheritance: str | None = None,
+    cleanup_targets: list | None = None,
     dry_run: bool = True,
     thorough: bool = False,
-    log_name: str = None,
-    level: str = None,
+    log_name: str | None = None,
+    level: str | None = None,
     hours_back: int = 24,
 ):
     """Test helper that mimics the system_admin function logic."""
@@ -168,4 +167,3 @@ async def system_admin_test(
             "status": "error",
             "message": f"Unknown operation: {operation}",
         }
-

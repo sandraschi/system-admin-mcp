@@ -1,73 +1,65 @@
-# React + TypeScript + Vite
+# Web Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+14-page React SPA for point-and-click Windows system administration.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 19** + **TypeScript 5.9**
+- **Vite 7** (dev server on port 10860)
+- **Tailwind CSS 3** + `tailwindcss-animate`
+- **Radix UI** primitives (dialog, dropdown, tabs, tooltip, etc.)
+- **TanStack React Query 5** for data fetching
+- **Lucide React** icons
+- **React Router v7** for routing
+- **Biome** for linting
 
-## React Compiler
+## Dev
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```powershell
+cd web_sota
+npm install
+npm run dev        # → http://localhost:10860
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Proxies `/api` to backend at `http://127.0.0.1:10861`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Pages
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Dashboard | Health overview cards |
+| `/status` | Status | Detailed system metrics |
+| `/processes` | Processes | Process list + detail modal |
+| `/services` | Services | Windows services table |
+| `/volumes` | Volumes | Volume management |
+| `/file-owner` | File Owner | File/folder ownership viewer |
+| `/file-recovery` | File Recovery | NTFS recovery interface |
+| `/logs` | Logs | System log viewer |
+| `/tools` | Tools | Browse MCP tools |
+| `/apps` | Apps | Prefab UI apps |
+| `/elevated` | Elevated | Elevated ops panel |
+| `/chat` | Chat | MCP chat interface |
+| `/settings` | Settings | Server config |
+| `/help` | Help | Documentation |
+
+## Backend
+
+The backend FastAPI server runs on port 10861. Start it with:
+
+```powershell
+# from repo root
+uv run system-admin-mcp --web
+```
+
+## Production Build
+
+```powershell
+npm run build     # outputs to dist/
+```
+
+## Linting
+
+```powershell
+npm run biome:ci         # check
+npm run biome            # auto-fix
 ```

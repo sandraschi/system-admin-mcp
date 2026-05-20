@@ -15,14 +15,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import the FastMCP instance
-from system_admin_mcp.app import mcp
+from system_admin_mcp.app import mcp  # noqa: E402
 
-from .transport import run_server
+from .transport import run_server  # noqa: E402
 
 # Import tools to trigger @mcp.tool() decorators
 # Wrap imports in try/except to prevent startup failures
 try:
     from system_admin_mcp.prompts import register_all_prompts
+
     register_all_prompts(mcp)
 except Exception as e:
     logger.warning(f"Failed to register prompts: {e}")
@@ -40,12 +41,10 @@ except Exception as e:
 try:
     from system_admin_mcp.tools import agentic_system_workflow  # noqa: F401
 except Exception as e:
-    logger.warning(
-        f"Failed to import agentic_system_workflow: {e}. SEP-1577 tools may not be available."
-    )
+    logger.warning(f"Failed to import agentic_system_workflow: {e}. SEP-1577 tools may not be available.")
 
 
-def create_app(config: dict[str, Any] = None) -> FastMCP:
+def create_app(config: dict[str, Any] | None = None) -> FastMCP:
     """Create and configure the MCP application.
 
     Args:
@@ -89,7 +88,7 @@ def main() -> None:
     if args.web:
         port = int(os.getenv("WEBAPP_PORT", 10861))
         logger.info(f"Starting FastAPI web server on port {port}...")
-        uvicorn.run("system_admin_mcp.server:app", host="0.0.0.0", port=port, reload=True)
+        uvicorn.run("system_admin_mcp.server:app", host="0.0.0.0", port=port, reload=True)  # noqa: S104
     else:
         app = create_app()
         run_server(app, server_name="system-admin-mcp")

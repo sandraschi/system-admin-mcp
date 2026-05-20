@@ -1,19 +1,24 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AppLayout } from '@/components/layout/app-layout';
-import { Dashboard } from '@/pages/dashboard';
-import { Chat } from '@/pages/chat';
-import { Settings } from '@/pages/settings';
-import { Status } from '@/pages/status';
-import { Help } from '@/pages/help';
-import { Apps } from '@/pages/apps';
-import { Tools } from '@/pages/tools';
-import { Elevated } from '@/pages/elevated';
-import { Processes } from '@/pages/processes';
-import { Services } from '@/pages/services';
-import { Volumes } from '@/pages/volumes';
-import { FileOwner } from '@/pages/file-owner';
-import { FileRecovery } from '@/pages/file-recovery';
-import { Logs } from '@/pages/logs';
+import {
+  Navigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+} from "react-router-dom";
+import { AppLayout } from "@/components/layout/app-layout";
+import { Apps } from "@/pages/apps";
+import { Chat } from "@/pages/chat";
+import { Dashboard } from "@/pages/dashboard";
+import { Elevated } from "@/pages/elevated";
+import { FileOwner } from "@/pages/file-owner";
+import { FileRecovery } from "@/pages/file-recovery";
+import { Help } from "@/pages/help";
+import { Logs } from "@/pages/logs";
+import { Processes } from "@/pages/processes";
+import { Services } from "@/pages/services";
+import { Settings } from "@/pages/settings";
+import { Status } from "@/pages/status";
+import { Tools } from "@/pages/tools";
+import { Volumes } from "@/pages/volumes";
 
 function App() {
   return (

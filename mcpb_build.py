@@ -2,8 +2,8 @@
 """
 MCPB packaging script for System Admin MCP Server.
 
-This script creates a minimal MCPB package with NO dependencies.
-IMPORTANT: MCPB packages contain NO dependencies - handled by MCPB runtime.
+Builds a v0.2 MCPB bundle from mcpb/ directory for Claude Desktop distribution.
+Run: uv run python mcpb_build.py
 """
 
 import json
@@ -12,63 +12,55 @@ from pathlib import Path
 
 
 def create_mcpb_package():
-    """Create a minimal MCPB package - NO dependencies included."""
-    project_root = Path(__file__).parent
-    mcpb_dir = project_root / "mcpb"
-    dist_dir = project_root / "dist"
-
-    # Ensure dist directory exists
+    root = Path(__file__).parent
+    mcpb_dir = root / "mcpb"
+    dist_dir = root / "dist"
     dist_dir.mkdir(parents=True, exist_ok=True)
 
-    # Read manifest
     manifest_path = mcpb_dir / "manifest.json"
-    if not manifest_path.exists():
-        print("[ERROR] MCPB manifest not found")
-        return False
-
-    with open(manifest_path, 'r', encoding='utf-8') as f:
+    with open(manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
 
-    package_name = manifest.get('name', 'system-admin-mcp')
-    version = manifest.get('version', '0.1.0')
-    output_file = dist_dir / f"{package_name}-{version}.mcpb"
+    name = manifest.get("name", "system-admin-mcp")
+    version = manifest.get("version", "0.4.0")
+    output_file = dist_dir / f"{name}-v{version}.mcpb"
 
-    # Create minimal MCPB package
-    with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        # Write the manifest
-        zipf.writestr("manifest.json", json.dumps(manifest, indent=2))
+    inclusions = [
+        "manifest.json",
+        "server/__main__.py",
+        "assets/prompts/system.md",
+        "assets/prompts/file_recovery.md",
+        "assets/prompts/security_management.md",
+        "assets/prompts/system_diagnostics.md",
+        "assets/prompts/troubleshooting.md",
+        "assets/prompts/volume_maintenance.md",
+        "assets/prompts/user.md",
+        "assets/prompts/examples.json",
+    ]
 
-        # Add the main server file ONLY (NO dependencies!)
-        server_path = mcpb_dir / "server" / "__main__.py"
-        if server_path.exists():
-            zipf.write(str(server_path), "server/__main__.py")
-        else:
-            print("[WARNING] Main server file not found")
+    with zipfile.ZipFile(output_file, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for rel_path in inclusions:
+            abs_path = mcpb_dir / rel_path
+            if abs_path.exists():
+                zipf.write(str(abs_path), rel_path)
+                print(f"  + {rel_path}")
+            else:
+                print(f"  - SKIPPED (not found): {rel_path}")
 
-    print("[SUCCESS] MCPB package created successfully!")
-    print(f"Package: {output_file}")
-    print(f"[WARNING] IMPORTANT: This MCPB package contains NO dependencies!")
-    print(f"   The MCPB runtime handles all Python package dependencies.")
-
-    # List contents
-    print("\nPackage contents:")
-    with zipfile.ZipFile(output_file, 'r') as zipf:
-        for file in zipf.namelist():
-            print(f"- {file}")
-
+    print(f"\nPackage: {output_file} ({output_file.stat().st_size / 1024:.1f} KB)")
+    print("Contents:")
+    with zipfile.ZipFile(output_file, "r") as zipf:
+        for f in zipf.namelist():
+            print(f"  - {f}")
     return True
 
 
 def main():
-    """Main entry point."""
-    print("\n=== Building MCPB Package (NO dependencies) ===\n")
-
-    success = create_mcpb_package()
-
-    if success:
-        print("\n[SUCCESS] MCPB package created!")
+    print("=== Building MCPB Package (SOTA v2.0) ===\n")
+    if create_mcpb_package():
+        print("\nSUCCESS: MCPB package created.")
     else:
-        print("\n[ERROR] Failed to create MCPB package")
+        print("\nERROR: Failed to create MCPB package.")
         exit(1)
 
 

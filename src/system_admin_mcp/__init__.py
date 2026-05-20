@@ -6,6 +6,6 @@ volume maintenance, services, processes. Full FastMCP 3.2 conformance:
 sampling, skills (SkillsDirectoryProvider), prompts, prefab UI.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __author__ = "Sandra Schipal"
 __email__ = "sandra@schipal.at"

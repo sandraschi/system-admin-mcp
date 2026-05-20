@@ -32,9 +32,7 @@ def get_bridge() -> Any | None:
         try:
             _bridge = UserBridge()
         except Exception as e:
-            logger.warning(
-                f"Failed to initialize UserBridge: {e}. Some operations may not be available."
-            )
+            logger.warning(f"Failed to initialize UserBridge: {e}. Some operations may not be available.")
             _bridge = None
     return _bridge
 

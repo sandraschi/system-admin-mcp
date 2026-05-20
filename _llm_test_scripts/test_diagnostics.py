@@ -5,11 +5,12 @@ from pathlib import Path
 # Add src to path
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
-from system_admin_mcp.tools.portmanteau import system_admin, get_comprehensive_diagnostics
+from system_admin_mcp.tools.portmanteau import get_comprehensive_diagnostics, system_admin
+
 
 async def run_tests():
     print("=== Testing System Admin Diagnostics ===\n")
-    
+
     # 1. Test get_comprehensive_diagnostics
     print("Testing get_comprehensive_diagnostics...")
     diag_result = await get_comprehensive_diagnostics()
@@ -17,7 +18,9 @@ async def run_tests():
     if diag_result.get("status") == "success":
         print(f"Timestamp: {diag_result.get('timestamp')}")
         print(f"Health Uptime: {diag_result.get('health', {}).get('uptime_human')}")
-        print(f"Top Processes: {len(diag_result.get('top_processes', {}).get('top_cpu', []))} CPU, {len(diag_result.get('top_processes', {}).get('top_memory', []))} Memory")
+        top_cpu = diag_result.get("top_processes", {}).get("top_cpu", [])
+        top_mem = diag_result.get("top_processes", {}).get("top_memory", [])
+        print(f"Top Processes: {len(top_cpu)} CPU, {len(top_mem)} Memory")
         print(f"Recent Errors: {len(diag_result.get('recent_errors', {}).get('errors', []))}")
         print(f"Volume Usage status: {diag_result.get('volume_usage', {}).get('status')}")
     else:
@@ -66,9 +69,11 @@ async def run_tests():
     if folder_analysis.get("status") == "success":
         print(f"Root path: {folder_analysis.get('root_path')}")
         print(f"Top folders found: {len(folder_analysis.get('top_folders', []))}")
-        if folder_analysis.get('top_folders'):
-            print(f"Largest: {folder_analysis.get('top_folders')[0].get('name')} ({folder_analysis.get('top_folders')[0].get('size_gb')} GB)")
+        if folder_analysis.get("top_folders"):
+            tf = folder_analysis["top_folders"][0]
+            print(f"Largest: {tf.get('name')} ({tf.get('size_gb')} GB)")
     print("-" * 40)
+
 
 if __name__ == "__main__":
     asyncio.run(run_tests())

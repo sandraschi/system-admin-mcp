@@ -1,7 +1,7 @@
-'''MCP server entry point for System Admin MCP.
+"""MCP server entry point for System Admin MCP.
 
 This is the MCPB-compliant server wrapper that launches the System Admin MCP server.
-'''
+"""
 
 import sys
 from pathlib import Path
@@ -16,8 +16,8 @@ try:
 except ImportError:
     # Fallback
     import system_admin_mcp
+
     main = system_admin_mcp.main
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

@@ -56,18 +56,21 @@ def _get_startup_type_name(startup_type: int) -> str:
     return startup_map.get(startup_type, f"Unknown ({startup_type})")
 
 
-@mcp.tool()
 def list_services(
     filter_status: str | None = None,
     filter_name: str | None = None,
     include_system: bool = True,
+    page: int = 1,
+    page_size: int = 50,
 ) -> dict[str, Any]:
-    """List Windows services with filtering.
+    """List Windows services with filtering and pagination.
 
     Args:
         filter_status: Filter by status ("running", "stopped", "all")
         filter_name: Filter by service name (partial match)
         include_system: Include system services
+        page: Page number (1-based)
+        page_size: Items per page
 
     Returns:
         Dictionary with services list
@@ -86,62 +89,61 @@ def list_services(
         try:
             services_list = win32service.EnumServicesStatus(manager)
 
-            for service_name, display_name, _ in services_list:
-                # Skip system services if not requested
-                if not include_system and service_name.startswith(
-                    ("Win", "W32", "Rpc", "Net", "Sys")
-                ):
-                    continue
-
-                # Apply name filter
-                if filter_name and filter_name.lower() not in service_name.lower():
-                    if filter_name.lower() not in display_name.lower():
-                        continue
-
-                # Get service status
-                try:
-                    status_info = win32serviceutil.QueryServiceStatus(service_name)
-                    status_code = status_info[1]
-                    status_name = _get_service_status_name(status_code)
-                except Exception:
-                    status_code = win32service.SERVICE_STOPPED
-                    status_name = "Unknown"
-
-                # Apply status filter
-                if filter_status and filter_status != "all":
-                    if filter_status == "running" and status_code != win32service.SERVICE_RUNNING:
-                        continue
-                    if filter_status == "stopped" and status_code != win32service.SERVICE_STOPPED:
-                        continue
-
-                # Get startup type
-                try:
-                    config = win32serviceutil.QueryServiceConfig(service_name)
-                    startup_type = config[1]
-                    startup_name = _get_startup_type_name(startup_type)
-                except Exception:
-                    startup_type = win32service.SERVICE_DEMAND_START
-                    startup_name = "Unknown"
-
-                services.append(
-                    {
-                        "name": service_name,
-                        "display_name": display_name,
-                        "status": status_name,
-                        "status_code": status_code,
-                        "startup_type": startup_name,
-                        "startup_code": startup_type,
-                    }
-                )
-
         finally:
             win32service.CloseServiceHandle(manager)
+
+        for service_name, display_name, _ in services_list:
+            if not include_system and service_name.startswith(("Win", "W32", "Rpc", "Net", "Sys")):
+                continue
+
+            if filter_name and filter_name.lower() not in service_name.lower():
+                if filter_name.lower() not in display_name.lower():
+                    continue
+
+            try:
+                status_info = win32serviceutil.QueryServiceStatus(service_name)
+                status_code = status_info[1]
+                status_name = _get_service_status_name(status_code)
+            except Exception:
+                status_code = win32service.SERVICE_STOPPED
+                status_name = "Unknown"
+
+            if filter_status and filter_status != "all":
+                if filter_status == "running" and status_code != win32service.SERVICE_RUNNING:
+                    continue
+                if filter_status == "stopped" and status_code != win32service.SERVICE_STOPPED:
+                    continue
+
+            try:
+                config = win32serviceutil.QueryServiceConfig(service_name)
+                startup_type = config[1]
+                startup_name = _get_startup_type_name(startup_type)
+            except Exception:
+                startup_type = win32service.SERVICE_DEMAND_START
+                startup_name = "Unknown"
+
+            services.append({
+                "name": service_name,
+                "display_name": display_name,
+                "status": status_name,
+                "status_code": status_code,
+                "startup_type": startup_name,
+                "startup_code": startup_type,
+            })
+
+        total = len(services)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_services = services[start:end]
 
         return {
             "status": "success",
             "operation": "list_services",
-            "services": services,
-            "count": len(services),
+            "services": page_services,
+            "count": len(page_services),
+            "total": total,
+            "page": page,
+            "page_size": page_size,
         }
 
     except Exception as e:
@@ -149,7 +151,6 @@ def list_services(
         return {"status": "error", "operation": "list_services", "error": str(e)}
 
 
-@mcp.tool()
 def get_service_stats() -> dict[str, Any]:
     """Get statistics about Windows services.
 
@@ -195,7 +196,7 @@ def get_service_stats() -> dict[str, Any]:
                         manual_start += 1
                     elif startup_type == win32service.SERVICE_DISABLED:
                         disabled += 1
-                except Exception:
+                except Exception:  # noqa: S112
                     continue
 
         finally:
@@ -217,7 +218,6 @@ def get_service_stats() -> dict[str, Any]:
         return {"status": "error", "operation": "get_service_stats", "error": str(e)}
 
 
-@mcp.tool()
 def start_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
     """Start a Windows service.
 
@@ -275,7 +275,6 @@ def start_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
         return {"status": "error", "operation": "start_service", "error": str(e)}
 
 
-@mcp.tool()
 def stop_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
     """Stop a Windows service.
 
@@ -326,7 +325,6 @@ def stop_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
         return {"status": "error", "operation": "stop_service", "error": str(e)}
 
 
-@mcp.tool()
 def get_service_info(service_name: str) -> dict[str, Any]:
     """Get detailed information about a Windows service.
 
@@ -376,7 +374,6 @@ def get_service_info(service_name: str) -> dict[str, Any]:
         return {"status": "error", "operation": "get_service_info", "error": str(e)}
 
 
-@mcp.tool()
 def set_service_startup(service_name: str, startup_type: str) -> dict[str, Any]:
     """Set service startup type.
 
@@ -439,36 +436,36 @@ def set_service_startup(service_name: str, startup_type: str) -> dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool()
 def list_processes(
     filter_name: str | None = None,
     filter_user: str | None = None,
     sort_by: str = "cpu",
+    page: int = 1,
+    page_size: int = 50,
 ) -> dict[str, Any]:
-    """List running processes with filtering and sorting.
+    """List running processes with filtering, sorting, and pagination.
 
     Args:
         filter_name: Filter by process name (partial match)
         filter_user: Filter by username
         sort_by: Sort by "cpu", "memory", "name", or "pid"
+        page: Page number (1-based)
+        page_size: Items per page
 
     Returns:
-        Dictionary with processes list
+        Dictionary with processes list, count, page, page_size
     """
     try:
         processes = []
 
-        for proc in psutil.process_iter(
-            ["pid", "name", "username", "cpu_percent", "memory_percent"]
-        ):
+        for proc in psutil.process_iter(["pid", "name", "username", "cpu_percent", "memory_percent"]):
             try:
                 proc_info = proc.info
-                proc_info["cpu_percent"] = proc.cpu_percent(interval=0.1)
+                proc_info["cpu_percent"] = proc.cpu_percent(interval=0)
                 proc_info["memory_info"] = proc.memory_info()._asdict()
                 proc_info["status"] = proc.status()
                 proc_info["create_time"] = proc.create_time()
 
-                # Apply filters
                 if filter_name and filter_name.lower() not in proc_info["name"].lower():
                     continue
 
@@ -480,7 +477,6 @@ def list_processes(
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
-        # Sort processes
         if sort_by == "cpu":
             processes.sort(key=lambda x: x.get("cpu_percent", 0), reverse=True)
         elif sort_by == "memory":
@@ -490,11 +486,19 @@ def list_processes(
         elif sort_by == "pid":
             processes.sort(key=lambda x: x.get("pid", 0))
 
+        total = len(processes)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_procs = processes[start:end]
+
         return {
             "status": "success",
             "operation": "list_processes",
-            "processes": processes,
-            "count": len(processes),
+            "processes": page_procs,
+            "count": len(page_procs),
+            "total": total,
+            "page": page,
+            "page_size": page_size,
         }
 
     except Exception as e:
@@ -502,7 +506,6 @@ def list_processes(
         return {"status": "error", "operation": "list_processes", "error": str(e)}
 
 
-@mcp.tool()
 def analyze_process(pid: int) -> dict[str, Any]:
     """Analyze a specific process in detail including CPU, Memory, and IO metrics.
 
@@ -562,7 +565,6 @@ def analyze_process(pid: int) -> dict[str, Any]:
         return {"status": "error", "operation": "analyze_process", "error": str(e)}
 
 
-@mcp.tool()
 def kill_process(pid: int, force: bool = False) -> dict[str, Any]:
     """Kill a process.
 
@@ -650,9 +652,7 @@ def list_startup_programs() -> dict[str, Any]:
                                 {
                                     "name": name,
                                     "command": value,
-                                    "location": "HKCU"
-                                    if hkey == winreg.HKEY_CURRENT_USER
-                                    else "HKLM",
+                                    "location": "HKCU" if hkey == winreg.HKEY_CURRENT_USER else "HKLM",
                                     "path": path,
                                 }
                             )
@@ -661,7 +661,7 @@ def list_startup_programs() -> dict[str, Any]:
                             break
                 finally:
                     winreg.CloseKey(key)
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
         # Also check Startup folder
@@ -853,7 +853,7 @@ def set_taskbar_autohide(enabled: bool) -> dict[str, Any]:
                 }}
 
                 Set-ItemProperty -Path $regPath -Name $regName -Value $bytes -Type Binary
-                
+
                 # Restart Explorer to apply changes
                 Stop-Process -Name explorer -Force
                 Start-Sleep -Seconds 2
@@ -941,7 +941,7 @@ def find_taskbar_blocking_processes() -> dict[str, Any]:
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
 
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
         return {
@@ -961,9 +961,7 @@ def find_taskbar_blocking_processes() -> dict[str, Any]:
         }
 
 
-def kill_taskbar_blocking_processes(
-    process_names: list[str] | None = None, force: bool = False
-) -> dict[str, Any]:
+def kill_taskbar_blocking_processes(process_names: list[str] | None = None, force: bool = False) -> dict[str, Any]:
     """Kill processes that prevent taskbar autohide.
 
     Args:
@@ -1010,3 +1008,130 @@ def kill_taskbar_blocking_processes(
             "operation": "kill_taskbar_blocking_processes",
             "error": str(e),
         }
+
+
+def forensic_scan() -> dict[str, Any]:
+    """Scan system for suspicious services and processes.
+
+    Flags items based on local heuristics: unusual paths, random-looking names,
+    missing descriptions, high resource usage, network connections to uncommon
+    ports. Does NOT perform web lookups — use ctx.sample() with the findings
+    for LLM-driven analysis.
+
+    Returns:
+        Dictionary with flagged services, processes, and network items.
+    """
+    findings: dict[str, list[dict]] = {
+        "suspicious_services": [],
+        "suspicious_processes": [],
+        "notable_connections": [],
+        "resource_hogs": [],
+    }
+
+    try:
+        # --- Services scan ---
+        try:
+            manager = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_ENUMERATE_SERVICE)
+            try:
+                svc_list = win32service.EnumServicesStatus(manager)
+            finally:
+                win32service.CloseServiceHandle(manager)
+
+            for svc_name, display_name, _ in svc_list:
+                flags = []
+                try:
+                    config = win32serviceutil.QueryServiceConfig(svc_name)
+                    bin_path = config[3] if len(config) > 3 else ""
+                except Exception:
+                    bin_path = ""
+
+                if bin_path and any(p in bin_path.lower() for p in [r"\temp", r"\tmp", r"\appdata\local\temp"]):
+                    flags.append("runs_from_temp")
+                if not display_name or display_name == svc_name:
+                    flags.append("missing_display_name")
+                if not bin_path:
+                    flags.append("no_binary_path")
+                try:
+                    status_info = win32serviceutil.QueryServiceStatus(svc_name)
+                    if status_info[1] == win32service.SERVICE_STOPPED:
+                        config_info = win32serviceutil.QueryServiceConfig(svc_name)
+                        if config_info[1] == win32service.SERVICE_AUTO_START:
+                            flags.append("stopped_but_auto_start")
+                except Exception:
+                    logger.debug("Skipped status query for service %s", svc_name)
+                if flags:
+                    findings["suspicious_services"].append({
+                        "name": svc_name,
+                        "display_name": display_name,
+                        "binary_path": bin_path[:120] if bin_path else "",
+                        "flags": flags,
+                    })
+        except Exception:
+            logger.debug("Forensic services scan failed")
+
+        # --- Processes scan ---
+        suspicious_paths = [r"\temp", r"\tmp", r"\appdata\local\temp", r"\users\public"]
+        for proc in psutil.process_iter(["pid", "name", "username", "cpu_percent", "memory_percent", "exe"]):
+            try:
+                info = proc.info
+                flags = []
+                exe = info.get("exe") or ""
+                name = info.get("name") or ""
+
+                if exe and any(p in exe.lower() for p in suspicious_paths):
+                    flags.append("runs_from_suspicious_path")
+                cpu = info.get("cpu_percent") or 0
+                mem = info.get("memory_percent") or 0
+                if cpu > 50:
+                    flags.append("high_cpu")
+                    findings["resource_hogs"].append({
+                        "pid": info["pid"], "name": name, "type": "cpu", "value": round(cpu, 1),
+                    })
+                if mem > 20:
+                    flags.append("high_memory")
+                    findings["resource_hogs"].append({
+                        "pid": info["pid"], "name": name, "type": "memory", "value": round(mem, 1),
+                    })
+                if flags:
+                    findings["suspicious_processes"].append({
+                        "pid": info["pid"],
+                        "name": name,
+                        "username": info.get("username"),
+                        "exe": exe[:120] if exe else "",
+                        "cpu": round(cpu, 1),
+                        "memory": round(mem, 1),
+                        "flags": flags,
+                    })
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
+        # --- Network connections ---
+        uncommon_ports = {22, 23, 3389, 5900, 5901, 4444, 1337, 31337, 6660, 6667}
+        for proc in psutil.process_iter(["pid", "name"]):
+            try:
+                for conn in proc.connections():
+                    if conn.raddr and conn.raddr.port in uncommon_ports:
+                        findings["notable_connections"].append({
+                            "pid": proc.pid,
+                            "process": proc.name(),
+                            "local": f"{conn.laddr.ip}:{conn.laddr.port}",
+                            "remote": f"{conn.raddr.ip}:{conn.raddr.port}",
+                            "status": conn.status,
+                        })
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+
+        return {
+            "status": "success",
+            "operation": "forensic_scan",
+            "findings": findings,
+            "summary": {
+                "suspicious_services": len(findings["suspicious_services"]),
+                "suspicious_processes": len(findings["suspicious_processes"]),
+                "notable_connections": len(findings["notable_connections"]),
+                "resource_hogs": len(findings["resource_hogs"]),
+            },
+        }
+    except Exception as e:
+        logger.exception("Error during forensic scan")
+        return {"status": "error", "operation": "forensic_scan", "error": str(e)}

@@ -8,7 +8,7 @@ elevated service and are called by the user bridge.
 
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 import psutil
 import win32api
@@ -81,6 +81,7 @@ def list_volumes() -> dict[str, Any]:
                     try:
                         free_bytes, total_bytes, _ = win32file.GetDiskFreeSpaceEx(drive)
                     except Exception:
+                        logger.warning("Skipping drive %s: not ready", drive)
                         continue
                 else:
                     free_bytes, total_bytes, _ = win32file.GetDiskFreeSpaceEx(drive)
@@ -110,7 +111,7 @@ def list_volumes() -> dict[str, Any]:
                     if volume_name:
                         volume_info["label"] = volume_name
                 except Exception:
-                    pass
+                    logger.debug("No volume label for %s", drive)
 
                 volumes.append(volume_info)
 
