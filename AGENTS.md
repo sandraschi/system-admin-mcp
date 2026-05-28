@@ -167,3 +167,5 @@ just audit-deps         # Safety dependency audit
 - Bundle output: `dist/system-admin-mcp-v0.4.0.mcpb`
 - Prompts included: system.md, user.md, examples.json + 4 domain guides
 - Exclusion: `.mcpbignore` follows MCPB_PACKAGING_STANDARDS.md
+
+Install docs: follow mcp-central-docs/standards/AGENT_INSTALL_REFERENCE.md
