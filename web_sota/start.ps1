@@ -19,6 +19,8 @@ $FleetStart = Initialize-FleetStartMode @PSBoundParameters
 Enter-FleetHeadlessConsole -Headless:$Headless -BackendOnly:$BackendOnly
 Stop-FleetPortSquatters -Ports @($WebPort, $BackendPort) -Label "system-admin-mcp"
 
+if (-not (Assert-FleetPortsAvailable -Ports @($WebPort, $BackendPort) -Label "system-admin-mcp")) { exit 1 }
+
 # 2. Setup
 Set-Location $PSScriptRoot
 if (-not (Test-Path "node_modules")) { npm install }
@@ -44,6 +46,7 @@ Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "
 Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
 if (-not $FleetStart.RunFrontend) { return }
 npm run dev -- --port $WebPort --host
+
 
 
 
