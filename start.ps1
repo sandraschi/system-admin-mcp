@@ -16,7 +16,7 @@ Write-Host 'Starting system-admin-mcp...' -ForegroundColor Cyan
 Set-Location $PSScriptRoot
 Write-Host 'Starting Standardized Fullstack Hybrid...' -ForegroundColor Green
 # Launch backend Hidden by default to prevent console spam
-Start-Process pwsh -ArgumentList '-NoProfile', '-Command', 'uv run -m system_admin_mcp' -WindowStyle Hidden
+Start-Process pwsh -ArgumentList '-NoProfile', '-Command', 'uv run -m system_admin_mcp --web' -WindowStyle Hidden
 Set-Location web_sota
 if ($SkipFrontend) { return }
 npm run dev
