@@ -10,10 +10,15 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['goliath'],
     port: 10860,
     strictPort: true,
     host: "127.0.0.1",
     proxy: {
+      "/api/logs": {
+        target: "http://127.0.0.1:11066",
+        changeOrigin: true,
+      },
       "/api": {
         target: "http://127.0.0.1:10861",
         changeOrigin: true,

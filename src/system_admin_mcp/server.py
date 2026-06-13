@@ -239,20 +239,31 @@ async def _run_tool(name: str, **kwargs: Any) -> Any:
 
 @app.get("/api/logs")
 async def get_logs(tail: int = 200, file: str | None = None) -> dict[str, Any]:
-    """Read log files from SystemAdminMCP log directory."""
-    log_dir = Path(os.environ.get("LOCALAPPDATA", "")) / "SystemAdminMCP" / "Logs"
-    if not log_dir.is_dir():
-        return {"lines": [], "source": str(log_dir), "message": "Log directory not found"}
+    """Read log files from SystemAdminMCP log directories."""
+    appdata = Path(os.environ.get("LOCALAPPDATA", ""))
+    log_dirs = [
+        appdata / "SystemAdminMCP" / "Logs",
+        appdata / "SystemAdminMCP",
+    ]
+    log_files: list[Path] = []
+    for log_dir in log_dirs:
+        if log_dir.is_dir():
+            log_files.extend(log_dir.glob("*.log"))
+    if not log_files:
+        return {"lines": [], "source": str(log_dirs[0]), "message": "No log files found"}
     try:
         if file:
-            log_path = log_dir / file
-            if not log_path.is_file():
-                return {"lines": [], "source": str(log_path), "message": "File not found"}
-            paths = [log_path]
+            log_path = appdata / "SystemAdminMCP" / "Logs" / file
+            if log_path.is_file():
+                paths = [log_path]
+            else:
+                log_path = appdata / "SystemAdminMCP" / file
+                if log_path.is_file():
+                    paths = [log_path]
+                else:
+                    return {"lines": [], "source": str(log_path), "message": "File not found"}
         else:
-            paths = sorted(log_dir.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
-            if not paths:
-                return {"lines": [], "source": str(log_dir), "message": "No log files"}
+            paths = sorted(log_files, key=lambda p: p.stat().st_mtime, reverse=True)
         lines: list[str] = []
         for p in paths[:3]:
             with open(p, encoding="utf-8", errors="replace") as f:

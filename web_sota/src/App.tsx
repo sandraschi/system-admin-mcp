@@ -12,7 +12,7 @@ import { Elevated } from "@/pages/elevated";
 import { FileOwner } from "@/pages/file-owner";
 import { FileRecovery } from "@/pages/file-recovery";
 import { Help } from "@/pages/help";
-import { Logs } from "@/pages/logs";
+import Logs from "@/pages/logs";
 import { Processes } from "@/pages/processes";
 import { Services } from "@/pages/services";
 import { Settings } from "@/pages/settings";
