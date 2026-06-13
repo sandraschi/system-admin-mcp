@@ -1,23 +1,54 @@
 import {
-  Brain,
-  Key,
-  Save,
   Settings as SettingsIcon,
   Shield,
   Zap,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+
+function LLMSettings() {
+    const [providers, setProviders] = useState<Record<string, {name:string}[]>>({});
+    const [selectedProvider, setSelectedProvider] = useState("ollama");
+    const [selectedModel, setSelectedModel] = useState("");
+    useEffect(() => {
+        fetch("/api/llm/providers").then(r => r.json()).then(d => {
+            setProviders(d);
+            const savedP = localStorage.getItem("llm_provider") || "ollama";
+            const savedM = localStorage.getItem("llm_model") || "";
+            setSelectedProvider(savedP);
+            const models = d[savedP === "ollama" ? "ollama" : "lm_studio"] || [];
+            setSelectedModel(savedM && models.some((m:{name:string}) => m.name === savedM) ? savedM : (models[0]?.name || ""));
+        }).catch(() => {
+            setProviders({ ollama: [{name:"llama3.2:3b"}] });
+            setSelectedModel(localStorage.getItem("llm_model") || "llama3.2:3b");
+        });
+    }, []);
+    const save = (p:string, m:string) => { localStorage.setItem("llm_provider", p); localStorage.setItem("llm_model", m); };
+    const models = providers[selectedProvider === "ollama" ? "ollama" : "lm_studio"] || [];
+    return (
+        <div className="space-y-3">
+            <select
+                className="h-9 w-full rounded-md border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+                value={selectedProvider}
+                onChange={(e) => { setSelectedProvider(e.target.value); save(e.target.value, ""); }}
+            >
+                <option value="ollama">Ollama</option>
+                <option value="lm_studio">LM Studio</option>
+            </select>
+            <select
+                className="h-9 w-full rounded-md border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+                value={selectedModel}
+                onChange={(e) => { setSelectedModel(e.target.value); save(selectedProvider, e.target.value); }}
+            >
+                {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+            </select>
+        </div>
+    );
+}
 
 export function Settings() {
   return (
@@ -35,73 +66,18 @@ export function Settings() {
           </div>
         </div>
         <Button className="bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all">
-          <Save className="w-4 h-4 mr-2" /> Save Configuration
+          Save Configuration
         </Button>
       </div>
 
       <div className="grid gap-8">
         <section className="space-y-4">
           <div className="flex items-center gap-2 text-white font-semibold">
-            <Brain className="w-5 h-5 text-purple-500" />
             Intelligence Engine (LLM)
           </div>
           <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-xl">
-            <CardContent className="pt-6 space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="text-slate-300">Default Provider</Label>
-                  <Select defaultValue="google">
-                    <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-100">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-950 border-slate-800 text-slate-100">
-                      <SelectItem value="google">Google Gemini</SelectItem>
-                      <SelectItem value="anthropic">
-                        Anthropic Claude
-                      </SelectItem>
-                      <SelectItem value="openai">OpenAI GPT</SelectItem>
-                      <SelectItem value="ollama">Ollama (Local)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-slate-300">Default Model</Label>
-                  <Select defaultValue="gemini-3-pro">
-                    <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-100">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-950 border-slate-800 text-slate-100">
-                      <SelectItem value="gemini-3-pro">
-                        Gemini 3 Pro (1M)
-                      </SelectItem>
-                      <SelectItem value="gemini-3-flash">
-                        Gemini 3 Flash (1M)
-                      </SelectItem>
-                      <SelectItem value="claude-sonnet-4">
-                        Claude 4 Sonnet
-                      </SelectItem>
-                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-300">Gemini API Key</Label>
-                <div className="flex gap-3">
-                  <Input
-                    type="password"
-                    className="bg-slate-950 border-slate-800 text-slate-100 font-mono"
-                    placeholder="Enter key..."
-                    defaultValue="***************************"
-                  />
-                  <Button
-                    variant="outline"
-                    className="border-slate-800 bg-slate-900 text-slate-400"
-                  >
-                    <Key className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+            <CardContent className="pt-6">
+              <LLMSettings />
             </CardContent>
           </Card>
         </section>
