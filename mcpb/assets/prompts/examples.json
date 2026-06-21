@@ -96,5 +96,17 @@
   {"tool": "system_admin", "operation": "list_processes", "example5": {"operation": "list_processes", "filter_name": "python", "sort_by": "memory"}, "description": "Python processes sorted by memory"},
   {"tool": "system_admin", "operation": "list_processes", "example6": {"operation": "list_processes", "filter_name": "explorer", "sort_by": "cpu"}, "description": "Explorer processes sorted by CPU"},
   {"tool": "system_admin", "operation": "analyze_process", "example2": {"operation": "analyze_process", "pid": 1}, "description": "Analyze PID 1 (System)"},
-  {"tool": "system_admin", "operation": "list_services", "example4": {"operation": "list_services", "filter_status": "stopped"}, "description": "List stopped services"}
+  {"tool": "system_admin", "operation": "list_services", "example4": {"operation": "list_services", "filter_status": "stopped"}, "description": "List stopped services"},
+  {"tool": "system_admin", "operation": "get_comprehensive_diagnostics", "example": {"operation": "get_comprehensive_diagnostics"}, "description": "Full diagnostics report"},
+  {"tool": "system_admin", "operation": "check_system_health_status", "example": {"operation": "check_system_health_status"}, "description": "Full health status with thresholds"},
+  {"tool": "system_admin", "operation": "get_top_resource_processes", "example": {"operation": "get_top_resource_processes", "count": 5}, "description": "Top 5 processes by resource"},
+  {"tool": "system_admin", "operation": "forensic_scan", "example": {"operation": "forensic_scan"}, "description": "Forensic system scan"},
+  {"tool": "system_admin", "operation": "modify_acl", "example": {"operation": "modify_acl", "path": "D:/Secure", "principal": "DOMAIN\\user", "rights": "ReadAndExecute", "inheritance": "both"}, "description": "Granular ACL modification"},
+  {"tool": "system_admin", "operation": "batch_recover", "example": {"operation": "batch_recover", "source_path": "C:/Deleted/*.pdf", "destination_path": "D:/Recovery/"}, "description": "Batch recover all PDFs"},
+  {"tool": "ping", "example": {"description": "Server connectivity test"}, "description": "Basic connectivity check"},
+  {"tool": "status", "example": {"level": "basic"}, "description": "Server status overview"},
+  {"tool": "help", "example": {"level": "basic"}, "description": "General help"},
+  {"tool": "get_system_info", "example": {}, "description": "Full system information"},
+  {"tool": "manage_filesystem_watch", "operation": "get_events", "example": {"operation": "get_events", "path": "C:/Watched", "auto_sample": true}, "description": "Get watch events with AI analysis"},
+  {"tool": "agentic_system_workflow", "example": {"workflow_prompt": "Audit all network ports for suspicious listening services", "available_tools": ["audit_network_ports"]}, "description": "Autonomous network security audit"}
 ]

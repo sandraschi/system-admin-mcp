@@ -79,5 +79,5 @@ if bridge_urls:
             try:
                 mcp.add_provider(create_proxy(url))
                 _bridge_proxies.append(url)
-            except Exception:
-                pass
+            except Exception as e:
+                mcp.logger.debug(f"Bridge proxy failed for {url}: {e}")

@@ -18,7 +18,7 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
-    "fastmcp[tasks]>=3.2.0,<4",
+    "fastmcp[tasks]>=3.4.2,<4",
     "pywin32>=300; platform_system=='Windows'",
     "psutil>=5.9.0",
     "wmi>=1.5.1; platform_system=='Windows'",

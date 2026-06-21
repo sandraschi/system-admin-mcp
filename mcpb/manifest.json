@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "system-admin-mcp",
   "version": "0.4.0",
-  "description": "FastMCP 3.2 server for elevated Windows system administration: NTFS file recovery, security/ACL management, disk maintenance, service orchestration, process diagnostics, and system health monitoring with a React web dashboard.",
+  "description": "FastMCP 3.4 server for elevated Windows system administration: NTFS file recovery, security/ACL management, disk maintenance, service orchestration, process diagnostics, system health monitoring, network auditing, startup management, and taskbar management with a React web dashboard.",
   "author": {
     "name": "Sandra Schipal",
     "email": "sandra@schipal.at"
@@ -43,6 +43,31 @@
     {"name": "add_startup_program", "description": "Add a program to Windows startup (HKCU or HKLM)."},
     {"name": "remove_startup_program", "description": "Remove a program from Windows startup."},
     {"name": "get_taskbar_settings", "description": "Get current taskbar autohide and lock settings."},
-    {"name": "set_taskbar_autohide", "description": "Enable or disable taskbar autohide via PowerShell."}
+    {"name": "set_taskbar_autohide", "description": "Enable or disable taskbar autohide."},
+    {"name": "scan_volume", "description": "Scan NTFS volume for deleted files using PowerShell."},
+    {"name": "recover_file_ntfs", "description": "Recover a deleted file from NTFS volume."},
+    {"name": "validate_recovery", "description": "Validate recovered file integrity with SHA-256 hash."},
+    {"name": "get_permissions", "description": "Get file/folder permissions and ACLs."},
+    {"name": "set_permissions", "description": "Set file/folder permissions with inheritance support."},
+    {"name": "remove_permission", "description": "Remove specific permission from file/folder."},
+    {"name": "take_ownership", "description": "Take ownership of file or folder."},
+    {"name": "audit_permissions", "description": "Audit permissions and identify security issues."},
+    {"name": "check_disk_health", "description": "Check disk SMART status and health via WMI."},
+    {"name": "analyze_disk_usage_advanced", "description": "Advanced disk usage analysis with folder breakdown."},
+    {"name": "disk_cleanup", "description": "Clean up disk space by removing temp files."},
+    {"name": "defragment_disk", "description": "Defragment HDD (do not use on SSDs)."},
+    {"name": "optimize_ssd", "description": "Optimize SSD with TRIM operation."},
+    {"name": "get_hardware_info", "description": "Get comprehensive hardware information via WMI and psutil."},
+    {"name": "get_os_info", "description": "Get operating system information."},
+    {"name": "get_installed_software", "description": "Get list of installed software from registry."},
+    {"name": "get_performance_metrics", "description": "Get real-time performance metrics."},
+    {"name": "get_event_log", "description": "Query Windows event logs with filtering."},
+    {"name": "health_check", "description": "Perform comprehensive system health check."},
+    {"name": "get_volume_info", "description": "Get detailed volume information."},
+    {"name": "get_recent_event_errors", "description": "Get recent Error and Warning events from Windows Event Logs."},
+    {"name": "audit_network_ports", "description": "List all processes listening on network ports."},
+    {"name": "get_top_resource_processes", "description": "Find top processes consuming CPU and memory."},
+    {"name": "check_system_health_status", "description": "Check system health status with warnings."},
+    {"name": "analyze_top_folder_sizes", "description": "Find the top largest folders on a drive by size."}
   ]
 }
