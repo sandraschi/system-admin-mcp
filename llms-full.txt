@@ -1,0 +1,275 @@
+# System Admin MCP — Full Agent Reference
+
+> FastMCP 3.2 server for elevated Windows system administration. 40+ operations across file recovery, security/permissions, disk/volume maintenance, system diagnostics, services, processes, startup/taskbar management, and agentic workflows. **Run as Administrator.**
+
+## Quick Links
+
+- Repo: `D:\Dev\repos\system-admin-mcp`
+- README: [README.md](README.md)
+- AGENTS.md: [AGENTS.md](AGENTS.md)
+- Quickstart: [docs/quickstart.md](docs/quickstart.md)
+- API reference: [docs/api/README.md](docs/api/README.md)
+- Version: 0.3.0
+- Ports: 10860 (webapp frontend), 10861 (API backend / MCP HTTP)
+- Dual transport: stdio (Claude Desktop default) / streamable-http (`MCP_TRANSPORT=http`)
+- Admin required: YES — many operations check `IsUserAnAdmin()` internally
+
+## Connection
+
+```json
+{
+  "mcpServers": {
+    "system-admin-mcp": {
+      "command": "uvx",
+      "args": ["system-admin-mcp"]
+    }
+  }
+}
+```
+
+## Tool Reference
+
+### `system_admin` — Portmanteau Tool (40+ operations)
+
+Single tool with `operation` discriminator. All admin operations go through this.
+
+#### File Recovery (NTFS)
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `scan_volume` | Scan NTFS volume for deleted files using PowerShell + MFT. Returns file pattern matches. | `drive` (e.g. "C:"), `file_pattern` (e.g. "*.docx"), `max_results` |
+| `recover_file` | Recover a deleted file from NTFS. Recover to a DIFFERENT drive to avoid overwrites. | `source_path`, `destination_path` |
+| `validate_recovery` | Verify integrity of a recovered file. Checks file exists, non-empty, readable. | `destination_path`, `verify_integrity` |
+| `batch_recover` | Recover multiple files in batch. | `source_path`, `destination_path` |
+
+#### Security / Permission Management
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `get_permissions` | Get file or folder permissions (ACLs). Returns owner, inherited/explicit entries, access control entries. | `path` |
+| `set_permissions` | Set file or folder permissions. Applies grant to specified principal. | `path`, `principal` (user/group), `rights` (Read/Write/Modify/FullControl), `inheritance` |
+| `remove_permission` | Remove a specific permission entry for a principal. | `path`, `principal` |
+| `take_ownership` | Take ownership of a file or folder. Required before permission changes on protected resources. | `path` |
+| `audit_permissions` | Comprehensive permission audit: all entries, effective access, inheritance analysis, security concerns. | `path` |
+| `modify_acl` | Granular ACL modification (wraps set_permissions). | `path`, `principal`, `rights`, `inheritance` |
+
+#### Volume / Disk Maintenance
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `check_disk_health` | Check disk health: SMART status, filesystem errors, pending repairs, partition info. Returns health status and any errors found. | `drive` |
+| `analyze_disk_usage` | Advanced disk space analysis by category. Breaks down usage by file type and directory. | `drive` |
+| `disk_cleanup` | Free disk space by cleaning temp files, recycle bin, Windows Update cache, delivery optimisation files, browser caches. Supports `dry_run` for preview. | `drive`, `cleanup_targets`, `dry_run` |
+| `defragment_disk` | Defragment an HDD drive. **HDDs only — do NOT use on SSDs.** | `drive`, `thorough` |
+| `optimize_ssd` | Optimise SSD via TRIM command. **SSDs only — do NOT use on HDDs.** | `drive` |
+| `get_volume_info` | Detailed volume information: capacity, used/free space, filesystem type, cluster size, serial number. | `drive` |
+
+#### System Diagnostics
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `get_hardware_info` | Comprehensive hardware details: CPU model/cores/threads, RAM total, motherboard, GPU, disks, network adapters. | — |
+| `get_os_info` | Operating system details: version, build, edition, install date, last boot, product key prefix, system locale. | — |
+| `get_installed_software` | List installed software from registry (HKLM Uninstall keys). Returns name, version, publisher, install date. | — |
+| `get_performance_metrics` | Real-time performance metrics: CPU usage %, memory used/available/%, disk I/O. | — |
+| `get_event_log` | Query Windows Event Log by channel and level. Returns events with timestamps, IDs, sources, messages. | `log_name` (System/Application/Security), `level` (Error/Warning/Info), `hours_back` |
+| `get_recent_event_errors` | Get recent critical errors from event logs, filtered and sorted. Includes event IDs and source names. | `log_name`, `max_results` |
+| `health_check` | Quick system health check: CPU, RAM, disk health status. Returns overall health assessment. | — |
+| `check_system_health_status` | Comprehensive health status with reboot pending check, uptime, resource thresholds. Async. | — |
+| `get_top_resource_processes` | Top N processes by resource consumption (CPU + memory). Returns sorted by combined load. | `max_results` |
+| `audit_network_ports` | Audit listening network ports: port number, process name, PID, protocol, state. | `include_system` |
+| `analyze_top_folder_sizes` | Find largest folders under a given path. Useful for disk space troubleshooting. | `path` |
+| `get_comprehensive_diagnostics` | Combined diagnostics: health + top processes + recent errors + volume usage. One-call overview. | — |
+| `forensic_scan` | Quick security scan: check for suspicious services, unexpected open ports, unusual startup entries. | — |
+
+#### Windows Services
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `list_services` | List Windows services with filtering and pagination. Returns name, display name, status, startup type. | `filter_status` (running/stopped/all), `filter_name`, `include_system`, `page`, `page_size` |
+| `get_service_stats` | Service statistics: total, running, stopped, by startup type. Summary counts. | — |
+| `get_service_info` | Detailed information about a specific service: status, startup type, path, dependencies, description. | `service_name` |
+| `start_service` | Start a service and wait for running state. | `service_name`, `wait_timeout` |
+| `stop_service` | Stop a service and wait for stopped state. | `service_name`, `wait_timeout` |
+| `set_service_startup` | Change service startup type. | `service_name`, `startup_type` (Auto/Manual/Disabled) |
+
+#### Process / Task Management
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `list_processes` | List running processes with filtering, sorting, and pagination. | `filter_name`, `filter_user`, `sort_by` (cpu/memory/name/pid), `page`, `page_size` |
+| `analyze_process` | Deep analysis of a specific process: CPU, memory, threads, handles, modules, connections. | `pid` |
+| `kill_process` | Terminate a process by PID. `force=False` sends SIGTERM; `force=True` sends SIGKILL. Prefer graceful kill first. | `pid`, `force` |
+
+#### Windows Startup Programs
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `list_startup_programs` | List programs configured to start with Windows (HKCU + HKLM Run keys). | — |
+| `add_startup_program` | Add a program to Windows startup registry. | `startup_name`, `startup_command`, `startup_location` (HKCU/HKLM) |
+| `remove_startup_program` | Remove a program from Windows startup. | `startup_name`, `startup_location` |
+
+#### Taskbar Management
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `find_taskbar_blocking_processes` | Find processes that prevent taskbar from auto-hiding. Useful for fullscreen/streaming setups. | — |
+| `kill_taskbar_blocking_processes` | Kill processes blocking taskbar autohide. | `process_names`, `force` |
+| `get_taskbar_settings` | Get current taskbar state: autohide enabled?, locked?, always on top? | — |
+| `set_taskbar_autohide` | Enable or disable taskbar autohide. | `autohide` |
+
+### Standalone Tools
+
+| Tool | Description | Key Parameters |
+|------|-------------|---------------|
+| `manage_filesystem_watch` | Background directory monitoring via watchdog. **Operations:** `start` (begin monitoring path), `stop` (stop monitoring), `list` (active watches), `get_events` (retrieve captured events). Optional `auto_sample` uses `ctx.sample()` to analyse events. | `operation`, `path`, `recursive`, `auto_sample` |
+| `get_comprehensive_diagnostics` | One-shot full system audit: health + top processes + recent errors + volume usage. Same as `system_admin(operation="get_comprehensive_diagnostics")`. | — |
+| `agentic_system_workflow` | SEP-1577 sampling-driven multi-step admin workflow. Phase 1: collect baseline diagnostics from specified tools. Phase 2: `ctx.sample()` for analysis and recommendations. Phase 3: extract HIGH priority actions. | `workflow_prompt`, `available_tools`, `max_iterations` |
+| `autonomous_system_troubleshooter` | 3-phase autonomous diagnosis. Phase 1: collect event logs, process list, health metrics. Phase 2: `ctx.sample()` for root cause analysis. Phase 3: return prioritised remediation. | `problem_description` |
+| `list_volumes` | List all available system volumes with drive letter, type, and filesystem info. | — |
+| `get_file_owner` | Get file or directory owner (domain\username + SID). | `file_path` |
+| `recover_file` | Attempt NTFS file recovery. Requires admin. | `original_path`, `output_dir` |
+| `get_disk_usage` | Get disk usage for a path. | `path` |
+| `get_process_info` | Detailed process information by PID (via UserBridge). | `pid` |
+| `ping` | Check if the System Admin MCP service is responsive. | — |
+| `get_system_info` | OS + hardware summary from service. | — |
+| `help` | Multi-level help system. `level`: basic/intermediate/advanced. `topic`: file_recovery/security/volume/diagnostics. | `level`, `topic` |
+| `status` | Server status: service installed, running, tool count. `level`: basic/intermediate/advanced. `focus`: tools/service/system. | `level`, `focus` |
+
+### Prefab UI Cards (app=True)
+
+Rich in-chat UI cards in supporting MCP hosts (Claude Desktop side-panel). Plain text fallback in others.
+
+| Tool | Description |
+|------|-------------|
+| `system_health_card` | CPU average + per-core %, RAM used/total/percent, disk C: used/total/percent, overall health status. |
+| `top_processes_card` | Top N processes sorted by CPU or memory: PID, name, CPU%, MEM%. Configurable: `sort_by`, `max_procs`. |
+| `list_services_card` | Filtered Windows services list with status icons and startup type. Parameters: `filter_status`, `filter_name`. |
+| `volume_status_card` | All partitions with device, mount point, filesystem type, bar chart of usage %, free/total GB. |
+
+## Prompts
+
+4 registered prompt templates via `@mcp.prompt()`:
+
+| Prompt | Description | Parameter |
+|--------|-------------|-----------|
+| `system_diagnostics_expert` | Systematic Windows diagnostic guidance: performance thresholds, event IDs, diagnostic sequence. | `focus`: general/performance/events |
+| `security_hardening_expert` | Windows security management: NTFS permissions, ACLs, PoLP, safe mode. | `scope`: general/ownership/audit |
+| `system_troubleshooter` | Troubleshooting guides: access denied, performance, service failures. | `problem`: general/access_denied/performance/services |
+| `volume_maintenance_expert` | Volume maintenance: disk health, cleanup, SSD vs HDD rules, NTFS recovery workflow. | `volume_type`: general/recovery/cleanup |
+
+## Skills
+
+| URI | Description |
+|-----|-------------|
+| `skill://system-admin-expert/SKILL.md` | Portable expertise document: safe-mode patterns, diagnostic sequences, agentic workflow recipes. |
+
+## Example Workflows
+
+**Disk space investigation:**
+```
+system_admin(operation="get_volume_info", drive="C:")
+system_admin(operation="analyze_top_folder_sizes", path="C:\\")
+system_admin(operation="disk_cleanup", drive="C:", cleanup_targets=["temp_files", "recycle_bin"], dry_run=True)
+```
+
+**Security audit:**
+```
+system_admin(operation="audit_permissions", path="D:\\Shared")
+system_admin(operation="get_permissions", path="D:\\Shared\\sensitive.docx")
+system_admin(operation="audit_network_ports")
+```
+
+**Service failure diagnosis:**
+```
+system_admin(operation="get_service_info", service_name="Spooler")
+system_admin(operation="get_event_log", log_name="System", level="Error", hours_back=48)
+system_admin(operation="start_service", service_name="Spooler", wait_timeout=30)
+```
+
+**Performance troubleshooting (agentic):**
+```
+agentic_system_workflow(
+    workflow_prompt="Diagnose why the system is running slowly",
+    available_tools=["get_performance_metrics", "list_processes", "get_recent_event_errors"]
+)
+autonomous_system_troubleshooter(problem_description="System is very slow after startup")
+```
+
+**File recovery:**
+```
+system_admin(operation="scan_volume", drive="C:", file_pattern="*.docx", max_results=50)
+system_admin(operation="recover_file", source_path="C:/deleted/report.docx", destination_path="D:/Recovery/")
+system_admin(operation="validate_recovery", destination_path="D:/Recovery/report.docx")
+```
+
+**Taskbar autohide fix:**
+```
+system_admin(operation="find_taskbar_blocking_processes")
+system_admin(operation="kill_taskbar_blocking_processes")
+system_admin(operation="set_taskbar_autohide", autohide=True)
+```
+
+## Architecture
+
+```
+src/system_admin_mcp/
+├── app.py                 # FastMCP 3.2 instance + lifespan (skills, prefab)
+├── main.py                # Entry point (--web flag for HTTP, else stdio)
+├── server.py              # FastAPI backend (20+ REST endpoints)
+├── transport.py           # Dual transport (stdio/streamable-http)
+├── prompts.py             # 4 @mcp.prompt() templates
+├── tools/
+│   ├── portmanteau.py     # system_admin (40+ ops) + manage_filesystem_watch
+│   ├── system_ops.py      # list_volumes, get_file_owner, recover_file, ping, etc.
+│   ├── implementations.py # 25+ real implementations (file recovery, ACLs, disk, WMI)
+│   ├── services_and_tasks.py  # Services, processes, startup, taskbar
+│   ├── agentic_system_workflow.py  # SEP-1577 sampling-driven workflows
+│   ├── monitoring.py      # FileWatcherManager (watchdog singleton)
+│   └── prefab/            # 4 Prefab UI cards
+├── elevated_service/      # Named-pipe elevated service bridge
+└── user_bridge/           # UserBridge client for elevated service
+```
+
+## REST API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Basic health check |
+| `GET /api/status` | System status: CPU, RAM, disk, uptime |
+| `GET /api/processes?sort_by=cpu&page=1&page_size=50` | Paginated process list |
+| `GET /api/processes/{pid}` | Detailed process info |
+| `GET /api/services?page=1&page_size=50` | Paginated service list |
+| `GET /api/volumes` | Drive listing |
+| `POST /api/disk_usage` | Check disk usage for a path |
+| `POST /api/file_owner` | Get file owner |
+| `GET /api/logs` | System log viewer |
+| `GET /api/tools` | List registered MCP tools |
+| `POST /api/tools/call` | Execute any MCP tool |
+
+## Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `MCP_TRANSPORT` | `http` for streamable HTTP (default: stdio) |
+| `MCP_PORT` | HTTP port override (default: 10861) |
+| `WEBAPP_PORT` | FastAPI backend port (default: 10861) |
+| `SYSADMIN_PREFAB_APPS` | Set to `0` to disable Prefab UI tools |
+| `MCP_BRIDGE_URLS` | Comma-separated remote MCP URLs for proxy |
+
+## Safety Rules
+
+- **Always `get_permissions` before `set_permissions`** — document current state first
+- **`dry_run=True` before `dry_run=False`** on `disk_cleanup` — preview what will be freed
+- **HDD vs SSD separation**: `defragment_disk` for HDDs only, `optimize_ssd` for SSDs only
+- **File recovery**: always recover to a DIFFERENT drive to avoid overwriting source data
+- **Kill process**: use `force=False` (SIGTERM) first, `force=True` (SIGKILL) as last resort
+- **Admin required**: disk operations, service management, file recovery, permission changes require elevated shell
+
+## Troubleshooting
+
+- **"Administrator privileges required"**: Run terminal/cmd as Administrator before starting the server
+- **"UserBridge not available"**: Install the elevated service component or run with admin rights
+- **pywin32 errors**: Install with `uv sync` — pywin32 is a core dependency
+- **WMI not available**: Optional dependency — some WMI-based operations fall back to PowerShell
+- **Permissions errors**: Verify UAC elevation and that the target path exists and is accessible
