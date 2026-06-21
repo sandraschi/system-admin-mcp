@@ -1,4 +1,5 @@
-﻿set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+import 'scripts/just/fleet.just'
 
 # Open the interactive recipe dashboard in the browser
 default:
@@ -152,4 +153,27 @@ check-sec:
 audit-deps:
     Set-Location '{{justfile_directory()}}'
     uv run safety check
+
+# ── Tauri Native ───────────────────────────────────────────────────────────────
+
+# Build Tauri native desktop app (full pipeline: frontend + backend)
+build-native:
+    Set-Location '{{justfile_directory()}}\native'
+    $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+    npx @tauri-apps/cli build
+
+# Run the CUA smoke test against the installed NSIS app
+cua-nsis-test:
+    uv run python scripts/cua-smoke.py
+# ── Playwright E2E ─────────────────────────────────────────────────────
+
+# Install Playwright browsers (one-time)
+e2e-install:
+    cd {{REPO}}\web_sota
+    npx playwright install chromium
+
+# Run Playwright E2E smoke tests (start backend first: just serve)
+e2e:
+    cd {{REPO}}\web_sota
+    npx playwright test
 
