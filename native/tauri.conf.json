@@ -26,6 +26,7 @@
 		"icon": ["icons/icon.png", "icons/icon.ico"],
 		"resources": [
 			"resources/system-admin-mcp-backend.exe",
+            "resources/.env",
 			"../scripts/install-mcp-clients.ps1"
 		],
         "windows": {
@@ -40,6 +41,7 @@
 	},
 	"plugins": {}
 }
+
 
 
 

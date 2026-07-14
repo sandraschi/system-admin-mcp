@@ -2,7 +2,6 @@ import { Cpu, Download, RefreshCw, Search, Skull, X } from "lucide-react";
 import { download, toCsv } from "@/common/export";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -81,7 +80,7 @@ export function Processes() {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ sort_by: sortBy, page: String(page), page_size: String(pageSize) });
-      const res = await fetch(`${API_BASE}/api/processes?${qs}`);
+      const res = await fetch(`/api/processes?${qs}`);
       if (res.ok) {
         const data = await res.json();
         setProcesses(Array.isArray(data?.processes) ? data.processes : []);
@@ -112,7 +111,7 @@ export function Processes() {
     setDetailLoading(true);
     setDetail(null);
     try {
-      const res = await fetch(`${API_BASE}/api/processes/${pid}`);
+      const res = await fetch(`/api/processes/${pid}`);
       if (res.ok) {
         const data = await res.json();
         setDetail((data?.process ?? data) as DetailData);
@@ -137,7 +136,7 @@ export function Processes() {
     for (const p of processes) {
       if (targets.some((t) => p.name.toLowerCase() === t.toLowerCase())) {
         try {
-          const res = await fetch(API_BASE + "/api/tools/call", {
+          const res = await fetch("/api/tools/call", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: "system_admin", arguments: { operation: "kill_process", pid: p.pid, force: false } }),

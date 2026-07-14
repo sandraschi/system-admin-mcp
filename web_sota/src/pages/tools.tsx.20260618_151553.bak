@@ -2,7 +2,6 @@ import { Code2, Loader2, Play, Search, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -21,7 +20,7 @@ export function Tools() {
   const [executing, setExecuting] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetch(API_BASE + "/api/tools")
+    fetch("/api/tools")
       .then((res) => res.json())
       .then((data) => {
         setTools(data);
@@ -33,7 +32,7 @@ export function Tools() {
   const callTool = async (name: string, args: any = {}) => {
     setExecuting((prev) => ({ ...prev, [name]: true }));
     try {
-      const res = await fetch(API_BASE + "/api/tools/call", {
+      const res = await fetch("/api/tools/call", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, arguments: args }),

@@ -1,7 +1,6 @@
 import { Archive, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -22,7 +21,7 @@ export function FileRecovery() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(API_BASE + "/api/recover_file", {
+      const res = await fetch("/api/recover_file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

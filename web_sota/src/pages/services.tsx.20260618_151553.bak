@@ -2,7 +2,6 @@ import { Download, RefreshCw, Search, Server } from "lucide-react";
 import { download, toCsv } from "@/common/export";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -31,7 +30,7 @@ export function Services() {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
-      const res = await fetch(`${API_BASE}/api/services?${qs}`);
+      const res = await fetch(`/api/services?${qs}`);
       if (res.ok) {
         const data = await res.json();
         setServices(

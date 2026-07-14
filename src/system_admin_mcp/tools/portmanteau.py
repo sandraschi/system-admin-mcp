@@ -17,6 +17,8 @@ from system_admin_mcp.tools.implementations import (
     defragment_disk,
     disk_cleanup,
     get_event_log,
+    get_gpu_info,
+    get_gpu_processes,
     get_hardware_info,
     get_installed_software,
     get_os_info,
@@ -173,6 +175,8 @@ async def system_admin(
         "optimize_ssd",
         "get_volume_info",
         # System Diagnostics
+        "get_gpu_info",
+        "get_gpu_processes",
         "get_hardware_info",
         "get_os_info",
         "get_installed_software",
@@ -526,6 +530,12 @@ async def system_admin(
 
         elif operation == "forensic_scan":
             return forensic_scan()
+
+        elif operation == "get_gpu_info":
+            return get_gpu_info()
+
+        elif operation == "get_gpu_processes":
+            return get_gpu_processes()
 
         # Windows Services operations
         elif operation == "list_services":

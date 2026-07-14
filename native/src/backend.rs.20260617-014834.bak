@@ -1,9 +1,7 @@
 use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::net::{SocketAddr, TcpStream};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::str::FromStr;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
@@ -148,8 +146,8 @@ pub fn spawn_backend(app: AppHandle, state: &BackendProcess) -> Result<String, S
         .env("PORT", BACKEND_PORT.to_string())
         .env("HOST", "127.0.0.1")
         .env("SYSTEMADMIN_TAURI", "1")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     #[cfg(windows)]
     {
@@ -162,27 +160,32 @@ pub fn spawn_backend(app: AppHandle, state: &BackendProcess) -> Result<String, S
         .spawn()
         .map_err(|e| format!("Failed to spawn {}: {e}", backend_path.display()))?;
 
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
     state.0.lock().unwrap().replace(child);
 
-    let addr = SocketAddr::from_str(&format!("127.0.0.1:{BACKEND_PORT}")).unwrap();
-    let app_health = app.clone();
-    thread::spawn(move || {
-        for attempt in 0..30 {
-            thread::sleep(Duration::from_secs(2));
-            match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
-                Ok(_) => {
-                    log_line(&app_health, &format!("Backend health check PASSED on port {BACKEND_PORT} (attempt {})", attempt + 1));
-                    let _ = app_health.emit("backend-status", "ready");
-                    return;
-                }
-                Err(e) => {
-                    log_line(&app_health, &format!("Backend health check: {e} (attempt {})", attempt + 1));
-                }
-            }
-        }
-        log_line(&app_health, &format!("Backend health check FAILED -- not listening on port {BACKEND_PORT} after 30 attempts"));
-        let _ = app_health.emit("backend-status", "error: backend not reachable");
-    });
+    if let Some(out) = stdout {
+        let app_handle = app.clone();
+        thread::spawn(move || watch_backend_stream(out, app_handle));
+    }
+    if let Some(err) = stderr {
+        let app_handle = app.clone();
+        thread::spawn(move || watch_backend_stream(err, app_handle));
+    }
 
     Ok(format!("Backend starting on port {BACKEND_PORT}"))
+}
+
+fn watch_backend_stream<R: std::io::Read + Send + 'static>(stream: R, app: AppHandle) {
+    let reader = BufReader::new(stream);
+    let mut ready = false;
+    for line in reader.lines().map_while(Result::ok) {
+        log_line(&app, &line);
+        if !ready
+            && (line.contains("Uvicorn running") || line.contains("Application startup complete"))
+        {
+            ready = true;
+            let _ = app.emit("backend-status", "ready");
+        }
+    }
 }

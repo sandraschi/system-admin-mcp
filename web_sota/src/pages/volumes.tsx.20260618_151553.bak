@@ -1,7 +1,6 @@
 import { FolderOpen, HardDrive, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -33,7 +32,7 @@ export function Volumes() {
   const fetchVolumes = useCallback(async () => {
     setLoadingVolumes(true);
     try {
-      const res = await fetch(API_BASE + "/api/volumes");
+      const res = await fetch("/api/volumes");
       const data = await res.json();
       setVolumes(Array.isArray(data?.volumes) ? data.volumes : []);
     } catch {
@@ -48,7 +47,7 @@ export function Volumes() {
     setLoadingUsage(true);
     setUsage(null);
     try {
-      const res = await fetch(API_BASE + "/api/disk_usage", {
+      const res = await fetch("/api/disk_usage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: path.trim() }),
