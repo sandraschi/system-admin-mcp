@@ -68,7 +68,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
     _svc_name_ = "SystemAdminMCP"
     _svc_display_name_ = "System Admin MCP Service"
     _svc_description_ = "Handles elevated system operations for System Admin MCP"
-    _svc_deps_ = ["EventLog"]  # type: ignore  # noqa: RUF012
+    _svc_deps_ = ["EventLog"]  # type: ignore
 
     def __init__(self, args):
         """Initialize the service with proper error handling."""

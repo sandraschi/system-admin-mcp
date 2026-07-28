@@ -591,7 +591,7 @@ def check_disk_health(drive: str) -> dict[str, Any]:
                 # Try to get SMART attributes via Win32_PhysicalMedia or Win32_DiskDrive
                 # Note: Full SMART data requires admin and may not be available on all systems
                 break
-            except Exception:  # noqa: S112
+            except Exception:
                 continue
 
         return health_data
@@ -644,7 +644,7 @@ def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
                 top_dirs = json.loads(result.stdout)
                 if not isinstance(top_dirs, list):
                     top_dirs = [top_dirs]
-            except Exception:  # noqa: S110
+            except Exception:
                 pass
 
         return {
@@ -877,7 +877,7 @@ def get_hardware_info() -> dict[str, Any]:
                 cpu = c.Win32_Processor()[0]
                 hw_info["cpu"]["name"] = cpu.Name.strip() if hasattr(cpu, "Name") else None
                 hw_info["cpu"]["manufacturer"] = cpu.Manufacturer if hasattr(cpu, "Manufacturer") else None
-            except Exception:  # noqa: S110
+            except Exception:
                 pass
 
         # Memory Info
@@ -911,7 +911,7 @@ def get_hardware_info() -> dict[str, Any]:
                         "percent": usage.percent,
                     }
                 )
-            except Exception:  # noqa: S112
+            except Exception:
                 continue
 
         # Network Info
@@ -938,7 +938,7 @@ def get_hardware_info() -> dict[str, Any]:
                             "driver_version": gpu.DriverVersion if hasattr(gpu, "DriverVersion") else None,
                         }
                     )
-            except Exception:  # noqa: S110
+            except Exception:
                 pass
 
         return hw_info
@@ -979,7 +979,7 @@ def get_os_info() -> dict[str, Any]:
                     os_info["total_memory"] = (
                         int(os_wmi.TotalVisibleMemorySize) * 1024 if hasattr(os_wmi, "TotalVisibleMemorySize") else None
                     )
-                except Exception:  # noqa: S110
+                except Exception:
                     pass
 
         # Boot time
@@ -1023,7 +1023,7 @@ def get_installed_software() -> dict[str, Any]:
                 software_list = json.loads(result.stdout)
                 if not isinstance(software_list, list):
                     software_list = [software_list]
-            except Exception:  # noqa: S110
+            except Exception:
                 pass
 
         return {
@@ -1222,7 +1222,7 @@ def health_check() -> dict[str, Any]:
                     "percent_used": usage.percent,
                     "free_gb": usage.free / (1024**3),
                 }
-            except Exception:  # noqa: S112
+            except Exception:
                 continue
 
         # Check memory
@@ -1624,13 +1624,13 @@ async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, A
         except asyncio.TimeoutExpired:
             try:
                 process.kill()
-            except Exception:  # noqa: S110
+            except Exception:
                 pass
             return {"status": "error", "error": "Folder analysis timed out"}
         except TimeoutError:
             try:
                 process.kill()
-            except Exception:  # noqa: S110
+            except Exception:
                 pass
             return {"status": "error", "error": f"Folder analysis timed out after 120s: {path}"}
     except Exception as e:
@@ -1650,7 +1650,9 @@ def get_gpu_info() -> dict[str, Any]:
                 "--query-gpu=index,name,temperature.gpu,utilization.gpu,memory.total,memory.used,memory.free,utilization.memory,power.draw",
                 "--format=csv,noheader,nounits",
             ],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         if result.returncode == 0 and result.stdout.strip():
@@ -1684,13 +1686,19 @@ def get_gpu_info() -> dict[str, Any]:
             gpus = c.Win32_VideoController()
             gpu_list = []
             for gpu in gpus:
-                gpu_list.append({
-                    "name": gpu.Name or "Unknown",
-                    "adapter_ram_mb": round(int(gpu.AdapterRAM or 0) / (1024**2), 1),
-                    "driver_version": gpu.DriverVersion or "Unknown",
-                })
+                gpu_list.append(
+                    {
+                        "name": gpu.Name or "Unknown",
+                        "adapter_ram_mb": round(int(gpu.AdapterRAM or 0) / (1024**2), 1),
+                        "driver_version": gpu.DriverVersion or "Unknown",
+                    }
+                )
             if gpu_list:
-                return {"status": "success", "message": f"{len(gpu_list)} GPU(s) detected via WMI (basic info only)", "gpu": gpu_list}
+                return {
+                    "status": "success",
+                    "message": f"{len(gpu_list)} GPU(s) detected via WMI (basic info only)",
+                    "gpu": gpu_list,
+                }
         except Exception as e:
             return {"status": "error", "error": f"WMI query failed: {e}"}
 
@@ -1705,7 +1713,9 @@ def get_gpu_processes() -> dict[str, Any]:
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-compute-apps=pid,process_name,used_gpu_memory", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         if result.returncode != 0 or not result.stdout.strip():
@@ -1727,11 +1737,17 @@ def get_gpu_processes() -> dict[str, Any]:
                 try:
                     cmd = subprocess.run(
                         ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-                        capture_output=True, text=True, timeout=5,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                         creationflags=subprocess.CREATE_NO_WINDOW,
                     )
                     if cmd.returncode == 0 and cmd.stdout.strip():
-                        proc_name = cmd.stdout.strip().strip('"').split('","')[0] if '","' in cmd.stdout else cmd.stdout.strip().strip('"')
+                        proc_name = (
+                            cmd.stdout.strip().strip('"').split('","')[0]
+                            if '","' in cmd.stdout
+                            else cmd.stdout.strip().strip('"')
+                        )
                         name = proc_name
                 except Exception:
                     pass
@@ -1764,7 +1780,9 @@ def _find_testdisk() -> str | None:
         if os.path.isfile(p):
             return p
     try:
-        r = subprocess.run(["where", "testdisk"], capture_output=True, text=True, timeout=5, creationflags=subprocess.CREATE_NO_WINDOW)
+        r = subprocess.run(
+            ["where", "testdisk"], capture_output=True, text=True, timeout=5, creationflags=subprocess.CREATE_NO_WINDOW
+        )
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip().splitlines()[0]
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -1778,7 +1796,9 @@ def _find_photorec() -> str | None:
         if os.path.isfile(p):
             return p
     try:
-        r = subprocess.run(["where", "photorec"], capture_output=True, text=True, timeout=5, creationflags=subprocess.CREATE_NO_WINDOW)
+        r = subprocess.run(
+            ["where", "photorec"], capture_output=True, text=True, timeout=5, creationflags=subprocess.CREATE_NO_WINDOW
+        )
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip().splitlines()[0]
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -1796,20 +1816,32 @@ def testdisk_version() -> dict[str, Any]:
     }
     if td_path:
         try:
-            r = subprocess.run([td_path, "--version"], capture_output=True, text=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
+            r = subprocess.run(
+                [td_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
             result["testdisk"]["version"] = r.stdout.strip() or r.stderr.strip()
         except (subprocess.TimeoutExpired, Exception):
             result["testdisk"]["version"] = "unknown"
     if pr_path:
         try:
-            r = subprocess.run([pr_path, "--version"], capture_output=True, text=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
+            r = subprocess.run(
+                [pr_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
             result["photorec"]["version"] = r.stdout.strip() or r.stderr.strip()
         except (subprocess.TimeoutExpired, Exception):
             result["photorec"]["version"] = "unknown"
     return {
         "status": "success",
-        "message": f"TestDisk: {'v' + (result['testdisk'].get('version','')[:20] or 'found') if td_path else 'NOT INSTALLED'}"
-        f" | PhotoRec: {'v' + (result['photorec'].get('version','')[:20] or 'found') if pr_path else 'NOT INSTALLED'}",
+        "message": f"TestDisk: {'v' + (result['testdisk'].get('version', '')[:20] or 'found') if td_path else 'NOT INSTALLED'}"
+        f" | PhotoRec: {'v' + (result['photorec'].get('version', '')[:20] or 'found') if pr_path else 'NOT INSTALLED'}",
         "tools": result,
     }
 
@@ -1824,13 +1856,18 @@ def testdisk_analyse(drive: str) -> dict[str, Any]:
     """
     td_path = _find_testdisk()
     if not td_path:
-        return {"status": "error", "message": "TestDisk not found. Install from https://www.cgsecurity.org/wiki/TestDisk"}
+        return {
+            "status": "error",
+            "message": "TestDisk not found. Install from https://www.cgsecurity.org/wiki/TestDisk",
+        }
     if not drive:
         return {"status": "error", "message": "drive parameter required"}
     try:
         r = subprocess.run(
             [td_path, "/log", "/list", drive],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         return {
@@ -1859,7 +1896,10 @@ def testdisk_launch(drive: str | None = None) -> dict[str, Any]:
     """
     td_path = _find_testdisk()
     if not td_path:
-        return {"status": "error", "message": "TestDisk not found. Install from https://www.cgsecurity.org/wiki/TestDisk"}
+        return {
+            "status": "error",
+            "message": "TestDisk not found. Install from https://www.cgsecurity.org/wiki/TestDisk",
+        }
     args = [td_path, "/log"]
     if drive:
         args.extend(["/list", drive])
@@ -1893,7 +1933,10 @@ def photorec_recover(drive: str, output_dir: str, file_types: str | None = None)
     """
     pr_path = _find_photorec()
     if not pr_path:
-        return {"status": "error", "message": "PhotoRec not found. Install from https://www.cgsecurity.org/wiki/PhotoRec"}
+        return {
+            "status": "error",
+            "message": "PhotoRec not found. Install from https://www.cgsecurity.org/wiki/PhotoRec",
+        }
     if not drive or not output_dir:
         return {"status": "error", "message": "drive and output_dir parameters required"}
 
@@ -1910,7 +1953,9 @@ def photorec_recover(drive: str, output_dir: str, file_types: str | None = None)
 
         r = subprocess.run(
             cmd,
-            capture_output=True, text=True, timeout=3600,
+            capture_output=True,
+            text=True,
+            timeout=3600,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         return {
@@ -1922,7 +1967,10 @@ def photorec_recover(drive: str, output_dir: str, file_types: str | None = None)
             "exit_code": r.returncode,
         }
     except subprocess.TimeoutExpired:
-        return {"status": "error", "message": "PhotoRec scan timed out after 1 hour (try launching interactively with photorec_launch)"}
+        return {
+            "status": "error",
+            "message": "PhotoRec scan timed out after 1 hour (try launching interactively with photorec_launch)",
+        }
     except Exception as e:
         return {"status": "error", "message": f"PhotoRec failed: {e}"}
 
@@ -1939,7 +1987,10 @@ def photorec_launch(drive: str | None = None, output_dir: str | None = None) -> 
     """
     pr_path = _find_photorec()
     if not pr_path:
-        return {"status": "error", "message": "PhotoRec not found. Install from https://www.cgsecurity.org/wiki/PhotoRec"}
+        return {
+            "status": "error",
+            "message": "PhotoRec not found. Install from https://www.cgsecurity.org/wiki/PhotoRec",
+        }
     args = [pr_path, "/log"]
     if drive:
         args.extend(["/d", output_dir or "recovered", "/cmd", drive, "search"])

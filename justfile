@@ -1,4 +1,4 @@
-set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set windows-shell := ["powershell.exe", "-NoProfile", "-Command"]
 import 'scripts/just/fleet.just'
 
 # Open the interactive recipe dashboard in the browser
@@ -114,11 +114,6 @@ info:
 
 # ── MCPB Packaging ────────────────────────────────────────────────────────────
 
-# Build MCPB package for Claude Desktop
-mcpb-pack:
-    Set-Location '{{justfile_directory()}}'
-    uv run python mcpb_build.py
-
 # Validate MCPB manifest
 mcpb-validate:
     Set-Location '{{justfile_directory()}}'
@@ -162,9 +157,6 @@ build-native:
     $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
     npx @tauri-apps/cli build
 
-# Run the CUA smoke test against the installed NSIS app
-cua-nsis-test:
-    uv run python scripts/cua-smoke.py
 # ── Playwright E2E ─────────────────────────────────────────────────────
 
 # Install Playwright browsers (one-time)

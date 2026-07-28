@@ -122,14 +122,16 @@ def list_services(
                 startup_type = win32service.SERVICE_DEMAND_START
                 startup_name = "Unknown"
 
-            services.append({
-                "name": service_name,
-                "display_name": display_name,
-                "status": status_name,
-                "status_code": status_code,
-                "startup_type": startup_name,
-                "startup_code": startup_type,
-            })
+            services.append(
+                {
+                    "name": service_name,
+                    "display_name": display_name,
+                    "status": status_name,
+                    "status_code": status_code,
+                    "startup_type": startup_name,
+                    "startup_code": startup_type,
+                }
+            )
 
         total = len(services)
         start = (page - 1) * page_size
@@ -196,7 +198,7 @@ def get_service_stats() -> dict[str, Any]:
                         manual_start += 1
                     elif startup_type == win32service.SERVICE_DISABLED:
                         disabled += 1
-                except Exception:  # noqa: S112
+                except Exception:
                     continue
 
         finally:
@@ -661,7 +663,7 @@ def list_startup_programs() -> dict[str, Any]:
                             break
                 finally:
                     winreg.CloseKey(key)
-            except Exception:  # noqa: S112
+            except Exception:
                 continue
 
         # Also check Startup folder
@@ -941,7 +943,7 @@ def find_taskbar_blocking_processes() -> dict[str, Any]:
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
 
-            except Exception:  # noqa: S112
+            except Exception:
                 continue
 
         return {
@@ -1060,12 +1062,14 @@ def forensic_scan() -> dict[str, Any]:
                 except Exception:
                     logger.debug("Skipped status query for service %s", svc_name)
                 if flags:
-                    findings["suspicious_services"].append({
-                        "name": svc_name,
-                        "display_name": display_name,
-                        "binary_path": bin_path[:120] if bin_path else "",
-                        "flags": flags,
-                    })
+                    findings["suspicious_services"].append(
+                        {
+                            "name": svc_name,
+                            "display_name": display_name,
+                            "binary_path": bin_path[:120] if bin_path else "",
+                            "flags": flags,
+                        }
+                    )
         except Exception:
             logger.debug("Forensic services scan failed")
 
@@ -1084,24 +1088,36 @@ def forensic_scan() -> dict[str, Any]:
                 mem = info.get("memory_percent") or 0
                 if cpu > 50:
                     flags.append("high_cpu")
-                    findings["resource_hogs"].append({
-                        "pid": info["pid"], "name": name, "type": "cpu", "value": round(cpu, 1),
-                    })
+                    findings["resource_hogs"].append(
+                        {
+                            "pid": info["pid"],
+                            "name": name,
+                            "type": "cpu",
+                            "value": round(cpu, 1),
+                        }
+                    )
                 if mem > 20:
                     flags.append("high_memory")
-                    findings["resource_hogs"].append({
-                        "pid": info["pid"], "name": name, "type": "memory", "value": round(mem, 1),
-                    })
+                    findings["resource_hogs"].append(
+                        {
+                            "pid": info["pid"],
+                            "name": name,
+                            "type": "memory",
+                            "value": round(mem, 1),
+                        }
+                    )
                 if flags:
-                    findings["suspicious_processes"].append({
-                        "pid": info["pid"],
-                        "name": name,
-                        "username": info.get("username"),
-                        "exe": exe[:120] if exe else "",
-                        "cpu": round(cpu, 1),
-                        "memory": round(mem, 1),
-                        "flags": flags,
-                    })
+                    findings["suspicious_processes"].append(
+                        {
+                            "pid": info["pid"],
+                            "name": name,
+                            "username": info.get("username"),
+                            "exe": exe[:120] if exe else "",
+                            "cpu": round(cpu, 1),
+                            "memory": round(mem, 1),
+                            "flags": flags,
+                        }
+                    )
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
@@ -1111,13 +1127,15 @@ def forensic_scan() -> dict[str, Any]:
             try:
                 for conn in proc.connections():
                     if conn.raddr and conn.raddr.port in uncommon_ports:
-                        findings["notable_connections"].append({
-                            "pid": proc.pid,
-                            "process": proc.name(),
-                            "local": f"{conn.laddr.ip}:{conn.laddr.port}",
-                            "remote": f"{conn.raddr.ip}:{conn.raddr.port}",
-                            "status": conn.status,
-                        })
+                        findings["notable_connections"].append(
+                            {
+                                "pid": proc.pid,
+                                "process": proc.name(),
+                                "local": f"{conn.laddr.ip}:{conn.laddr.port}",
+                                "remote": f"{conn.raddr.ip}:{conn.raddr.port}",
+                                "status": conn.status,
+                            }
+                        )
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
 

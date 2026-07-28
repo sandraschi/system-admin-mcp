@@ -15,9 +15,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import the FastMCP instance
-from system_admin_mcp.app import mcp  # noqa: E402
+from system_admin_mcp.app import mcp
 
-from .transport import run_server  # noqa: E402
+from .transport import run_server
 
 # Import tools to trigger @mcp.tool() decorators
 # Wrap imports in try/except to prevent startup failures

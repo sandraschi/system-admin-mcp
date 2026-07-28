@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "system-admin-mcp"
+version = "0.4.0"
+description = "System Admin MCP — elevated Windows system operations, diagnostics, security, file recovery. FastMCP 3.2.0 full conformance. Prefab UI, MCPB packaging, SOTA justfile."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Sandra Schipal", email = "sandra@schipal.at"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+]
+dependencies = [
+    "fastmcp[tasks]>=3.4.2,<4",
+    "pywin32>=300; platform_system=='Windows'",
+    "psutil>=5.9.0",
+    "wmi>=1.5.1; platform_system=='Windows'",
+    "ruff>=0.15.2",
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "watchdog>=4.0.0",
+    "starlette>=0.36.0",
+    "prefab-ui>=0.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+system-admin-mcp = "system_admin_mcp.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/system_admin_mcp"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["system_admin_mcp*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "S", "UP", "RUF"]
+ignore = ["S101", "B008", "S603", "S607"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
