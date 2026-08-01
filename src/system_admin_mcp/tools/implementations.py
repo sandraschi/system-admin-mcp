@@ -15,13 +15,22 @@ from typing import Any
 
 import psutil
 import win32api
-import win32con
 import win32evtlog
 import win32evtlogutil
 import win32file
 import win32security
 
 from system_admin_mcp.app import mcp
+
+# pywin32's win32con does not expose the file-specific rights constants (winnt.h)
+FILE_READ_DATA = 0x0001
+FILE_WRITE_DATA = 0x0002
+FILE_EXECUTE = 0x0020
+FILE_READ_ATTRIBUTES = 0x0080
+FILE_WRITE_ATTRIBUTES = 0x0100
+FILE_READ_EA = 0x0008
+FILE_WRITE_EA = 0x0010
+FILE_ALL_ACCESS = 0x001F01FF
 
 try:
     import wmi
@@ -107,6 +116,9 @@ def scan_volume(drive: str, file_pattern: str | None = None, max_results: int = 
             import json
 
             files = json.loads(result.stdout)
+            # PowerShell may emit a hashtable wrapper when no results match
+            if isinstance(files, dict):
+                files = files.get("files", [])
             return {
                 "status": "success",
                 "operation": "scan_volume",
@@ -294,13 +306,13 @@ def get_permissions(path: str) -> dict[str, Any]:
 
                 # Convert access mask to readable permissions
                 rights = []
-                if mask & win32con.FILE_READ_DATA:
+                if mask & FILE_READ_DATA:
                     rights.append("Read")
-                if mask & win32con.FILE_WRITE_DATA:
+                if mask & FILE_WRITE_DATA:
                     rights.append("Write")
-                if mask & win32con.FILE_EXECUTE:
+                if mask & FILE_EXECUTE:
                     rights.append("Execute")
-                if mask & win32con.FILE_ALL_ACCESS:
+                if mask & FILE_ALL_ACCESS:
                     rights.append("FullControl")
 
                 permissions.append(
@@ -344,13 +356,13 @@ def set_permissions(path: str, principal: str, rights: str, inheritance: str | N
         # Parse rights
         access_mask = 0
         if "Read" in rights or "read" in rights:
-            access_mask |= win32con.FILE_READ_DATA | win32con.FILE_READ_ATTRIBUTES | win32con.FILE_READ_EA
+            access_mask |= FILE_READ_DATA | FILE_READ_ATTRIBUTES | FILE_READ_EA
         if "Write" in rights or "write" in rights:
-            access_mask |= win32con.FILE_WRITE_DATA | win32con.FILE_WRITE_ATTRIBUTES | win32con.FILE_WRITE_EA
+            access_mask |= FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA
         if "Execute" in rights or "execute" in rights:
-            access_mask |= win32con.FILE_EXECUTE
+            access_mask |= FILE_EXECUTE
         if "FullControl" in rights or "full" in rights.lower():
-            access_mask = win32con.FILE_ALL_ACCESS
+            access_mask = FILE_ALL_ACCESS
 
         # Get account SID
         try:

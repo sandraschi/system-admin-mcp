@@ -1,8 +1,15 @@
-"""Tests for edge cases and boundary conditions."""
+"""Tests for edge cases and boundary conditions.
+
+All classes here exercise the REAL implementations against the live system
+(PowerShell NTFS scans, WMI, real drives), so the whole module is marked
+integration — excluded from the default `pytest` run via `-m "not integration"`.
+"""
 
 import pytest
 
 from tests.test_portmanteau_helper import system_admin_test as system_admin
+
+pytestmark = pytest.mark.integration
 
 
 class TestEdgeCases:

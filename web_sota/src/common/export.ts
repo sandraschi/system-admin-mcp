@@ -18,7 +18,9 @@ export function toCsv(rows: Record<string, unknown>[]): string {
         .map((k) => {
           const v = r[k];
           const s = v == null ? "" : String(v);
-          return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+          return s.includes(",") || s.includes('"')
+            ? `"${s.replace(/"/g, '""')}"`
+            : s;
         })
         .join(","),
     )
@@ -26,7 +28,10 @@ export function toCsv(rows: Record<string, unknown>[]): string {
   return `${header}\n${body}`;
 }
 
-export function toMarkdownTable(rows: Record<string, unknown>[], title: string): string {
+export function toMarkdownTable(
+  rows: Record<string, unknown>[],
+  title: string,
+): string {
   if (rows.length === 0) return `# ${title}\n\nNo data.\n`;
   const keys = Object.keys(rows[0]);
   const header = `| ${keys.join(" | ")} |`;

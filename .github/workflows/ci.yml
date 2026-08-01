@@ -1,106 +1,127 @@
 # CI/CD Workflow - system-admin-mcp
-# Part of: GitHub Dash (CI/CD Modernization)
+# Fleet five-gate shape: ruff + biome style, pyright + tsc types, pytest behavior.
 
 name: CI/CD
 
 on:
   push:
+    branches: [main, master]
     tags: ["v*"]
-  workflow_dispatch:
+  pull_request:
 
 jobs:
   lint:
-    name: Lint with Ruff
+    name: Lint
     runs-on: windows-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
+          python-version: "3.12"
+
+      - name: Install Python dependencies
         run: uv sync --dev
-      
-      - name: Run ruff linting
-        run: uv run ruff check .
+
+      - name: Ruff lint
+        run: uv run ruff check src/
+
+      - name: Ruff format check
+        run: uv run ruff format --check src/
+
+      - name: Pyright typecheck
+        # 149 pre-existing errors as of 2026-08-01 — non-blocking during adoption.
+        # Flip to blocking when pyright src/ is clean (fleet QUALITY_GATES shape).
+        run: uv run pyright src/
         continue-on-error: true
-      
-      - name: Run ruff format check
-        run: uv run ruff format --check .
-        continue-on-error: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        working-directory: web_sota
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: web_sota
+        run: npx tsc --noEmit
+
+      - name: Biome check
+        working-directory: web_sota
+        run: npx biome ci src/
 
   test:
     name: Test with pytest
     runs-on: windows-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
+          python-version: "3.12"
+
+      - name: Install Python dependencies
         run: uv sync --dev
-      
-      - name: Verify pytest installation
-        run: uv run python -m pytest --version
-      
+
       - name: Run tests with coverage
         run: |
           uv run python -m pytest \
             --cov=src \
             --cov-report=xml \
             --cov-report=term-missing \
-            -v \
+            -q \
             --maxfail=10 \
-            --tb=short || echo "Tests completed with warnings"
-        continue-on-error: true
-      
+            --tb=short
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         if: always()
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
-        continue-on-error: true
 
   build:
     name: Build package
     runs-on: windows-latest
     needs: [lint, test]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
-      
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Build package
         run: uv build
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: python-package
           path: dist/*
-

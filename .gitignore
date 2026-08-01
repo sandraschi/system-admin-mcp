@@ -52,3 +52,22 @@ docs-private/
 # Rust / Zed IDE — rust-analyzer may create target/ at repo root
 target/
 _dashboard/
+reports/
+
+# Node / webapp
+node_modules/
+web_sota/node_modules/
+
+# MCPB
+*.mcpb
+mcpb/src/
+
+# Backups (batch-mutation safety)
+*.bak
+*.bak.*
+
+# Reports (regenerable audit snapshots)
+reports/
+
+# Environment (single source of truth is .env.example)
+.env

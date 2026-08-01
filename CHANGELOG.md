@@ -1,4 +1,39 @@
 
+## [Unreleased] — 2026-08-01
+
+### Fixed
+- Tests: `UserBridge` missing `get_disk_usage`/`get_process_info` methods; `win32con.FILE_*`
+  constants missing from pywin32 (now local constants); `cpu_percent(percpu=True)` mock shape;
+  `is_admin` test now patches the module attribute; live-system edge-case tests marked
+  `integration` (excluded from default run — no more hangs); tool-registration tests use the
+  public `mcp.list_tools()` API.
+- `recover_file` placeholder replaced with a real bridge-backed implementation returning
+  structured errors instead of raising.
+- Tool modules now imported from `app.py` — registration happens on package import, not only
+  via `main.py`.
+- Chat page was a fake echo placeholder; now wired to a real `POST /api/chat` (Ollama/LM Studio).
+- Dashboard was fully static; now live KPIs + hero section.
+- Removed the fabricated "Elevated Operations" page (hardcoded counts + fake console telemetry).
+- CORS: added fleet `allow_origin_regex` + Tauri origins.
+- httpx/log spam silenced in the ring buffer.
+
+### Added
+- `POST /api/chat`, `GET /api/llm/discover`, `GET /api/skills`, `GET /api/v1/diagnostics`,
+  `POST /api/shutdown` REST endpoints.
+- Skills page + sidebar entry; LLM provider/model selectors with `data-testid` on Chat + Settings.
+- Session context injection: `.claude-plugin/plugin.json` + `hooks/hooks.json`,
+  `## Session Context` in `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md`,
+  `.opencode/skills/session-context/SKILL.md`.
+- MCPB prompts expanded to 3-4-100: system.md 3969 words, user.md 4135 words (examples.json 110).
+- pyright dev dependency (149 pre-existing type errors — adoption in progress, CI non-blocking).
+
+### Changed
+- CI: python 3.12 (was 3.11), biome + tsc + pyright gates, pytest/ruff now blocking,
+  triggers on push/PR. actionlint clean.
+- `glama.json` refreshed: FastMCP 3.4.4, 44 tools, streamable-http transport.
+- `.gitignore`: `.env`, `node_modules/`, `*.mcpb`, `*.bak`, `reports/`; tracked `.bak` files removed.
+- pytest.ini: `-m "not integration"` default.
+
 ## [Unreleased] — 2026-06-14
 
 ### Added

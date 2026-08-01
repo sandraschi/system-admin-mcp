@@ -117,21 +117,28 @@ async def recover_file(original_path: str, output_dir: str) -> dict:
         Dictionary with recovery status
     """
     if not is_admin():
-        raise RuntimeError("Administrator privileges required for file recovery")
-
-    try:
-        # Implementation would go here
-        # This is a placeholder that needs proper NTFS implementation
         return {
             "status": "error",
-            "message": "File recovery not yet implemented",
-            "original_path": original_path,
-            "output_dir": output_dir,
+            "error": {
+                "code": "admin_required",
+                "message": "Administrator privileges required for file recovery",
+            },
         }
 
+    bridge = get_bridge()
+    if bridge is None:
+        return {
+            "status": "error",
+            "error": {
+                "code": "bridge_unavailable",
+                "message": "UserBridge not available. Service may not be installed.",
+            },
+        }
+    try:
+        return bridge.recover_file(original_path, output_dir)
     except Exception as e:
         logger.error(f"File recovery failed: {e}")
-        raise
+        return {"status": "error", "error": {"code": "recovery_failed", "message": str(e)}}
 
 
 @mcp.tool()
@@ -144,8 +151,11 @@ async def get_disk_usage(path: str) -> dict:
     Returns:
         Dictionary containing disk usage information
     """
+    bridge = get_bridge()
+    if bridge is None:
+        raise RuntimeError("UserBridge not available. Service may not be installed.")
     try:
-        return _bridge.get_disk_usage(path)
+        return bridge.get_disk_usage(path)
     except Exception as e:
         logger.error(f"Error getting disk usage for {path}: {e}")
         raise

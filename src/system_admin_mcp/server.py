@@ -1,12 +1,14 @@
 import asyncio
 import logging
 import os
+import signal
+import threading
 import time
 from pathlib import Path
 from typing import Any
 
 import psutil
-from fastapi import FastAPI, Request
+from fastapi import Body, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from system_admin_mcp.app import mcp
@@ -66,13 +68,18 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Add CORS middleware
+# Add CORS middleware — fleet standard: explicit origins + unconditional regex
+# covering Tauri webview, Tailscale, LAN IPs, Tailscale CGNAT, localhost.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:10860",
         "http://127.0.0.1:10860",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+        "tauri://localhost",
     ],
+    allow_origin_regex=r"https?://(?:[a-zA-Z0-9-]+\.ts\.net|.*?\.tail-[a-f0-9]+\.ts\.net|tauri\.localhost|localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?$|^tauri://localhost$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -205,6 +212,106 @@ async def get_metrics() -> dict[str, Any]:
         "load_average": os.getloadavg() if hasattr(os, "getloadavg") else [0, 0, 0],
         "network": {"bytes_sent": net_io.bytes_sent, "bytes_recv": net_io.bytes_recv},
     }
+
+
+@app.get("/api/llm/discover")
+async def llm_discover() -> dict[str, Any]:
+    """Probe local LLM providers (Ollama, LM Studio) and list available models."""
+    import httpx
+
+    async def probe(name: str, base: str, url: str, container: str, field: str) -> dict[str, Any]:
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                r = await client.get(url)
+                if r.status_code == 200:
+                    items = r.json().get(container) or []
+                    models = [m.get(field) for m in items if m.get(field)]
+                    return {"name": name, "base": base, "detected": True, "models": models}
+        except Exception:
+            pass
+        return {"name": name, "base": base, "detected": False, "models": []}
+
+    providers = await asyncio.gather(
+        probe("ollama", "http://127.0.0.1:11434", "http://127.0.0.1:11434/api/tags", "models", "name"),
+        probe("lm_studio", "http://127.0.0.1:1234", "http://127.0.0.1:1234/v1/models", "data", "id"),
+    )
+    return {"providers": providers, "detected": [p for p in providers if p["detected"]]}
+
+
+@app.post("/api/chat")
+async def chat(
+    query: str = Body(..., embed=True),
+    model: str | None = None,
+    provider: str | None = None,
+) -> dict[str, Any]:
+    """Chat with a local LLM (Ollama default, LM Studio fallback)."""
+    import httpx
+
+    base = "http://127.0.0.1:1234/v1" if provider == "lm_studio" else "http://127.0.0.1:11434/v1"
+    model_name = model or "llama3.2:3b"
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            r = await client.post(
+                f"{base}/chat/completions",
+                json={
+                    "model": model_name,
+                    "messages": [{"role": "user", "content": query}],
+                    "max_tokens": 1024,
+                    "temperature": 0.7,
+                },
+            )
+        if r.status_code == 200:
+            content = r.json()["choices"][0]["message"]["content"]
+            return {
+                "status": "success",
+                "response": content,
+                "model": model_name,
+                "provider": provider or "ollama",
+            }
+        return {"status": "error", "message": f"LLM HTTP {r.status_code}: {r.text[:200]}"}
+    except Exception as e:
+        return {"status": "error", "message": f"LLM unreachable: {e}"}
+
+
+@app.get("/api/skills")
+async def api_skills() -> dict[str, Any]:
+    """List available skills from the skills/ directory."""
+    skills_dir = Path(__file__).resolve().parent.parent.parent / "skills"
+    results = []
+    if skills_dir.is_dir():
+        for d in sorted(skills_dir.iterdir()):
+            sk = d / "SKILL.md"
+            if d.is_dir() and sk.exists():
+                results.append({"name": d.name, "description": sk.read_text(encoding="utf-8")[:200]})
+    return {"skills": results}
+
+
+@app.get("/api/v1/diagnostics")
+async def api_diagnostics() -> dict[str, Any]:
+    """Full diagnostics for CUA-NSIS smoke testing: tools, system, errors."""
+    try:
+        tools = await mcp.list_tools()
+        tool_list = [{"name": t.name} for t in tools]
+    except Exception as e:
+        tool_list = []
+        logger.warning(f"Diagnostics tool listing failed: {e}")
+    return {
+        "status": "ok",
+        "server": "system-admin-mcp",
+        "version": "0.4.0",
+        "uptime_seconds": int(time.time() - START_TIME),
+        "tool_count": len(tool_list),
+        "tools": tool_list,
+        "system": {"windows": os.name == "nt", "cpu_count": psutil.cpu_count()},
+        "errors": [],
+    }
+
+
+@app.post("/api/shutdown")
+async def api_shutdown() -> dict[str, Any]:
+    """Gracefully stop the server (agent/self-termination endpoint)."""
+    threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
+    return {"status": "shutting_down"}
 
 
 async def _run_tool(name: str, **kwargs: Any) -> Any:

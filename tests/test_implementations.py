@@ -183,11 +183,15 @@ class TestUtilityFunctions:
 
     def test_is_admin(self, mock_is_admin):
         """Test is_admin function."""
-        assert is_admin() is True
+        from system_admin_mcp.tools import implementations as impl
+
+        assert impl.is_admin() is True
 
     def test_is_not_admin(self, mock_is_not_admin):
         """Test is_admin returning False."""
-        assert is_admin() is False
+        from system_admin_mcp.tools import implementations as impl
+
+        assert impl.is_admin() is False
 
 
 class TestErrorHandling:

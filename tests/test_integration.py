@@ -1,9 +1,17 @@
 """Integration tests for System Admin MCP."""
 
+import asyncio
+
 import pytest
 
 from system_admin_mcp.app import mcp
 from system_admin_mcp.tools import system_ops
+
+
+def _tool_names() -> set[str]:
+    """Public API (FastMCP 3.4+) — mcp.list_tools() is the supported surface."""
+    tools = asyncio.run(mcp.list_tools())
+    return {t.name for t in tools}
 
 
 class TestToolRegistration:
@@ -11,22 +19,17 @@ class TestToolRegistration:
 
     def test_tools_registered(self):
         """Test that all tools are registered."""
-        tm = getattr(mcp, "_tool_manager", None)
-        tools = getattr(tm, "_tools", {}) if tm else {}
-        assert len(tools) > 0
-        assert "system_admin" in tools
-        assert "list_volumes" in tools
-        assert "ping" in tools
-        assert "help" in tools
-        assert "status" in tools
+        names = _tool_names()
+        assert len(names) > 0
+        assert "system_admin" in names
+        assert "list_volumes" in names
+        assert "ping" in names
+        assert "help" in names
+        assert "status" in names
 
     def test_portmanteau_tool_registered(self):
         """Test that portmanteau tool is registered."""
-        tm = getattr(mcp, "_tool_manager", None)
-        tools = getattr(tm, "_tools", {}) if tm else {}
-        assert "system_admin" in tools
-        tool = tools["system_admin"]
-        assert tool is not None
+        assert "system_admin" in _tool_names()
 
     def test_all_operations_available(self):
         """Test that all 22 operations are available in portmanteau."""

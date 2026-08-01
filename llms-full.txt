@@ -246,6 +246,11 @@ src/system_admin_mcp/
 | `GET /api/logs` | System log viewer |
 | `GET /api/tools` | List registered MCP tools |
 | `POST /api/tools/call` | Execute any MCP tool |
+| `POST /api/chat` | Chat with local LLM (Ollama/LM Studio); body `{query, provider?, model?}` |
+| `GET /api/llm/discover` | Probe Ollama (11434) + LM Studio (1234), list models |
+| `GET /api/skills` | List skills from `skills/` directory |
+| `GET /api/v1/diagnostics` | Tool list + system info (CUA-NSIS smoke test) |
+| `POST /api/shutdown` | Graceful server termination |
 
 ## Environment Variables
 

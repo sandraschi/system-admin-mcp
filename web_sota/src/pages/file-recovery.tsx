@@ -1,7 +1,6 @@
 import { Archive, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -10,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import API_BASE from "@/lib/api";
 
 export function FileRecovery() {
   const [originalPath, setOriginalPath] = useState("");
@@ -22,7 +22,7 @@ export function FileRecovery() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(API_BASE + "/api/recover_file", {
+      const res = await fetch(`${API_BASE}/api/recover_file`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -66,7 +66,10 @@ export function FileRecovery() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="recovery-original-path" className="text-sm text-slate-400">
+            <label
+              htmlFor="recovery-original-path"
+              className="text-sm text-slate-400"
+            >
               Original path (deleted file)
             </label>
             <Input
@@ -78,7 +81,10 @@ export function FileRecovery() {
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="recovery-output-dir" className="text-sm text-slate-400">
+            <label
+              htmlFor="recovery-output-dir"
+              className="text-sm text-slate-400"
+            >
               Output directory
             </label>
             <Input

@@ -1,8 +1,7 @@
 import { Cpu, Download, RefreshCw, Search, Skull, X } from "lucide-react";
-import { download, toCsv } from "@/common/export";
 import { useCallback, useEffect, useState } from "react";
+import { download, toCsv } from "@/common/export";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -11,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import API_BASE from "@/lib/api";
 
 interface ProcessRow {
   pid: number;
@@ -56,11 +56,37 @@ const SORT_OPTIONS = [
 
 type KillPreset = { label: string; targets: string[]; color: string };
 const KILL_PRESETS: KillPreset[] = [
-  { label: "Kill Python", targets: ["python.exe", "python3.exe"], color: "bg-yellow-600 hover:bg-yellow-700" },
-  { label: "Kill Node", targets: ["node.exe"], color: "bg-green-700 hover:bg-green-800" },
-  { label: "Kill Consoles", targets: ["conhost.exe", "cmd.exe", "powershell.exe", "pwsh.exe", "WindowsTerminal.exe"], color: "bg-blue-700 hover:bg-blue-800" },
-  { label: "Kill Browsers", targets: ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe"], color: "bg-orange-600 hover:bg-orange-700" },
-  { label: "Kill VS Code", targets: ["Code.exe"], color: "bg-indigo-600 hover:bg-indigo-700" },
+  {
+    label: "Kill Python",
+    targets: ["python.exe", "python3.exe"],
+    color: "bg-yellow-600 hover:bg-yellow-700",
+  },
+  {
+    label: "Kill Node",
+    targets: ["node.exe"],
+    color: "bg-green-700 hover:bg-green-800",
+  },
+  {
+    label: "Kill Consoles",
+    targets: [
+      "conhost.exe",
+      "cmd.exe",
+      "powershell.exe",
+      "pwsh.exe",
+      "WindowsTerminal.exe",
+    ],
+    color: "bg-blue-700 hover:bg-blue-800",
+  },
+  {
+    label: "Kill Browsers",
+    targets: ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe"],
+    color: "bg-orange-600 hover:bg-orange-700",
+  },
+  {
+    label: "Kill VS Code",
+    targets: ["Code.exe"],
+    color: "bg-indigo-600 hover:bg-indigo-700",
+  },
 ];
 
 export function Processes() {
@@ -80,7 +106,11 @@ export function Processes() {
   const fetchProcesses = useCallback(async () => {
     setLoading(true);
     try {
-      const qs = new URLSearchParams({ sort_by: sortBy, page: String(page), page_size: String(pageSize) });
+      const qs = new URLSearchParams({
+        sort_by: sortBy,
+        page: String(page),
+        page_size: String(pageSize),
+      });
       const res = await fetch(`${API_BASE}/api/processes?${qs}`);
       if (res.ok) {
         const data = await res.json();
@@ -129,31 +159,43 @@ export function Processes() {
     setDetail(null);
   }, []);
 
-  const killByName = useCallback(async (label: string, targets: string[]) => {
-    setKilling(label);
-    setKillResult(null);
-    const killed: number[] = [];
-    const errors: string[] = [];
-    for (const p of processes) {
-      if (targets.some((t) => p.name.toLowerCase() === t.toLowerCase())) {
-        try {
-          const res = await fetch(API_BASE + "/api/tools/call", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: "system_admin", arguments: { operation: "kill_process", pid: p.pid, force: false } }),
-          });
-          const data = await res.json();
-          if (data.status === "success") killed.push(p.pid);
-          else errors.push(`${p.pid}: ${data.message ?? "failed"}`);
-        } catch {
-          errors.push(`${p.pid}: request failed`);
+  const killByName = useCallback(
+    async (label: string, targets: string[]) => {
+      setKilling(label);
+      setKillResult(null);
+      const killed: number[] = [];
+      const errors: string[] = [];
+      for (const p of processes) {
+        if (targets.some((t) => p.name.toLowerCase() === t.toLowerCase())) {
+          try {
+            const res = await fetch(`${API_BASE}/api/tools/call`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: "system_admin",
+                arguments: {
+                  operation: "kill_process",
+                  pid: p.pid,
+                  force: false,
+                },
+              }),
+            });
+            const data = await res.json();
+            if (data.status === "success") killed.push(p.pid);
+            else errors.push(`${p.pid}: ${data.message ?? "failed"}`);
+          } catch {
+            errors.push(`${p.pid}: request failed`);
+          }
         }
       }
-    }
-    setKillResult(`Killed ${killed.length} process(es)${errors.length ? `, ${errors.length} error(s)` : ""}`);
-    setKilling(null);
-    fetchProcesses();
-  }, [processes, fetchProcesses]);
+      setKillResult(
+        `Killed ${killed.length} process(es)${errors.length ? `, ${errors.length} error(s)` : ""}`,
+      );
+      setKilling(null);
+      fetchProcesses();
+    },
+    [processes, fetchProcesses],
+  );
 
   const filtered = processes.filter(
     (p) =>
@@ -176,7 +218,9 @@ export function Processes() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <label htmlFor="sort-by" className="text-xs text-slate-400">Sort by</label>
+          <label htmlFor="sort-by" className="text-xs text-slate-400">
+            Sort by
+          </label>
           <select
             id="sort-by"
             value={sortBy}
@@ -205,7 +249,12 @@ export function Processes() {
             <button
               type="button"
               title="Export CSV"
-              onClick={() => download(`processes-${Date.now()}.csv`, toCsv(processes as unknown as Record<string, unknown>[]))}
+              onClick={() =>
+                download(
+                  `processes-${Date.now()}.csv`,
+                  toCsv(processes as unknown as Record<string, unknown>[]),
+                )
+              }
               className="p-1.5 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -339,7 +388,8 @@ export function Processes() {
 
           <div className="flex items-center justify-between mt-4">
             <p className="text-xs text-slate-500">
-              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
+              Showing {(page - 1) * pageSize + 1}–
+              {Math.min(page * pageSize, total)} of {total}
             </p>
             <div className="flex gap-2">
               <Button
@@ -431,9 +481,7 @@ export function Processes() {
                       label="Started"
                       value={
                         detail.create_time
-                          ? new Date(
-                              detail.create_time * 1000,
-                            ).toLocaleString()
+                          ? new Date(detail.create_time * 1000).toLocaleString()
                           : null
                       }
                     />
@@ -487,12 +535,8 @@ export function Processes() {
                               ? "TCP"
                               : c.type}{" "}
                             {c.laddr?.ip}:{c.laddr?.port}
-                            {c.raddr
-                              ? ` → ${c.raddr.ip}:${c.raddr.port}`
-                              : ""}{" "}
-                            <span className="text-slate-500">
-                              [{c.status}]
-                            </span>
+                            {c.raddr ? ` → ${c.raddr.ip}:${c.raddr.port}` : ""}{" "}
+                            <span className="text-slate-500">[{c.status}]</span>
                           </div>
                         ))}
                       </div>
@@ -524,9 +568,7 @@ function Section({
       </h3>
       <div
         className={
-          cols
-            ? `grid grid-cols-${cols} gap-x-4 gap-y-1`
-            : "space-y-1"
+          cols ? `grid grid-cols-${cols} gap-x-4 gap-y-1` : "space-y-1"
         }
       >
         {children}
@@ -535,13 +577,7 @@ function Section({
   );
 }
 
-function Field({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
   if (value == null) return null;
   return (
     <div className="flex justify-between gap-2">

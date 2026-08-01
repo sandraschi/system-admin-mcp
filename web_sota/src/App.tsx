@@ -8,7 +8,6 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Apps } from "@/pages/apps";
 import { Chat } from "@/pages/chat";
 import { Dashboard } from "@/pages/dashboard";
-import { Elevated } from "@/pages/elevated";
 import { FileOwner } from "@/pages/file-owner";
 import { FileRecovery } from "@/pages/file-recovery";
 import { Help } from "@/pages/help";
@@ -16,6 +15,7 @@ import Logs from "@/pages/logs";
 import { Processes } from "@/pages/processes";
 import { Services } from "@/pages/services";
 import { Settings } from "@/pages/settings";
+import { Skills } from "@/pages/skills";
 import { Status } from "@/pages/status";
 import { Tools } from "@/pages/tools";
 import { Volumes } from "@/pages/volumes";
@@ -36,7 +36,7 @@ function App() {
           <Route path="/logs" element={<Logs />} />
           <Route path="/apps" element={<Apps />} />
           <Route path="/tools" element={<Tools />} />
-          <Route path="/elevated" element={<Elevated />} />
+          <Route path="/skills" element={<Skills />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/help" element={<Help />} />
           <Route path="*" element={<Navigate to="/" replace />} />

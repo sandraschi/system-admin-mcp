@@ -2,7 +2,6 @@ import { Code2, Loader2, Play, Search, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -12,16 +11,17 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import API_BASE from "@/lib/api";
 
 export function Tools() {
-  const [tools, setTools] = useState<any[]>([]);
+  const [tools, setTools] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<Record<string, any>>({});
+  const [results, setResults] = useState<Record<string, unknown>>({});
   const [executing, setExecuting] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetch(API_BASE + "/api/tools")
+    fetch(`${API_BASE}/api/tools`)
       .then((res) => res.json())
       .then((data) => {
         setTools(data);
@@ -30,10 +30,10 @@ export function Tools() {
       .catch((err) => console.error("Failed to fetch tools", err));
   }, []);
 
-  const callTool = async (name: string, args: any = {}) => {
+  const callTool = async (name: string, args: Record<string, unknown> = {}) => {
     setExecuting((prev) => ({ ...prev, [name]: true }));
     try {
-      const res = await fetch(API_BASE + "/api/tools/call", {
+      const res = await fetch(`${API_BASE}/api/tools/call`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, arguments: args }),
@@ -131,7 +131,10 @@ export function Tools() {
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {Object.entries(tool.parameters.properties).map(
-                        ([param, details]: [string, any]) => (
+                        ([param, details]: [
+                          string,
+                          Record<string, unknown>,
+                        ]) => (
                           <div key={param} className="space-y-1.5">
                             <Label className="text-xs text-slate-300">
                               {param}

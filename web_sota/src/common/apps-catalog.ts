@@ -6,12 +6,13 @@ import {
   Scan,
   Shield,
 } from "lucide-react";
+import type { ComponentType } from "react";
 
 export interface AppEntry {
   id: string;
   label: string;
   description: string;
-  icon: any;
+  icon: ComponentType<{ className?: string }>;
   url: string;
   port: number;
   tags: string[];

@@ -1,7 +1,6 @@
 import { FolderOpen, HardDrive, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -10,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import API_BASE from "@/lib/api";
 
 const DRIVE_TYPE_NAMES: Record<number, string> = {
   0: "Unknown",
@@ -22,9 +22,7 @@ const DRIVE_TYPE_NAMES: Record<number, string> = {
 };
 
 export function Volumes() {
-  const [volumes, setVolumes] = useState<
-    { drive: string; type: number }[]
-  >([]);
+  const [volumes, setVolumes] = useState<{ drive: string; type: number }[]>([]);
   const [path, setPath] = useState("C:\\");
   const [usage, setUsage] = useState<Record<string, unknown> | null>(null);
   const [loadingVolumes, setLoadingVolumes] = useState(false);
@@ -33,7 +31,7 @@ export function Volumes() {
   const fetchVolumes = useCallback(async () => {
     setLoadingVolumes(true);
     try {
-      const res = await fetch(API_BASE + "/api/volumes");
+      const res = await fetch(`${API_BASE}/api/volumes`);
       const data = await res.json();
       setVolumes(Array.isArray(data?.volumes) ? data.volumes : []);
     } catch {
@@ -48,7 +46,7 @@ export function Volumes() {
     setLoadingUsage(true);
     setUsage(null);
     try {
-      const res = await fetch(API_BASE + "/api/disk_usage", {
+      const res = await fetch(`${API_BASE}/api/disk_usage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: path.trim() }),
@@ -77,9 +75,7 @@ export function Volumes() {
           <h1 className="text-3xl font-bold tracking-tight text-white">
             Volumes
           </h1>
-          <p className="text-slate-400 text-sm">
-            Drive listing and disk usage
-          </p>
+          <p className="text-slate-400 text-sm">Drive listing and disk usage</p>
         </div>
         <Button
           variant="outline"
@@ -121,9 +117,7 @@ export function Volumes() {
                       colSpan={2}
                       className="px-4 py-8 text-center text-slate-500"
                     >
-                      {loadingVolumes
-                        ? "Loading..."
-                        : "No volumes returned."}
+                      {loadingVolumes ? "Loading..." : "No volumes returned."}
                     </td>
                   </tr>
                 )}

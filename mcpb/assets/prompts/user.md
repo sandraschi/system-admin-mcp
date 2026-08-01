@@ -363,3 +363,392 @@ Stop all writes to the affected drive immediately. Recover to a different physic
 
 ### 12.5 Permission Change Protocol
 Backup current permissions before changes. Make one change at a time. Verify each change with get_permissions. Document the before and after state for audit purposes.
+
+## 10. Security Audit Walkthrough
+
+Goal: identify dangerous permissions on the user's data directories.
+
+```
+system_admin(operation="audit_permissions", path="C:\\Users\\sandraschi\\Documents")
+system_admin(operation="get_permissions", path="C:\\Users\\sandraschi\\Documents\\Contracts")
+```
+
+Step 1: audit the top-level folder. The audit reports Everyone/FullControl entries, weak inherited permissions, and missing inheritance flags. Step 2: for each flagged entry, inspect the full ACL. Step 3: remove dangerous ACEs:
+
+```
+system_admin(operation="remove_permission", path="C:\\Users\\sandraschi\\Documents\\Contracts", principal="Everyone")
+system_admin(operation="set_permissions", path="C:\\Users\\sandraschi\\Documents\\Contracts", principal="sandraschi", rights="FullControl", inheritance="both")
+```
+
+Step 4: re-audit to confirm the hardening. Expected result: status=success with the re-audited permission list showing no Everyone entries.
+
+## 11. Disk Full Investigation
+
+Goal: reclaim disk space when C: is at 95%.
+
+```
+system_admin(operation="check_disk_health", drive="C:")
+system_admin(operation="analyze_disk_usage", path="C:\\")
+system_admin(operation="analyze_top_folder_sizes", drive="C:", limit=10)
+```
+
+Step 1: confirm health and get the top-level usage breakdown. Step 2: drill into the largest folder. Step 3: preview the cleanup:
+
+```
+system_admin(operation="disk_cleanup", dry_run=true)
+```
+
+The dry-run lists candidate files (temp files, recycle bin, Windows temp, prefetch, delivery optimization) with sizes and total reclaimable space. Step 4: execute cleanup when the preview looks correct. Step 5: re-check free space with get_volume_info. For HDDs, defragment after cleanup; for SSDs (auto-detected), run optimize_ssd (TRIM) instead. Never defragment an SSD.
+
+## 12. Service Dependency Audit
+
+Goal: understand why a service fails to start and what depends on it.
+
+```
+system_admin(operation="list_services", filter_status="stopped")
+system_admin(operation="get_service_info", service_name="Print Spooler")
+system_admin(operation="get_service_stats")
+```
+
+Step 1: find the stopped service. Step 2: inspect its dependencies and binary path. Step 3: check whether its dependencies are running. Step 4: start the service; if it fails, check the Application event log for the failure:
+
+```
+system_admin(operation="get_event_log", log_name="Application", level="Error", hours_back=24)
+```
+
+Step 5: correlate the error source with the service name and remediate (correct the binary path, start the dependency, or change startup type to Automatic).
+
+## 13. Slow Machine Diagnosis (Agentic)
+
+Goal: investigate a slow machine end-to-end.
+
+Option A (agentic, open-ended): call autonomous_system_troubleshooter — it snapshots health, scans event logs, and analyzes top processes, then returns a root-cause report with remediation steps.
+
+Option B (manual, structured):
+```
+system_admin(operation="health_check")
+system_admin(operation="get_top_resource_processes", limit=10)
+system_admin(operation="get_performance_metrics")
+system_admin(operation="get_recent_event_errors", hours_back=24)
+```
+Compare CPU/memory/disk KPIs against expected baselines, inspect the top resource consumers, then kill or restart the offending process:
+```
+system_admin(operation="analyze_process", pid=<PID>)
+system_admin(operation="kill_process", pid=<PID>, force=false)
+```
+
+## 14. Startup Cleanup
+
+Goal: remove unwanted startup programs and restore taskbar behavior.
+
+```
+system_admin(operation="list_startup_programs")
+system_admin(operation="find_taskbar_blocking_processes")
+```
+
+Step 1: list all startup entries with their registry locations. Step 2: remove entries for uninstalled software:
+```
+system_admin(operation="remove_startup_program", name="LegacyUpdater")
+```
+Step 3: terminate taskbar-blocking processes and verify:
+```
+system_admin(operation="kill_taskbar_blocking_processes")
+system_admin(operation="get_taskbar_settings")
+system_admin(operation="set_taskbar_autohide", enabled=true)
+```
+
+## 15. Network Port Audit
+
+Goal: detect unexpected listeners.
+
+```
+system_admin(operation="audit_network_ports")
+```
+Review each listening port against known services (3389 RDP, 445 SMB, 10861 this server, 11434 Ollama). Flag unknown listeners for investigation. Pair with get_event_log on the Security channel for failed-login correlation (Event ID 4625).
+
+## FAQ
+
+**Why do I get admin_required?** Recovery, defragmentation, ownership, and some service operations need an elevated server. Restart the server as Administrator. The tool returns a structured error — forward it.
+
+**Why is disk_cleanup not removing files?** Use dry_run=true first; the preview must be inspected before execution. Some files are in use and are skipped by design.
+
+**The bridge returns bridge_unavailable.** The elevated service (SystemAdminMCP) is not installed. Install it from the MSI installer or via the bridge's install flow, then retry.
+
+**Which transport should I use?** stdio for Claude Desktop/IDE clients; MCP_TRANSPORT=http for the web dashboard. Both expose the same 44 tools.
+
+**Can I undo a permission change?** Permission changes are immediate and not reversible by the tool. Audit before changing, and record the previous ACL (get_permissions) if you may need to restore it.
+
+## Parameter Reference
+
+| Operation | Key parameters | Notes |
+|-----------|---------------|-------|
+| list_services | filter_status (running/stopped/all), filter_name, include_system, page, page_size | include_system=false hides Windows system services |
+| start_service / stop_service / restart_service | service_name | Restart also works on stopped services |
+| set_service_startup | service_name, startup_type (auto/manual/disabled) | Requires elevation |
+| list_processes | sort_by (cpu/memory/name/pid), filter_name, filter_user, page, page_size | |
+| kill_process | pid, force (bool) | force=false = SIGTERM first |
+| scan_volume | drive, file_pattern, max_results | NTFS scan via PowerShell |
+| recover_file | original_path, output_dir | Elevation required |
+| get_permissions / set_permissions / remove_permission | path, principal, rights, inheritance | rights: Read, Write, Modify, FullControl |
+| take_ownership | path | Elevation required |
+| check_disk_health | drive | WMI-based |
+| disk_cleanup | dry_run | Always preview first |
+| defragment_disk / optimize_ssd | drive | HDD vs SSD auto-detected |
+| get_event_log | log_name, level, hours_back | Default: System, 24h |
+| get_recent_event_errors | hours_back | Error + Warning entries |
+| audit_network_ports | — | All listeners with owning process |
+| list_startup_programs | — | HKCU/HKLM + Startup folders |
+| get_taskbar_settings / set_taskbar_autohide | enabled | Autohide + lock state |
+| get_comprehensive_diagnostics | — | Full health snapshot |
+| health_check | — | CPU/mem/disk + status |
+
+## Troubleshooting Matrix
+
+| Symptom | Likely cause | Action |
+|---------|-------------|--------|
+| All operations return error | Server not elevated for required op | Restart as Administrator |
+| ping fails | Server not running | Start server (stdio or http) |
+| /api/* 404 | Wrong port | Backend is 10861; frontend 10860 |
+| Services list empty | include_system filter | Set include_system=true |
+| Event log query fails | Channel name invalid | Use get_event_log with a valid channel (System, Application, Security) |
+| Chat unavailable | No local LLM | Start Ollama (11434) or LM Studio (1234) |
+
+
+---
+
+## Example Workflows
+
+## Example Workflows
+
+**Disk space investigation:**
+```
+system_admin(operation="get_volume_info", drive="C:")
+system_admin(operation="analyze_top_folder_sizes", path="C:\\")
+system_admin(operation="disk_cleanup", drive="C:", cleanup_targets=["temp_files", "recycle_bin"], dry_run=True)
+```
+
+**Security audit:**
+```
+system_admin(operation="audit_permissions", path="D:\\Shared")
+system_admin(operation="get_permissions", path="D:\\Shared\\sensitive.docx")
+system_admin(operation="audit_network_ports")
+```
+
+**Service failure diagnosis:**
+```
+system_admin(operation="get_service_info", service_name="Spooler")
+system_admin(operation="get_event_log", log_name="System", level="Error", hours_back=48)
+system_admin(operation="start_service", service_name="Spooler", wait_timeout=30)
+```
+
+**Performance troubleshooting (agentic):**
+```
+agentic_system_workflow(
+    workflow_prompt="Diagnose why the system is running slowly",
+    available_tools=["get_performance_metrics", "list_processes", "get_recent_event_errors"]
+)
+autonomous_system_troubleshooter(problem_description="System is very slow after startup")
+```
+
+**File recovery:**
+```
+system_admin(operation="scan_volume", drive="C:", file_pattern="*.docx", max_results=50)
+system_admin(operation="recover_file", source_path="C:/deleted/report.docx", destination_path="D:/Recovery/")
+system_admin(operation="validate_recovery", destination_path="D:/Recovery/report.docx")
+```
+
+**Taskbar autohide fix:**
+```
+system_admin(operation="find_taskbar_blocking_processes")
+system_admin(operation="kill_taskbar_blocking_processes")
+system_admin(operation="set_taskbar_autohide", autohide=True)
+```
+
+
+
+## Architecture & REST API
+
+## Architecture
+
+```
+src/system_admin_mcp/
+├── app.py                 # FastMCP 3.2 instance + lifespan (skills, prefab)
+├── main.py                # Entry point (--web flag for HTTP, else stdio)
+├── server.py              # FastAPI backend (20+ REST endpoints)
+├── transport.py           # Dual transport (stdio/streamable-http)
+├── prompts.py             # 4 @mcp.prompt() templates
+├── tools/
+│   ├── portmanteau.py     # system_admin (40+ ops) + manage_filesystem_watch
+│   ├── system_ops.py      # list_volumes, get_file_owner, recover_file, ping, etc.
+│   ├── implementations.py # 25+ real implementations (file recovery, ACLs, disk, WMI)
+│   ├── services_and_tasks.py  # Services, processes, startup, taskbar
+│   ├── agentic_system_workflow.py  # SEP-1577 sampling-driven workflows
+│   ├── monitoring.py      # FileWatcherManager (watchdog singleton)
+│   └── prefab/            # 4 Prefab UI cards
+├── elevated_service/      # Named-pipe elevated service bridge
+└── user_bridge/           # UserBridge client for elevated service
+```
+
+## REST API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Basic health check |
+| `GET /api/status` | System status: CPU, RAM, disk, uptime |
+| `GET /api/processes?sort_by=cpu&page=1&page_size=50` | Paginated process list |
+| `GET /api/processes/{pid}` | Detailed process info |
+| `GET /api/services?page=1&page_size=50` | Paginated service list |
+| `GET /api/volumes` | Drive listing |
+| `POST /api/disk_usage` | Check disk usage for a path |
+| `POST /api/file_owner` | Get file owner |
+| `GET /api/logs` | System log viewer |
+| `GET /api/tools` | List registered MCP tools |
+| `POST /api/tools/call` | Execute any MCP tool |
+
+## Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `MCP_TRANSPORT` | `http` for streamable HTTP (default: stdio) |
+| `MCP_PORT` | HTTP port override (default: 10861) |
+| `WEBAPP_PORT` | FastAPI backend port (default: 10861) |
+| `SYSADMIN_PREFAB_APPS` | Set to `0` to disable Prefab UI tools |
+| `MCP_BRIDGE_URLS` | Comma-separated remote MCP URLs for proxy |
+
+## Safety Rules
+
+- **Always `get_permissions` before `set_permissions`** — document current state first
+- **`dry_run=True` before `dry_run=False`** on `disk_cleanup` — preview what will be freed
+- **HDD vs SSD separation**: `defragment_disk` for HDDs only, `optimize_ssd` for SSDs only
+- **File recovery**: always recover to a DIFFERENT drive to avoid overwriting source data
+- **Kill process**: use `force=False` (SIGTERM) first, `force=True` (SIGKILL) as last resort
+- **Admin required**: disk operations, service management, file recovery, permission changes require elevated shell
+
+
+
+## Skills & Guided Procedures
+
+
+4 registered prompt templates via `@mcp.prompt()`:
+
+| Prompt | Description | Parameter |
+|--------|-------------|-----------|
+| `system_diagnostics_expert` | Systematic Windows diagnostic guidance: performance thresholds, event IDs, diagnostic sequence. | `focus`: general/performance/events |
+| `security_hardening_expert` | Windows security management: NTFS permissions, ACLs, PoLP, safe mode. | `scope`: general/ownership/audit |
+| `system_troubleshooter` | Troubleshooting guides: access denied, performance, service failures. | `problem`: general/access_denied/performance/services |
+| `volume_maintenance_expert` | Volume maintenance: disk health, cleanup, SSD vs HDD rules, NTFS recovery workflow. | `volume_type`: general/recovery/cleanup |
+
+## Skills
+
+| URI | Description |
+|-----|-------------|
+| `skill://system-admin-expert/SKILL.md` | Portable expertise document: safe-mode patterns, diagnostic sequences, agentic workflow recipes. |
+
+## Example Workflows
+
+
+## Safety Rules
+
+## Safety Rules
+
+- **Always `get_permissions` before `set_permissions`** — document current state first
+- **`dry_run=True` before `dry_run=False`** on `disk_cleanup` — preview what will be freed
+- **HDD vs SSD separation**: `defragment_disk` for HDDs only, `optimize_ssd` for SSDs only
+- **File recovery**: always recover to a DIFFERENT drive to avoid overwriting source data
+- **Kill process**: use `force=False` (SIGTERM) first, `force=True` (SIGKILL) as last resort
+- **Admin required**: disk operations, service management, file recovery, permission changes require elevated shell
+
+## Troubleshooting
+
+- **"Administrator privileges required"**: Run terminal/cmd as Administrator before starting the server
+
+
+## Troubleshooting
+
+## Troubleshooting
+
+- **"Administrator privileges required"**: Run terminal/cmd as Administrator before starting the server
+- **"UserBridge not available"**: Install the elevated service component or run with admin rights
+- **pywin32 errors**: Install with `uv sync` — pywin32 is a core dependency
+- **WMI not available**: Optional dependency — some WMI-based operations fall back to PowerShell
+- **Permissions errors**: Verify UAC elevation and that the target path exists and is accessible
+
+
+## REST API Reference (Web Dashboard)
+
+## REST API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Basic health check |
+| `GET /api/status` | System status: CPU, RAM, disk, uptime |
+| `GET /api/processes?sort_by=cpu&page=1&page_size=50` | Paginated process list |
+| `GET /api/processes/{pid}` | Detailed process info |
+| `GET /api/services?page=1&page_size=50` | Paginated service list |
+| `GET /api/volumes` | Drive listing |
+| `POST /api/disk_usage` | Check disk usage for a path |
+| `POST /api/file_owner` | Get file owner |
+| `GET /api/logs` | System log viewer |
+| `GET /api/tools` | List registered MCP tools |
+| `POST /api/tools/call` | Execute any MCP tool |
+
+## Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `MCP_TRANSPORT` | `http` for streamable HTTP (default: stdio) |
+| `MCP_PORT` | HTTP port override (default: 10861) |
+| `WEBAPP_PORT` | FastAPI backend port (default: 10861) |
+| `SYSADMIN_PREFAB_APPS` | Set to `0` to disable Prefab UI tools |
+| `MCP_BRIDGE_URLS` | Comma-separated remote MCP URLs for proxy |
+
+## Safety Rules
+
+
+
+## Connection Guide
+
+## Connection
+
+```json
+{
+  "mcpServers": {
+    "system-admin-mcp": {
+      "command": "uvx",
+      "args": ["system-admin-mcp"]
+    }
+  }
+}
+```
+
+## Tool Reference
+
+
+## Prompt Templates (Guided Diagnostics)
+
+## Prompts
+
+4 registered prompt templates via `@mcp.prompt()`:
+
+| Prompt | Description | Parameter |
+|--------|-------------|-----------|
+| `system_diagnostics_expert` | Systematic Windows diagnostic guidance: performance thresholds, event IDs, diagnostic sequence. | `focus`: general/performance/events |
+| `security_hardening_expert` | Windows security management: NTFS permissions, ACLs, PoLP, safe mode. | `scope`: general/ownership/audit |
+| `system_troubleshooter` | Troubleshooting guides: access denied, performance, service failures. | `problem`: general/access_denied/performance/services |
+| `volume_maintenance_expert` | Volume maintenance: disk health, cleanup, SSD vs HDD rules, NTFS recovery workflow. | `volume_type`: general/recovery/cleanup |
+
+## Skills
+
+
+
+## General Guidance
+
+- Always confirm the target identity (PID, service name, path) before destructive operations; use the corresponding list or get operation first.
+- Prefer the least-destructive variant: SIGTERM before SIGKILL, dry-run disk cleanup before execution, restart before stop for services.
+- When an operation returns admin_required, forward the message and instruct the user to restart the server as Administrator; do not attempt partial workarounds.
+- For open-ended questions ("why is my machine slow"), prefer the agentic tools (agentic_system_workflow, autonomous_system_troubleshooter) over manual multi-step sequences.
+- Structured errors carry an error code (admin_required, process_not_found, bridge_unavailable, access_denied); relay the code and message verbatim.
+- The web dashboard runs on port 10860 (frontend) and 10861 (REST API / MCP streamable HTTP); both surfaces expose the same tool set.
+- Prefab UI cards render rich dashboards in supporting clients; plain-text clients receive the same data as readable text.
+- Disk cleanup, defragmentation, and ownership changes modify the filesystem; audit before and after each operation.
+- Never disable core Windows services (winlogon, lsass, RpcSs, netlogon) without explicit user confirmation.

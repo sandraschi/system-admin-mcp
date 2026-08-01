@@ -81,3 +81,13 @@ if bridge_urls:
                 _bridge_proxies.append(url)
             except Exception as e:
                 mcp.logger.debug(f"Bridge proxy failed for {url}: {e}")
+
+# Tools register at import time via @mcp.tool() decorators — importing the
+# tool modules here guarantees registration no matter which entry point loads
+# the package (main.py, server.py, tests, or an IDE importing `app`).
+from system_admin_mcp.tools import (
+    agentic_system_workflow,  # noqa: F401
+    portmanteau,  # noqa: F401
+    services_and_tasks,  # noqa: F401
+    system_ops,  # noqa: F401
+)

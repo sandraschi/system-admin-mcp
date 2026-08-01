@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -17,15 +16,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import API_BASE from "@/lib/api";
 
 export function Status() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(API_BASE + "/api/status");
+      const res = await fetch(`${API_BASE}/api/status`);
       if (res.ok) {
         const data = await res.json();
         setStats(data);

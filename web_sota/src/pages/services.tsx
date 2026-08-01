@@ -1,8 +1,7 @@
 import { Download, RefreshCw, Search, Server } from "lucide-react";
-import { download, toCsv } from "@/common/export";
 import { useCallback, useEffect, useState } from "react";
+import { download, toCsv } from "@/common/export";
 import { Button } from "@/components/ui/button";
-import API_BASE from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -11,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import API_BASE from "@/lib/api";
 
 interface ServiceRow {
   name: string;
@@ -30,7 +30,10 @@ export function Services() {
   const fetchServices = useCallback(async () => {
     setLoading(true);
     try {
-      const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+      const qs = new URLSearchParams({
+        page: String(page),
+        page_size: String(pageSize),
+      });
       const res = await fetch(`${API_BASE}/api/services?${qs}`);
       if (res.ok) {
         const data = await res.json();
@@ -78,7 +81,12 @@ export function Services() {
           <button
             type="button"
             title="Export CSV"
-            onClick={() => download(`services-${Date.now()}.csv`, toCsv(services as unknown as Record<string, unknown>[]))}
+            onClick={() =>
+              download(
+                `services-${Date.now()}.csv`,
+                toCsv(services as unknown as Record<string, unknown>[]),
+              )
+            }
             className="p-2 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
           >
             <Download className="w-4 h-4" />
@@ -142,9 +150,7 @@ export function Services() {
                       colSpan={4}
                       className="px-4 py-8 text-center text-slate-500"
                     >
-                      {loading
-                        ? "Loading..."
-                        : "No services returned."}
+                      {loading ? "Loading..." : "No services returned."}
                     </td>
                   </tr>
                 )}
@@ -187,7 +193,8 @@ export function Services() {
 
           <div className="flex items-center justify-between mt-4">
             <p className="text-xs text-slate-500">
-              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
+              Showing {(page - 1) * pageSize + 1}–
+              {Math.min(page * pageSize, total)} of {total}
             </p>
             <div className="flex gap-2">
               <Button

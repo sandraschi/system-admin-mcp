@@ -1,6 +1,7 @@
 import {
   Activity,
   Archive,
+  BookOpen,
   Bot,
   ChevronLeft,
   ChevronRight,
@@ -13,7 +14,6 @@ import {
   LayoutGrid,
   Server,
   Settings,
-  Shield,
   ShieldCheck,
   Terminal,
 } from "lucide-react";
@@ -32,6 +32,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/", label: "Overview", icon: LayoutDashboard },
     { href: "/chat", label: "AI Command", icon: Bot },
     { href: "/tools", label: "MCP Tools", icon: Terminal },
+    { href: "/skills", label: "Skills", icon: BookOpen },
     { href: "/apps", label: "Apps Hub", icon: LayoutGrid },
     { href: "/status", label: "Status", icon: Activity },
     { href: "/processes", label: "Processes", icon: Cpu },
@@ -40,7 +41,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/file-owner", label: "File owner", icon: ShieldCheck },
     { href: "/file-recovery", label: "File recovery", icon: Archive },
     { href: "/logs", label: "Logs", icon: FileText },
-    { href: "/elevated", label: "System Ops", icon: Shield },
     { href: "/settings", label: "Settings", icon: Settings },
     { href: "/help", label: "Help", icon: HelpCircle },
   ];

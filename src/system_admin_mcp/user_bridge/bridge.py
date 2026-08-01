@@ -485,6 +485,32 @@ class UserBridge:
             {"source": source_path, "destination": destination_path},
         )
 
+    def get_disk_usage(self, path: str) -> dict[str, Any]:
+        """Get disk usage information for a path via the elevated service.
+
+        Args:
+            path: Path to check (file or directory)
+
+        Returns:
+            Dict with disk usage information or structured error
+        """
+        if not isinstance(path, str) or not path.strip():
+            return {"status": "error", "error": {"code": "invalid_path", "message": "Invalid path"}}
+        return self._send_request("get_disk_usage", {"path": os.path.abspath(path)})
+
+    def get_process_info(self, pid: int) -> dict[str, Any]:
+        """Get information about a running process via the elevated service.
+
+        Args:
+            pid: Process ID
+
+        Returns:
+            Dict with process information or structured error
+        """
+        if not isinstance(pid, int) or pid <= 0:
+            return {"status": "error", "error": {"code": "invalid_pid", "message": "PID must be a positive integer"}}
+        return self._send_request("get_process_info", {"pid": pid})
+
 
 # FastMCP 2.10 Server Implementation
 class SystemAdminMCP:

@@ -29,41 +29,46 @@ def temp_file(temp_dir: Path) -> Generator[Path, None, None]:
 
 @pytest.fixture
 def mock_bridge():
-    """Mock UserBridge for testing without actual service."""
-    with patch("system_admin_mcp.user_bridge.UserBridge") as mock:
-        bridge = MagicMock()
-        bridge.service_installed = True
-        bridge.service_running = True
-        bridge.ping.return_value = True
-        bridge.get_system_info.return_value = {
-            "status": "success",
-            "result": {
-                "os": {"platform": "win32", "name": "Windows"},
-                "python": {"version": "3.10.0"},
-            },
-        }
-        bridge.get_disk_usage.return_value = {
-            "status": "success",
-            "result": {
-                "path": "C:\\",
-                "total_bytes": 1000000000,
-                "used_bytes": 500000000,
-                "free_bytes": 500000000,
-            },
-        }
-        bridge.get_process_info.return_value = {
-            "status": "success",
-            "result": {"pid": 1234, "name": "test.exe"},
-        }
-        bridge.list_volumes.return_value = {
-            "status": "success",
-            "result": [{"name": "C", "type": "fixed", "total_gb": 100}],
-        }
-        bridge.recover_file.return_value = {
-            "status": "success",
-            "result": {"recovered": True},
-        }
-        mock.return_value = bridge
+    """Mock UserBridge for testing without actual service.
+
+    Patches ``system_admin_mcp.tools.system_ops._bridge`` directly (the reference
+    the tools actually use) so unit tests never instantiate the real bridge.
+    """
+    bridge = MagicMock()
+    bridge.service_installed = True
+    bridge.service_running = True
+    bridge.ping.return_value = True
+    bridge.get_system_info.return_value = {
+        "status": "success",
+        "result": {
+            "os": {"platform": "win32", "name": "Windows"},
+            "python": {"version": "3.10.0"},
+        },
+    }
+    bridge.get_disk_usage.return_value = {
+        "status": "success",
+        "result": {
+            "path": "C:\\",
+            "total_bytes": 1000000000,
+            "used_bytes": 500000000,
+            "free_bytes": 500000000,
+        },
+    }
+    bridge.get_process_info.return_value = {
+        "status": "success",
+        "result": {"pid": 1234, "name": "test.exe"},
+    }
+    bridge.list_volumes.return_value = {
+        "status": "success",
+        "result": [{"name": "C", "type": "fixed", "total_gb": 100}],
+    }
+    bridge.recover_file.return_value = {
+        "status": "success",
+        "result": {"recovered": True},
+    }
+    with patch("system_admin_mcp.tools.system_ops._bridge", bridge), patch(
+        "system_admin_mcp.tools.system_ops.UserBridge"
+    ):
         yield bridge
 
 
@@ -88,10 +93,13 @@ def mock_wmi():
 def mock_psutil():
     """Mock psutil for system metrics tests."""
     with patch("system_admin_mcp.tools.implementations.psutil") as mock:
-        # Mock CPU
+        # CPU: percpu=True returns a list; plain call returns a float
+        def _cpu_percent(interval=0.0, percpu=False):
+            return [12.5, 25.0] if percpu else 25.0
+
         mock.cpu_count.return_value = 4
         mock.cpu_freq.return_value = MagicMock(current=3000.0)
-        mock.cpu_percent.return_value = 25.0
+        mock.cpu_percent.side_effect = _cpu_percent
 
         # Mock memory
         mem = MagicMock()
