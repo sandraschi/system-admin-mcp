@@ -54,7 +54,7 @@ export function Chat() {
     () => localStorage.getItem(PERSONALITY_KEY) || "SysAdmin",
   );
   const [messages, setMessages] = useState<
-    { id: string; role: "user" | "assistant"; content: string }[]
+    { id: string; role: "user" | "assistant"; content: string; ts?: string }[]
   >(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
@@ -108,6 +108,7 @@ export function Chat() {
       id: `m${msgIdRef.current++}`,
       role: "user" as const,
       content: text,
+      ts: new Date().toISOString(),
     };
     setMessages((prev) => {
       const next = [...prev, userMsg];
@@ -130,6 +131,7 @@ export function Chat() {
           id: `m${msgIdRef.current++}`,
           role: "assistant",
           content: data.response,
+          ts: new Date().toISOString(),
         },
       ]);
     } catch (e) {
@@ -139,6 +141,7 @@ export function Chat() {
         {
           id: `m${msgIdRef.current++}`,
           role: "assistant",
+          ts: new Date().toISOString(),
           content: `LLM unavailable: ${msg}\n\nStart Ollama (port 11434) or LM Studio (port 1234) to enable chat.`,
         },
       ]);
@@ -283,11 +286,13 @@ export function Chat() {
                 className={`max-w-[80%] space-y-1 ${msg.role === "user" ? "text-right" : ""}`}
               >
                 <div className="text-xs font-bold text-slate-500 uppercase tracking-tighter">
-                  {msg.role === "assistant" ? "Assistant" : "You"} \u2022{" "}
-                  {new Date().toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {msg.role === "assistant" ? "Assistant" : "You"} ·{" "}
+                  {msg.ts
+                    ? new Date(msg.ts).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : ""}
                 </div>
                 <div
                   className={`p-4 rounded-3xl text-sm leading-relaxed ${msg.role === "assistant" ? "bg-slate-950 border border-slate-800 text-slate-200 rounded-tl-none border-l-4 border-l-blue-500" : "bg-blue-600 text-white rounded-tr-none"} shadow-2xl`}
