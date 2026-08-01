@@ -71,3 +71,4 @@ reports/
 
 # Environment (single source of truth is .env.example)
 .env
+*.bak-*
