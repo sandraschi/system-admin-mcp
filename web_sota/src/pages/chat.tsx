@@ -330,7 +330,7 @@ export function Chat() {
           <input
             data-testid="chat-input"
             className="flex-1 bg-slate-900/50 border border-slate-800 text-slate-100 placeholder:text-slate-500 rounded-2xl h-12 px-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            placeholder="Type a system directive..."
+            placeholder="Ask about services, processes, disk, or security..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {

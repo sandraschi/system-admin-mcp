@@ -98,8 +98,8 @@ export function Help() {
               </h3>
               <p className="text-sm text-slate-500 mt-1">
                 Utilize the Dashboard for high-granularity performance
-                snapshots. Data is pulled directly from the hardware substrate
-                via the Python bridge.
+                snapshots. Data is pulled live from the Windows APIs via the
+                Python backend.
               </p>
             </div>
           </div>
