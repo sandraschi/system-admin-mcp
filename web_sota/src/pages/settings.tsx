@@ -100,7 +100,7 @@ export function Settings() {
               System Settings
             </h1>
             <p className="text-slate-400 text-sm italic">
-              Core orchestration and intelligence configuration
+              Backend status and local LLM provider configuration
             </p>
           </div>
         </div>

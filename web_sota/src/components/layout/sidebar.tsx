@@ -30,7 +30,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const navItems = [
     { href: "/", label: "Overview", icon: LayoutDashboard },
-    { href: "/chat", label: "AI Command", icon: Bot },
+    { href: "/chat", label: "Chat", icon: Bot },
     { href: "/tools", label: "MCP Tools", icon: Terminal },
     { href: "/skills", label: "Skills", icon: BookOpen },
     { href: "/apps", label: "Apps Hub", icon: LayoutGrid },

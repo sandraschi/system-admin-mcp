@@ -174,9 +174,9 @@ export function Chat() {
         <div className="flex items-center gap-3">
           <Bot className="w-8 h-8 text-blue-500" />
           <div>
-            <h1 className="text-2xl font-bold text-white">AI Command</h1>
+            <h1 className="text-2xl font-bold text-white">Chat</h1>
             <p className="text-slate-400 text-xs italic">
-              Multi-model system orchestration bridge
+              Ask about services, processes, disk health, and security
             </p>
           </div>
         </div>
@@ -283,10 +283,7 @@ export function Chat() {
                 className={`max-w-[80%] space-y-1 ${msg.role === "user" ? "text-right" : ""}`}
               >
                 <div className="text-xs font-bold text-slate-500 uppercase tracking-tighter">
-                  {msg.role === "assistant"
-                    ? "System Intelligence"
-                    : "Operator"}{" "}
-                  \u2022{" "}
+                  {msg.role === "assistant" ? "Assistant" : "You"} \u2022{" "}
                   {new Date().toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
