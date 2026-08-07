@@ -5,7 +5,7 @@ import 'scripts/just/fleet.just'
 default:
     @just --list
 
-# ── Quality ───────────────────────────────────────────────────────────────────
+# --- Quality ---
 
 # Execute Ruff linting (Python backend)
 lint-python:
@@ -40,7 +40,7 @@ format: fix
 # Run all quality checks (lint + test)
 check: lint test
 
-# ── Testing ───────────────────────────────────────────────────────────────────
+# --- Testing ---
 
 # Run all tests
 test:
@@ -52,7 +52,7 @@ test-cov:
     Set-Location '{{justfile_directory()}}'
     uv run pytest tests/ --cov=system_admin_mcp --cov-report=term --cov-report=html
 
-# ── Build & Sync ──────────────────────────────────────────────────────────────
+# --- Build  Sync ---
 
 # Sync dependencies and install package
 build:
@@ -77,7 +77,7 @@ setup:
     npm install
     Write-Host "Setup complete. Run 'just dev' to start." -ForegroundColor Green
 
-# ── Development ───────────────────────────────────────────────────────────────
+# --- Development ---
 
 # Start MCP server in stdio mode (Claude Desktop)
 run:
@@ -112,14 +112,14 @@ info:
     if ($admin) { Write-Host "Admin: YES" -ForegroundColor Green } else { Write-Host "Admin: NO (run as Administrator!)" -ForegroundColor Red }
     Write-Host "Server ports: 10860 (frontend) / 10861 (backend)" -ForegroundColor Gray
 
-# ── MCPB Packaging ────────────────────────────────────────────────────────────
+# --- MCPB Packaging ---
 
 # Validate MCPB manifest
 mcpb-validate:
     Set-Location '{{justfile_directory()}}'
     uv run python -c "import json; m=json.load(open('mcpb/manifest.json')); print(f'Manifest OK: {m[\"name\"]} v{m[\"version\"]}, type={m[\"server\"][\"type\"]}')"
 
-# ── Housekeeping ──────────────────────────────────────────────────────────────
+# --- Housekeeping ---
 
 # Remove build artifacts and caches
 clean:
@@ -137,7 +137,7 @@ clean-all: clean
     Remove-Item -Recurse -Force target -ErrorAction SilentlyContinue
     Write-Host "Cleaned all generated files" -ForegroundColor Yellow
 
-# ── Hardening ─────────────────────────────────────────────────────────────────
+# --- Hardening ---
 
 # Execute Bandit security audit
 check-sec:
@@ -149,7 +149,7 @@ audit-deps:
     Set-Location '{{justfile_directory()}}'
     uv run safety check
 
-# ── Tauri Native ───────────────────────────────────────────────────────────────
+# --- Tauri Native ---
 
 # Build Tauri native desktop app (full pipeline: frontend + backend)
 build-native:
@@ -157,7 +157,7 @@ build-native:
     $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
     npx @tauri-apps/cli build
 
-# ── Playwright E2E ─────────────────────────────────────────────────────
+# --- Playwright E2E ---
 
 # Install Playwright browsers (one-time)
 e2e-install:
