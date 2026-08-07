@@ -31,7 +31,7 @@ class BufferedEventHandler(FileSystemEventHandler):
         watch_event = WatchEvent(
             timestamp=time.time(),
             event_type=event.event_type,
-            src_path=event.src_path,
+            src_path=str(event.src_path),
             is_directory=event.is_directory,
             dest_path=getattr(event, "dest_path", None),
         )

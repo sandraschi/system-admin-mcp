@@ -7,7 +7,7 @@ No simulation stubs — all phases execute actual tool calls.
 
 import json
 import logging
-from typing import Any
+from typing import Any, cast
 
 from fastmcp import Context
 
@@ -57,8 +57,8 @@ async def agentic_system_workflow(
     if not available_tools:
         return {"success": False, "error": "available_tools must not be empty."}
 
-    ctx.info(f"Agentic workflow started: {workflow_prompt[:60]}")
-    ctx.report_progress(5, 100)
+    await ctx.info(f"Agentic workflow started: {workflow_prompt[:60]}")
+    await ctx.report_progress(5, 100)
 
     # Phase 1: Collect baseline diagnostics for the available tools
     inventory: dict[str, Any] = {}
@@ -81,14 +81,14 @@ async def agentic_system_workflow(
         if tool_name in collection_map:
             label, kwargs = collection_map[tool_name]
             try:
-                inventory[label] = await system_admin(**kwargs)
+                inventory[label] = await system_admin(**cast(dict[str, Any], kwargs))
             except Exception as e:
                 inventory[label] = {"error": str(e)}
 
-    ctx.report_progress(40, 100)
+    await ctx.report_progress(40, 100)
 
     # Phase 2: SEP-1577 sampling — reason over inventory
-    ctx.info("Phase 2: Sampling for analysis and recommendations...")
+    await ctx.info("Phase 2: Sampling for analysis and recommendations...")
 
     system_prompt = (
         "You are a senior Windows systems administrator. "
@@ -105,25 +105,28 @@ async def agentic_system_workflow(
 
     try:
         sampling_res = await ctx.sample(
-            prompt=user_prompt,
+            user_prompt,
             system_prompt=system_prompt,
             max_tokens=1200,
         )
+        sampling_data = cast(Any, sampling_res)
         analysis = (
-            sampling_res.content[0].text if sampling_res and sampling_res.content else "Sampling returned no analysis."
+            sampling_data.content[0].text
+            if sampling_res and sampling_data.content
+            else "Sampling returned no analysis."
         )
     except Exception as e:
         analysis = f"Sampling failed: {e}"
 
-    ctx.info(f"Analysis: {analysis[:100]}...")
-    ctx.report_progress(80, 100)
+    await ctx.info(f"Analysis: {analysis[:100]}...")
+    await ctx.report_progress(80, 100)
 
     # Phase 3: Extract and queue HIGH priority actions (up to max_iterations)
     high_priority = [line.strip() for line in analysis.splitlines() if "HIGH" in line.upper() and line.strip()][
         :max_iterations
     ]
 
-    ctx.report_progress(100, 100)
+    await ctx.report_progress(100, 100)
 
     return {
         "success": True,
@@ -154,8 +157,8 @@ async def autonomous_system_troubleshooter(
     if not ctx:
         return {"success": False, "error": "Context required."}
 
-    ctx.info(f"Troubleshooting: {problem_description[:60]}")
-    ctx.report_progress(10, 100)
+    await ctx.info(f"Troubleshooting: {problem_description[:60]}")
+    await ctx.report_progress(10, 100)
 
     from system_admin_mcp.tools.portmanteau import system_admin
 
@@ -169,14 +172,14 @@ async def autonomous_system_troubleshooter(
         ("top_processes", {"operation": "get_top_resource_processes"}),
     ]:
         try:
-            findings[label] = await system_admin(**kwargs)
+            findings[label] = await system_admin(**cast(dict[str, Any], kwargs))
         except Exception as e:
             findings[label] = {"error": str(e)}
 
-    ctx.report_progress(50, 100)
+    await ctx.report_progress(50, 100)
 
     # Phase 2: Root cause sampling
-    ctx.info("Sampling for root cause analysis...")
+    await ctx.info("Sampling for root cause analysis...")
     system_prompt = (
         "You are a senior Windows engineer. "
         "Given a problem description and diagnostics, identify: "
@@ -188,12 +191,12 @@ async def autonomous_system_troubleshooter(
     user_prompt = f"Problem: {problem_description}\n\nDiagnostics:\n{json.dumps(findings, indent=2, default=str)}"
 
     try:
-        res = await ctx.sample(prompt=user_prompt, system_prompt=system_prompt, max_tokens=900)
-        root_cause_analysis = res.content[0].text if res and res.content else "Sampling unavailable."
+        res = await ctx.sample(user_prompt, system_prompt=system_prompt, max_tokens=900)
+        root_cause_analysis = res.content[0].text if res and res.content else "Sampling unavailable."  # type: ignore[reportAttributeAccessIssue]
     except Exception as e:
         root_cause_analysis = f"Sampling failed: {e}"
 
-    ctx.report_progress(100, 100)
+    await ctx.report_progress(100, 100)
 
     return {
         "success": True,

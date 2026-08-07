@@ -22,7 +22,7 @@ async def system_health_card(ctx: Context | None = None) -> Any:
     Returns a Prefab UI card in capable MCP hosts; plain text fallback otherwise.
     """
     if ctx:
-        ctx.info("Building system health card...")
+        await ctx.info("Building system health card...")
 
     cpu = psutil.cpu_percent(interval=1, percpu=True)
     cpu_avg = sum(cpu) / len(cpu) if cpu else 0.0
@@ -45,7 +45,7 @@ async def system_health_card(ctx: Context | None = None) -> Any:
         f"Disk {disk_used_gb:.1f}/{disk_total_gb:.1f}GB | Health: {health_status}"
     )
 
-    with Card(css_class="max-w-lg") as view:
+    with Card(css_class="max-w-lg") as view:  # type: ignore[reportCallIssue]
         with CardHeader():
             CardTitle("System Health — Goliath")
         with CardContent():
@@ -70,7 +70,7 @@ async def top_processes_card(
     Returns a Prefab UI card in capable MCP hosts; plain text fallback otherwise.
     """
     if ctx:
-        ctx.info(f"Building top processes card (sort={sort_by}, max={max_procs})")
+        await ctx.info(f"Building top processes card (sort={sort_by}, max={max_procs})")
 
     procs = []
     for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent", "username"]):
@@ -85,7 +85,7 @@ async def top_processes_card(
 
     summary = f"Top {len(procs)} processes by {sort_by}"
 
-    with Card(css_class="max-w-xl") as view:
+    with Card(css_class="max-w-xl") as view:  # type: ignore[reportCallIssue]
         with CardHeader():
             CardTitle(f"Top Processes — by {sort_by.upper()}")
         with CardContent():
@@ -117,7 +117,7 @@ async def list_services_card(
         list_services_card(filter_name="sql")
     """
     if ctx:
-        ctx.info("Building services card...")
+        await ctx.info("Building services card...")
 
     from system_admin_mcp.tools.services_and_tasks import list_services
 
@@ -130,7 +130,7 @@ async def list_services_card(
     if filter_name:
         summary += f" (filter={filter_name})"
 
-    with Card(css_class="max-w-2xl") as view:
+    with Card(css_class="max-w-2xl") as view:  # type: ignore[reportCallIssue]
         with CardHeader():
             CardTitle(f"Windows Services ({len(services)})")
         with CardContent():
@@ -160,7 +160,7 @@ async def volume_status_card(
         volume_status_card()
     """
     if ctx:
-        ctx.info("Building volume status card...")
+        await ctx.info("Building volume status card...")
 
     volumes = []
     for part in psutil.disk_partitions():
@@ -191,7 +191,7 @@ async def volume_status_card(
             )
 
     summary = f"Volumes: {len(volumes)} found"
-    with Card(css_class="max-w-2xl") as view:
+    with Card(css_class="max-w-2xl") as view:  # type: ignore[reportCallIssue]
         with CardHeader():
             CardTitle(f"Volume Status ({len(volumes)} volumes)")
         with CardContent():

@@ -37,11 +37,8 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check src/
 
-      - name: Pyright typecheck
-        # 149 pre-existing errors as of 2026-08-01 — non-blocking during adoption.
-        # Flip to blocking when pyright src/ is clean (fleet QUALITY_GATES shape).
-        run: uv run pyright src/
-        continue-on-error: true
+        - name: Pyright typecheck
+          run: uv run pyright src/
 
       - name: Set up Node
         uses: actions/setup-node@v4

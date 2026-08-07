@@ -11,7 +11,7 @@ import sys
 import time
 import winreg
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import psutil
 import win32api
@@ -32,12 +32,18 @@ FILE_READ_EA = 0x0008
 FILE_WRITE_EA = 0x0010
 FILE_ALL_ACCESS = 0x001F01FF
 
+# pywin32 stubs omit some constants; resolve at runtime with fallbacks
+EVENTLOG_SUCCESS_AUDIT_TYPE = getattr(win32evtlog, "EVENTLOG_SUCCESS_AUDIT_TYPE", 8)
+EVENTLOG_FAILURE_AUDIT_TYPE = getattr(win32evtlog, "EVENTLOG_FAILURE_AUDIT_TYPE", 9)
+CREATE_NEW_CONSOLE = 0x00000010
+
 try:
     import wmi
 
     WMI_AVAILABLE = True
 except ImportError:
     WMI_AVAILABLE = False
+    wmi: Any = None
 
 logger = logging.getLogger(__name__)
 
@@ -294,8 +300,8 @@ def get_permissions(path: str) -> dict[str, Any]:
         if dacl:
             for i in range(dacl.GetAceCount()):
                 ace = dacl.GetAce(i)
-                ace_type, ace_flags = ace[0][0], ace[0][1]
-                sid = ace[0][2]
+                ace_parts = cast(Any, ace[0])
+                ace_type, ace_flags, sid = ace_parts[0], ace_parts[1], ace_parts[2]
                 mask = ace[1]
 
                 try:
@@ -446,9 +452,9 @@ def remove_permission(path: str, principal: str) -> dict[str, Any]:
 
         for i in range(dacl.GetAceCount()):
             ace = dacl.GetAce(i)
-            ace_sid = ace[0][2]
+            ace_sid = cast(Any, ace[0])[2]
             if ace_sid != sid:
-                new_dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ace[1], ace_sid)
+                new_dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ace[1], ace_sid)  # type: ignore[reportArgumentType]
             else:
                 removed = True
 
@@ -493,8 +499,8 @@ def take_ownership(path: str) -> dict[str, Any]:
         )
 
         # Enable SeTakeOwnershipPrivilege
-        privilege = win32security.LookupPrivilegeValue(None, win32security.SE_TAKE_OWNERSHIP_NAME)
-        win32security.AdjustTokenPrivileges(token, False, [(privilege, win32security.SE_PRIVILEGE_ENABLED)])
+        privilege = win32security.LookupPrivilegeValue("", win32security.SE_TAKE_OWNERSHIP_NAME)
+        win32security.AdjustTokenPrivileges(token, False, [(privilege, win32security.SE_PRIVILEGE_ENABLED)])  # type: ignore[reportArgumentType]
 
         # Get current user SID
         user_sid = win32security.LookupAccountName(None, win32api.GetUserName())[0]
@@ -873,7 +879,7 @@ def optimize_ssd(drive: str) -> dict[str, Any]:
 def get_hardware_info() -> dict[str, Any]:
     """Get comprehensive hardware information using WMI and psutil."""
     try:
-        hw_info = {"status": "success", "operation": "get_hardware_info"}
+        hw_info: dict[str, Any] = {"status": "success", "operation": "get_hardware_info"}
 
         # CPU Info
         hw_info["cpu"] = {
@@ -964,7 +970,7 @@ def get_hardware_info() -> dict[str, Any]:
 def get_os_info() -> dict[str, Any]:
     """Get operating system information."""
     try:
-        os_info = {"status": "success", "operation": "get_os_info"}
+        os_info: dict[str, Any] = {"status": "success", "operation": "get_os_info"}
 
         # Basic OS info
         os_info["platform"] = sys.platform
@@ -1144,8 +1150,8 @@ def get_event_log(log_name: str = "System", level: str | None = None, hours_back
             "Error": win32evtlog.EVENTLOG_ERROR_TYPE,
             "Warning": win32evtlog.EVENTLOG_WARNING_TYPE,
             "Information": win32evtlog.EVENTLOG_INFORMATION_TYPE,
-            "Success": win32evtlog.EVENTLOG_SUCCESS_AUDIT_TYPE,
-            "Failure": win32evtlog.EVENTLOG_FAILURE_AUDIT_TYPE,
+            "Success": EVENTLOG_SUCCESS_AUDIT_TYPE,
+            "Failure": EVENTLOG_FAILURE_AUDIT_TYPE,
         }
 
         event_type = level_map.get(level) if level else None
@@ -1418,7 +1424,7 @@ async def audit_network_ports(include_established: bool = True) -> dict[str, Any
                 connections.append(
                     {
                         "status": conn.status,
-                        "local_addr": f"{conn.laddr.ip}:{conn.laddr.port}",
+                        "local_addr": f"{cast(Any, conn.laddr).ip}:{cast(Any, conn.laddr).port}",
                         "remote_addr": f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
                         "pid": conn.pid,
                         "process": pname,
@@ -1633,12 +1639,6 @@ async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, A
                 "root_path": path,
                 "top_folders": folders,
             }
-        except asyncio.TimeoutExpired:
-            try:
-                process.kill()
-            except Exception:
-                pass
-            return {"status": "error", "error": "Folder analysis timed out"}
         except TimeoutError:
             try:
                 process.kill()
@@ -1918,7 +1918,7 @@ def testdisk_launch(drive: str | None = None) -> dict[str, Any]:
     try:
         subprocess.Popen(
             args,
-            creationflags=subprocess.CREATE_NEW_CONSOUSE_WINDOW,
+            creationflags=CREATE_NEW_CONSOLE,
         )
         return {
             "status": "success",
@@ -2009,7 +2009,7 @@ def photorec_launch(drive: str | None = None, output_dir: str | None = None) -> 
     try:
         subprocess.Popen(
             args,
-            creationflags=subprocess.CREATE_NEW_CONSOLE_WINDOW,
+            creationflags=CREATE_NEW_CONSOLE,
         )
         return {
             "status": "success",

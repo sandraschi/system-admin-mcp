@@ -115,7 +115,7 @@ def list_services(
                     continue
 
             try:
-                config = win32serviceutil.QueryServiceConfig(service_name)
+                config = win32serviceutil.QueryServiceConfig(service_name)  # type: ignore[reportAttributeAccessIssue]
                 startup_type = config[1]
                 startup_name = _get_startup_type_name(startup_type)
             except Exception:
@@ -189,7 +189,7 @@ def get_service_stats() -> dict[str, Any]:
                     elif status_code == win32service.SERVICE_STOPPED:
                         stopped += 1
 
-                    config = win32serviceutil.QueryServiceConfig(service_name)
+                    config = win32serviceutil.QueryServiceConfig(service_name)  # type: ignore[reportAttributeAccessIssue]
                     startup_type = config[1]
 
                     if startup_type == win32service.SERVICE_AUTO_START:
@@ -361,11 +361,11 @@ def get_service_info(service_name: str) -> dict[str, Any]:
             service_info = {
                 "name": service_name,
                 "display_name": config[2],
-                "status": _get_service_status_name(status["CurrentState"]),
+                "status": _get_service_status_name(status["CurrentState"]),  # type: ignore[reportArgumentType]
                 "startup_type": _get_startup_type_name(config[1]),
                 "binary_path": config[3],
                 "account": config[6],
-                "pid": status["ProcessId"],
+                "pid": status["ProcessId"],  # type: ignore[reportArgumentType]
             }
 
             return {"status": "success", "service": service_info}
@@ -407,12 +407,12 @@ def set_service_startup(service_name: str, startup_type: str) -> dict[str, Any]:
                 "error": f"Invalid startup type: {startup_type}. Must be 'automatic', 'manual', or 'disabled'",
             }
 
-        win32serviceutil.ChangeServiceConfig(
+        win32serviceutil.ChangeServiceConfig(  # type: ignore[reportArgumentType]
             service_name,
             None,  # service type
             startup_map[startup_type.lower()],
             None,  # error control
-            None,  # binary path
+            None,  # binary path  # type: ignore[reportArgumentType]
             None,  # load order group
             None,  # tag id
             None,  # dependencies
@@ -535,7 +535,7 @@ def analyze_process(pid: int) -> dict[str, Any]:
                 "cpu_affinity": process.cpu_affinity(),
                 "nice": process.nice(),
                 "ppid": process.ppid(),
-                "parent": process.parent().pid if process.parent() else None,
+                "parent": process.parent().pid if process.parent() else None,  # type: ignore[reportAttributeAccessIssue]
                 "children": [p.pid for p in process.children(recursive=False)],
                 "connections": [
                     {
@@ -1042,7 +1042,7 @@ def forensic_scan() -> dict[str, Any]:
             for svc_name, display_name, _ in svc_list:
                 flags = []
                 try:
-                    config = win32serviceutil.QueryServiceConfig(svc_name)
+                    config = win32serviceutil.QueryServiceConfig(svc_name)  # type: ignore[reportAttributeAccessIssue]
                     bin_path = config[3] if len(config) > 3 else ""
                 except Exception:
                     bin_path = ""
@@ -1056,7 +1056,7 @@ def forensic_scan() -> dict[str, Any]:
                 try:
                     status_info = win32serviceutil.QueryServiceStatus(svc_name)
                     if status_info[1] == win32service.SERVICE_STOPPED:
-                        config_info = win32serviceutil.QueryServiceConfig(svc_name)
+                        config_info = win32serviceutil.QueryServiceConfig(svc_name)  # type: ignore[reportAttributeAccessIssue]
                         if config_info[1] == win32service.SERVICE_AUTO_START:
                             flags.append("stopped_but_auto_start")
                 except Exception:

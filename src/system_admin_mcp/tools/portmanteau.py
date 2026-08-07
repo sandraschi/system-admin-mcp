@@ -103,7 +103,7 @@ async def manage_filesystem_watch(
             if auto_sample and events and ctx:
                 await ctx.sample(
                     messages=[
-                        {
+                        {  # type: ignore[reportArgumentType]
                             "role": "user",
                             "content": (
                                 f"I've detected {len(events)} filesystem events: {json.dumps(events[:5])}. "

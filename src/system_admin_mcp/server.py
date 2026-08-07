@@ -149,9 +149,9 @@ async def list_mcp_tools() -> list[dict[str, Any]]:
                 if hasattr(tool, "parameters"):
                     params = tool.parameters
                     if hasattr(params, "model_json_schema"):
-                        schema = params.model_json_schema()
+                        schema = params.model_json_schema()  # type: ignore[reportAttributeAccessIssue]
                     elif hasattr(params, "schema"):
-                        schema = params.schema()
+                        schema = params.schema()  # type: ignore[reportAttributeAccessIssue]
 
                 tools_list.append(
                     {
@@ -178,9 +178,10 @@ async def list_mcp_tools() -> list[dict[str, Any]]:
 @app.post("/api/tools/call")
 async def call_mcp_tool(request: Request) -> dict[str, Any]:
     """Execute an MCP tool and return the result."""
+    tool_name = ""
     try:
         body = await request.json()
-        tool_name = body.get("name")
+        tool_name = body.get("name") or ""
         arguments = body.get("arguments", {})
 
         if not tool_name:
@@ -199,7 +200,7 @@ async def call_mcp_tool(request: Request) -> dict[str, Any]:
 
         return {"status": "success", "result": result}
     except Exception as e:
-        logger.error(f"Error calling tool {tool_name if 'tool_name' in locals() else 'unknown'}: {e}")
+        logger.error(f"Error calling tool {tool_name or 'unknown'}: {e}")
         return {"status": "error", "message": str(e)}
 
 
@@ -209,7 +210,7 @@ async def get_metrics() -> dict[str, Any]:
     net_io = psutil.net_io_counters()
     return {
         "cpu_count": psutil.cpu_count(),
-        "load_average": os.getloadavg() if hasattr(os, "getloadavg") else [0, 0, 0],
+        "load_average": getattr(os, "getloadavg", lambda: [0, 0, 0])(),
         "network": {"bytes_sent": net_io.bytes_sent, "bytes_recv": net_io.bytes_recv},
     }
 
@@ -319,9 +320,11 @@ async def _run_tool(name: str, **kwargs: Any) -> Any:
     try:
         # FastMCP 3.1+ get_tool is async
         tool = await mcp.get_tool(name)
+        if tool is None:
+            raise ValueError(f"Tool '{name}' not found")
 
         # Extract function from tool object
-        fn = getattr(tool, "fn", tool)
+        fn: Any = getattr(tool, "fn", tool)
 
         if asyncio.iscoroutinefunction(fn):
             return await fn(**kwargs)
@@ -335,7 +338,7 @@ async def _run_tool(name: str, **kwargs: Any) -> Any:
                 tool_key = f"tool:{name}@"
                 if tool_key in components:
                     tool = components[tool_key]
-                    fn = getattr(tool, "fn", tool)
+                    fn: Any = getattr(tool, "fn", tool)
                     if asyncio.iscoroutinefunction(fn):
                         return await fn(**kwargs)
                     return await asyncio.to_thread(fn, **kwargs)
@@ -353,6 +356,7 @@ async def get_logs(tail: int = 200, file: str | None = None) -> dict[str, Any]:
         appdata / "SystemAdminMCP",
     ]
     log_files: list[Path] = []
+    log_dir = log_dirs[0]
     for log_dir in log_dirs:
         if log_dir.is_dir():
             log_files.extend(log_dir.glob("*.log"))

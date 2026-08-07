@@ -49,13 +49,15 @@ sd = win32security.GetNamedSecurityInfo(
 sid_everyone = win32security.ConvertStringSidToSid("S-1-1-0")
 sd.AddAccessAllowedAce(
     win32security.ACL_REVISION,
-    win32con.FILE_GENERIC_READ | win32con.FILE_GENERIC_WRITE,
+    getattr(win32con, "FILE_GENERIC_READ", 0x120089) | getattr(win32con, "FILE_GENERIC_WRITE", 0x120116),
     sid_everyone,
-)
+)  # type: ignore[reportArgumentType]
 
 SECURITY_ATTRIBUTES.SECURITY_DESCRIPTOR = win32security.GetSecurityInfo(
-    None, win32security.SE_KERNEL_OBJECT, win32security.DACL_SECURITY_INFORMATION
-).GetSecurityDescriptorDacl()
+    None,  # type: ignore[reportArgumentType]
+    win32security.SE_KERNEL_OBJECT,
+    win32security.DACL_SECURITY_INFORMATION,
+).GetSecurityDescriptorDacl()  # type: ignore[reportAssignmentType]
 
 
 class ElevatedService(win32serviceutil.ServiceFramework):
@@ -163,25 +165,27 @@ class ElevatedService(win32serviceutil.ServiceFramework):
         """
         if not self.pipe_handle:
             self._create_pipe()
+        if self.pipe_handle is None:
+            return
 
         try:
             # Wait for a client to connect with timeout
             logger.debug("Waiting for client connection...")
-            win32pipe.ConnectNamedPipe(self.pipe_handle, None)
+            win32pipe.ConnectNamedPipe(int(self.pipe_handle), None)  # type: ignore[reportArgumentType]
             logger.info("Client connected to pipe")
 
             # Read the request
             try:
                 result, data = win32file.ReadFile(
-                    self.pipe_handle,
-                    BUFFER_SIZE,
+                    int(self.pipe_handle),
+                    BUFFER_SIZE,  # type: ignore[reportArgumentType]
                     None,  # No overlapped I/O for now
                 )
 
                 if result != 0:
                     raise RuntimeError(f"Failed to read from pipe: {win32api.FormatMessage(result)}")
 
-                request = json.loads(data.decode("utf-8"))
+                request = json.loads(data.decode("utf-8"))  # type: ignore[reportAttributeAccessIssue]
                 logger.debug(f"Received request: {json.dumps(request, indent=2)}")
 
                 # Process the request
@@ -189,7 +193,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
 
                 # Send the response
                 response_data = json.dumps(response).encode("utf-8")
-                win32file.WriteFile(self.pipe_handle, response_data)
+                win32file.WriteFile(int(self.pipe_handle), response_data)  # type: ignore[reportArgumentType]
                 logger.debug("Response sent successfully")
 
             except json.JSONDecodeError as e:
@@ -291,7 +295,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
             return {"status": "success", "result": result}
 
         except Exception as e:
-            logger.exception(f"Error handling command: {command}")
+            logger.exception(f"Error handling command: {command}")  # type: ignore[reportPossiblyUnboundVariable]
             return {
                 "status": "error",
                 "error": {"code": "command_error", "message": str(e)},
@@ -308,7 +312,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
             "os": {
                 "name": os.name,
                 "platform": sys.platform,
-                "version": sys.getwindowsversion()._asdict(),
+                "version": sys.getwindowsversion()._asdict(),  # type: ignore[reportAttributeAccessIssue]
             },
             "python": {"version": sys.version, "executable": sys.executable},
             "service": {
@@ -318,7 +322,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
             },
         }
 
-    def _handle_get_file_owner(self, path: str) -> str:
+    def _handle_get_file_owner(self, path: str) -> Any:
         """Get the owner of a file."""
         from . import file_ops  # Import here to avoid circular imports
 
@@ -330,7 +334,7 @@ class ElevatedService(win32serviceutil.ServiceFramework):
 
         return volume_ops.list_volumes()
 
-    def _handle_recover_file(self, source: str, destination: str) -> bool:
+    def _handle_recover_file(self, source: str, destination: str) -> Any:
         """Recover a file."""
         from . import file_ops
 

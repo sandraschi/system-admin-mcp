@@ -200,12 +200,12 @@ def get_process_info(pid: int) -> dict[str, Any]:
                 "ionice": process.ionice(),
                 "num_ctx_switches": process.num_ctx_switches()._asdict(),
                 "ppid": process.ppid(),
-                "parent": process.parent().pid if process.parent() else None,
+                "parent": process.parent().pid if process.parent() else None,  # type: ignore[attr-defined]
                 "children": [p.pid for p in process.children(recursive=False)],
                 "is_running": process.is_running(),
-                "terminal": process.terminal() if hasattr(process, "terminal") else None,
-                "uids": process.uids()._asdict() if hasattr(process, "uids") else None,
-                "gids": process.gids()._asdict() if hasattr(process, "gids") else None,
+                "terminal": process.terminal() if hasattr(process, "terminal") else None,  # type: ignore[attr-defined]
+                "uids": process.uids()._asdict() if hasattr(process, "uids") else None,  # type: ignore[attr-defined]
+                "gids": process.gids()._asdict() if hasattr(process, "gids") else None,  # type: ignore[attr-defined]
             }
 
         return {"status": "success", "result": info}

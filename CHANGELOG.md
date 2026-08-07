@@ -1,4 +1,22 @@
 
+## [Unreleased] — 2026-08-07 (assfix re-run)
+
+### Fixed
+- **pyright clean (149 → 0 errors)**: awaited `ctx.info`/`ctx.report_progress` calls in agentic
+  workflows; `ctx.sample()` positional `messages` + `cast(Any, ...)` for `SamplingResult`;
+  `os.getloadavg` via `getattr` (Windows); `CREATE_NEW_CONSOUSE_WINDOW` typo → `CREATE_NEW_CONSOLE`;
+  `asyncio.TimeoutExpired` → `TimeoutError` (dup except removed); `wmi` module bound as `Any`;
+  unbound `tool_name`/`log_dir`/`command`; `dict[str, Any]` annotations for mixed-value results;
+  pywin32/prefab stub gaps silenced with typed ignores (pyright codes).
+- **CI**: pyright step flipped to blocking (was non-blocking with 149 errors).
+- **Coverage gate**: `--cov-fail-under=20` added (total 22.8%).
+- **justfile**: added `cua-nsis-test` + `cua-webapp-test` recipes (fleet CUA scripts committed).
+- Removed 10 stale `.bak` page files from `web_sota/src/pages`.
+
+### Remaining (deferred, MEDIUM)
+- data-testid density (<3/page on several pages), `text-xs` x67, low-contrast
+  `text-slate-400/500` x111, `print()` in bridge/service debug paths, `@mcp.resource()` absent.
+
 ## [Unreleased] — 2026-08-01
 
 ### Fixed

@@ -222,6 +222,8 @@ async def get_system_info() -> dict:
         Dictionary containing system information
     """
     try:
+        if _bridge is None:
+            raise RuntimeError("bridge not initialized")
         return _bridge.get_system_info()
     except Exception as e:
         logger.error(f"Error getting system info: {e}")

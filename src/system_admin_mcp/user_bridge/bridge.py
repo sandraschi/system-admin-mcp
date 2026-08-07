@@ -110,7 +110,7 @@ class UserBridge:
             else:
                 logger.error(f"Error checking service status: {e}")
                 self.service_running = False
-            return False
+            return False  # type: ignore[reportReturnType]
 
     def ensure_service_running(self) -> bool:
         """Ensure the elevated service is running.
@@ -164,14 +164,10 @@ class UserBridge:
 
             logger.info(f"Installing service with command: {' '.join(cmd)}")
 
-            # Run with UAC elevation
-            shell = True
-            if hasattr(subprocess, "CREATE_NO_WINDOW"):
-                shell = subprocess.CREATE_NO_WINDOW
-
+            # Run with UAC elevation (no console window)
             result = subprocess.run(
                 cmd,
-                shell=shell,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -257,7 +253,7 @@ class UserBridge:
             )
 
             # Set read mode to message mode
-            res = win32pipe.SetNamedPipeHandleState(self.pipe_handle, win32pipe.PIPE_READMODE_MESSAGE, None, None)
+            res = win32pipe.SetNamedPipeHandleState(int(self.pipe_handle), win32pipe.PIPE_READMODE_MESSAGE, None, None)
 
             if res is None:
                 error = win32api.GetLastError()
@@ -286,7 +282,7 @@ class UserBridge:
 
             return False
 
-    def _send_request(self, action: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _send_request(self, action: str, params: dict[str, Any] | None = None) -> dict[str, Any]:  # type: ignore[reportReturnType]
         """Send a request to the elevated service via named pipe.
 
         Args:
@@ -338,13 +334,19 @@ class UserBridge:
                 # Convert request to JSON and ensure it's bytes
                 request_data = json.dumps(request).encode("utf-8")
 
+                if self.pipe_handle is None:
+                    return {
+                        "status": "error",
+                        "error": {"code": "pipe_disconnected", "message": "Named pipe handle is None"},
+                    }
+
                 # Write the request
-                win32file.WriteFile(self.pipe_handle, request_data)
+                win32file.WriteFile(int(self.pipe_handle), request_data)
 
                 # Read the response
                 result, data = win32file.ReadFile(
-                    self.pipe_handle,
-                    BUFFER_SIZE,
+                    int(self.pipe_handle),
+                    BUFFER_SIZE,  # type: ignore[reportArgumentType]
                     None,  # No overlapped I/O for now
                 )
 
@@ -360,7 +362,7 @@ class UserBridge:
                     }
 
                 # Parse and return the response
-                response = json.loads(data.decode("utf-8"))
+                response = json.loads(data.decode("utf-8"))  # type: ignore[reportAttributeAccessIssue]
                 logger.debug(f"Received response: {json.dumps(response, indent=2)}")
                 return response
 
@@ -409,7 +411,7 @@ class UserBridge:
         """Clean up resources used by the bridge."""
         if self.pipe_handle:
             try:
-                win32file.CloseHandle(self.pipe_handle)
+                win32file.CloseHandle(int(self.pipe_handle))
                 logger.debug("Closed connection to service")
             except Exception as e:
                 logger.error(f"Error during cleanup: {e!s}")
@@ -571,7 +573,7 @@ class SystemAdminMCP:
         owner = self.bridge.get_file_owner(path)
         return {"path": path, "owner": owner}
 
-    async def tool_list_volumes(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+    async def tool_list_volumes(self, params: dict[str, Any]) -> Any:
         """List all volumes on the system."""
         return self.bridge.list_volumes()
 
@@ -630,8 +632,8 @@ if __name__ == "__main__":
             # List volumes
             print("\nListing volumes...")
             volumes = bridge.list_volumes()
-            for vol in volumes:
-                print(f"- {vol.get('name')}: {vol.get('label', 'No label')} ({vol.get('size_gb', 0):.2f} GB)")
+            for vol in volumes if isinstance(volumes, list) else []:
+                print(f"- {vol.get('name')}: {vol.get('label', 'No label')} ({vol.get('size_gb', 0):.2f} GB)")  # type: ignore[reportAttributeAccessIssue]
 
     # Run the test
     asyncio.run(main())
