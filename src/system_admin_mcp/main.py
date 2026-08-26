@@ -85,8 +85,8 @@ def main() -> None:
     parser.add_argument("--web", action="store_true", help="Start the FastAPI web server")
     args = parser.parse_args()
 
-    if args.web:
-        port = int(os.getenv("WEBAPP_PORT", 10861))
+    if args.web or os.getenv("SYSTEMADMIN_TAURI", "").lower() in ("1", "true", "yes"):
+        port = int(os.getenv("WEBAPP_PORT", os.getenv("PORT", "10861")))
         logger.info(f"Starting FastAPI web server on port {port}...")
         uvicorn.run("system_admin_mcp.server:app", host="0.0.0.0", port=port, reload=True)  # noqa: S104
     else:
