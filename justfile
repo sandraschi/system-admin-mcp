@@ -176,12 +176,4 @@ bootstrap:
     uv run pre-commit install
     Write-Host "Pre-commit hooks installed." -ForegroundColor Green
 
-# --- CUA tests ---
-
-# CUA-NSIS smoke test (install -> launch -> nav walk -> uninstall)
-cua-nsis-test:
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\just\cua-nsis-test.ps1
-
-# CUA webapp test (pre-Tauri browser walk)
-cua-webapp-test:
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\just\cua-webapp-test.ps1
+# --- CUA tests (fleet.just: `just cua-nsis-test` / `just cua-webapp-test`) ---
