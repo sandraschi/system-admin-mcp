@@ -1017,7 +1017,7 @@ def forensic_scan() -> dict[str, Any]:
 
     Flags items based on local heuristics: unusual paths, random-looking names,
     missing descriptions, high resource usage, network connections to uncommon
-    ports. Does NOT perform web lookups — use ctx.sample() with the findings
+    ports. Does NOT perform web lookups - use ctx.sample() with the findings
     for LLM-driven analysis.
 
     Returns:

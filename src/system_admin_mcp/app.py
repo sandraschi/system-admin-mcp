@@ -47,7 +47,7 @@ async def lifespan(app: FastMCP):
             register_prefab_tools(app)
             logger.info("Prefab tools registered")
         except ImportError:
-            logger.info("prefab-ui not installed — prefab tools skipped (uv sync --extra apps)")
+            logger.info("prefab-ui not installed - prefab tools skipped (uv sync --extra apps)")
         except Exception as e:
             logger.warning(f"Prefab registration failed: {e}")
 
@@ -63,7 +63,7 @@ mcp = FastMCP(
     version="0.3.0",
     lifespan=lifespan,
     instructions=(
-        "SOTA v0.3.0: Windows System Administration Hub — "
+        "SOTA v0.3.0: Windows System Administration Hub - "
         "elevated ops, file recovery, security, diagnostics, services, processes. "
         "Full FastMCP 3.2 conformance: sampling, skills, prompts, prefab UI."
     ),
@@ -85,7 +85,7 @@ if bridge_urls:
             except Exception as e:
                 logger.debug(f"Bridge proxy failed for {url}: {e}")
 
-# Tools register at import time via @mcp.tool() decorators — importing the
+# Tools register at import time via @mcp.tool() decorators - importing the
 # tool modules here guarantees registration no matter which entry point loads
 # the package (main.py, server.py, tests, or an IDE importing `app`).
 from system_admin_mcp.tools import (

@@ -1,8 +1,8 @@
 """
-System Admin MCP — Agentic Workflows (FastMCP 3.2 / SEP-1577)
+System Admin MCP - Agentic Workflows (FastMCP 3.2 / SEP-1577)
 
 Real sampling-driven orchestration using ctx.sample().
-No simulation stubs — all phases execute actual tool calls.
+No simulation stubs - all phases execute actual tool calls.
 """
 
 import json
@@ -87,7 +87,7 @@ async def agentic_system_workflow(
 
     await ctx.report_progress(40, 100)
 
-    # Phase 2: SEP-1577 sampling — reason over inventory
+    # Phase 2: SEP-1577 sampling - reason over inventory
     await ctx.info("Phase 2: Sampling for analysis and recommendations...")
 
     system_prompt = (

@@ -1,5 +1,5 @@
 """
-System Admin MCP — FastMCP 3.2 SOTA Implementation
+System Admin MCP - FastMCP 3.2 SOTA Implementation
 
 Elevated Windows system operations: diagnostics, security, file recovery,
 volume maintenance, services, processes. Full FastMCP 3.2 conformance:

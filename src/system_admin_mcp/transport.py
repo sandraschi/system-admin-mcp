@@ -215,7 +215,7 @@ async def run_server_async(mcp_app, args: argparse.Namespace | None = None, serv
             host = config["host"]
             port = config["port"]
             if transport == "sse":
-                logger.warning("SSE transport removed in FastMCP 3.2 — using streamable-http instead.")
+                logger.warning("SSE transport removed in FastMCP 3.2 - using streamable-http instead.")
             logger.info(f"Running HTTP mode: http://{host}:{port}")
             await mcp_app.run_async(transport="streamable-http", host=host, port=port)
 
