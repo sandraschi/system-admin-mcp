@@ -56,6 +56,22 @@ def is_admin() -> bool:
         return False
 
 
+def _wmi_connect() -> Any:
+    """WMI connection safe for web-server worker threads.
+
+    Starlette runs sync tools in worker threads where COM is uninitialized;
+    plain wmi.WMI() fails there with x_wmi_uninitialised_thread.
+    """
+    import pythoncom
+    import wmi as wmi_module
+
+    try:
+        pythoncom.CoInitialize()
+    except Exception:
+        pass
+    return wmi_module.WMI()
+
+
 # ============================================================================
 # FILE RECOVERY OPERATIONS
 # ============================================================================
@@ -581,7 +597,7 @@ def check_disk_health(drive: str) -> dict[str, Any]:
         if not drive.endswith(":"):
             drive = drive + ":"
 
-        c = wmi.WMI()
+        c = _wmi_connect()
 
         # Get SMART attributes
         disks = c.Win32_DiskDrive()
@@ -891,7 +907,7 @@ def get_hardware_info() -> dict[str, Any]:
 
         if WMI_AVAILABLE:
             try:
-                c = wmi.WMI()
+                c = _wmi_connect()
                 cpu = c.Win32_Processor()[0]
                 hw_info["cpu"]["name"] = cpu.Name.strip() if hasattr(cpu, "Name") else None
                 hw_info["cpu"]["manufacturer"] = cpu.Manufacturer if hasattr(cpu, "Manufacturer") else None
@@ -945,7 +961,7 @@ def get_hardware_info() -> dict[str, Any]:
         # GPU Info (via WMI if available)
         if WMI_AVAILABLE:
             try:
-                c = wmi.WMI()
+                c = _wmi_connect()
                 gpus = c.Win32_VideoController()
                 hw_info["gpu"] = []
                 for gpu in gpus:
@@ -987,7 +1003,7 @@ def get_os_info() -> dict[str, Any]:
             # Get detailed Windows info via WMI
             if WMI_AVAILABLE:
                 try:
-                    c = wmi.WMI()
+                    c = _wmi_connect()
                     os_wmi = c.Win32_OperatingSystem()[0]
                     os_info["name"] = os_wmi.Caption if hasattr(os_wmi, "Caption") else None
                     os_info["version"] = os_wmi.Version if hasattr(os_wmi, "Version") else None
@@ -1694,7 +1710,7 @@ def get_gpu_info() -> dict[str, Any]:
 
     if WMI_AVAILABLE:
         try:
-            c = wmi.WMI()
+            c = _wmi_connect()
             gpus = c.Win32_VideoController()
             gpu_list = []
             for gpu in gpus:
@@ -3055,3 +3071,505 @@ def audit_admin_toolbox() -> dict[str, Any]:
     except Exception as e:
         logger.exception("Error auditing admin toolbox")
         return {"status": "error", "operation": "audit_admin_toolbox", "error": str(e)}
+
+
+# ============================================================================
+# SYSTEM AUDIT OPERATIONS (firmware, tasks, updates, access, storage, drivers)
+# ============================================================================
+
+
+def _reg_value(root: Any, path: str, name: str) -> Any:
+    try:
+        with winreg.OpenKey(root, path) as key:
+            val, _ = winreg.QueryValueEx(key, name)
+            return val
+    except OSError:
+        return None
+
+
+@mcp.tool()
+def get_firmware_posture() -> dict[str, Any]:
+    """Firmware and virtualization posture: SVM, TPM, Secure Boot, VBS, BIOS.
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "get_firmware_posture",
+      "virtualization_firmware": bool, "tpm": {...}, "secure_boot": bool,
+      "vbs": {...}, "bios": {...}
+    }
+    ```
+
+    ## Examples
+        get_firmware_posture()
+    """
+    try:
+
+        conn = _wmi_connect()
+        virt = slat = None
+        try:
+            cpu = conn.Win32_Processor()[0]
+            virt = bool(cpu.VirtualizationFirmwareEnabled)
+            slat = bool(cpu.SecondLevelAddressTranslationExtensions)
+        except Exception:
+            pass
+        board = bios_ver = bios_date = None
+        try:
+            bb = conn.Win32_BaseBoard()[0]
+            board = f"{bb.Manufacturer} {bb.Product}".strip()
+        except Exception:
+            pass
+        try:
+            bi = conn.Win32_BIOS()[0]
+            bios_ver = bi.SMBIOSBIOSVersion
+            bios_date = str(bi.ReleaseDate or "")[:8]
+        except Exception:
+            pass
+        tpm_present = tpm_enabled = None
+        try:
+            tpm = conn.Win32_Tpm()[0]
+            tpm_present = True
+            tpm_enabled = bool(tpm.IsEnabled)
+        except Exception:
+            tpm_present = (
+                _reg_value(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\TPM\WMI", "FirmwareVersion")
+                is not None
+            )
+        secure_boot = _reg_value(
+            winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\SecureBoot\State", "UEFISecureBootEnabled"
+        )
+        vbs = _reg_value(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\DeviceGuard",
+            "EnableVirtualizationBasedSecurity",
+        )
+        return {
+            "status": "success",
+            "operation": "get_firmware_posture",
+            "virtualization_firmware": virt,
+            "second_level_address_translation": slat,
+            "tpm": {"present": tpm_present, "enabled": tpm_enabled},
+            "secure_boot": bool(secure_boot) if secure_boot is not None else None,
+            "vbs_enabled": bool(vbs) if vbs is not None else None,
+            "bios": {"board": board, "version": bios_ver, "date": bios_date},
+            "note": "virtualization_firmware=false breaks Docker/Hyper-V; re-enable SVM/VT-x in firmware",
+        }
+    except Exception as e:
+        logger.exception("Error reading firmware posture")
+        return {"status": "error", "operation": "get_firmware_posture", "error": str(e)}
+
+
+@mcp.tool()
+def audit_scheduled_tasks(max_results: int = 50) -> dict[str, Any]:
+    """List scheduled tasks (name, next run, status) via schtasks.
+
+    ## Return Format
+    ```json
+    {"status": "success", "operation": "audit_scheduled_tasks", "tasks": [...], "total": int}
+    ```
+
+    ## Examples
+        audit_scheduled_tasks()
+        audit_scheduled_tasks(max_results=100)
+    """
+    import csv as csv_module
+
+    try:
+        proc = subprocess.run(
+            ["schtasks", "/QUERY", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=60,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        tasks: list[dict[str, Any]] = []
+        reader = csv_module.reader(proc.stdout.splitlines())
+        for row in reader:
+            if len(row) < 3:
+                continue
+            tasks.append({"name": row[0], "next_run": row[1], "status": row[2]})
+            if len(tasks) >= max_results:
+                break
+        return {
+            "status": "success",
+            "operation": "audit_scheduled_tasks",
+            "tasks": tasks,
+            "total": len(tasks),
+            "truncated": len(tasks) >= max_results,
+        }
+    except Exception as e:
+        logger.exception("Error auditing scheduled tasks")
+        return {"status": "error", "operation": "audit_scheduled_tasks", "error": str(e)}
+
+
+@mcp.tool()
+def get_update_status() -> dict[str, Any]:
+    """Windows Update status: last install, pending reboot, uptime.
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "get_update_status",
+      "last_install": str|null, "pending_reboot": bool,
+      "uptime_hours": float, "last_boot": str
+    }
+    ```
+
+    ## Examples
+        get_update_status()
+    """
+    try:
+        last_install = _reg_value(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\Results\Install",
+            "LastSuccessTime",
+        )
+        reboot_required = False
+        try:
+            with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
+            ):
+                reboot_required = True
+        except OSError:
+            pass
+        try:
+            with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending",
+            ):
+                reboot_required = True
+        except OSError:
+            pass
+        boot_ts = psutil.boot_time()
+        return {
+            "status": "success",
+            "operation": "get_update_status",
+            "last_install": str(last_install) if last_install else None,
+            "pending_reboot": reboot_required,
+            "uptime_hours": round((time.time() - boot_ts) / 3600, 1),
+            "last_boot": datetime.fromtimestamp(boot_ts).isoformat(),
+        }
+    except Exception as e:
+        logger.exception("Error reading update status")
+        return {"status": "error", "operation": "get_update_status", "error": str(e)}
+
+
+@mcp.tool()
+def audit_local_admins() -> dict[str, Any]:
+    """Local users and Administrators group membership.
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "audit_local_admins",
+      "administrators": [str], "users": [{"name": str, "disabled": bool}]
+    }
+    ```
+
+    ## Examples
+        audit_local_admins()
+    """
+    try:
+
+        conn = _wmi_connect()
+        admins: list[str] = []
+        try:
+            for group in conn.Win32_Group(Name="Administrators"):
+                for user in group.associators("Win32_GroupUser"):
+                    admins.append(str(user.Name))
+        except Exception:
+            pass
+        users: list[dict[str, Any]] = []
+        try:
+            for u in conn.Win32_UserAccount(LocalAccount=True):
+                users.append({"name": str(u.Name), "disabled": bool(u.Disabled)})
+        except Exception:
+            pass
+        return {
+            "status": "success",
+            "operation": "audit_local_admins",
+            "administrators": sorted(set(admins)),
+            "users": sorted(users, key=lambda x: x["name"].lower()),
+        }
+    except Exception as e:
+        logger.exception("Error auditing local admins")
+        return {"status": "error", "operation": "audit_local_admins", "error": str(e)}
+
+
+@mcp.tool()
+def audit_smb_shares() -> dict[str, Any]:
+    """SMB shares (name, path, description) and open sessions.
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "audit_smb_shares",
+      "shares": [...], "sessions": [...]
+    }
+    ```
+
+    ## Examples
+        audit_smb_shares()
+    """
+    try:
+
+        conn = _wmi_connect()
+        shares: list[dict[str, Any]] = []
+        try:
+            for s in conn.Win32_Share():
+                shares.append(
+                    {
+                        "name": str(s.Name),
+                        "path": str(s.Path or ""),
+                        "description": str(s.Description or ""),
+                        "type": int(s.Type or 0),
+                    }
+                )
+        except Exception as e:
+            return {"status": "error", "operation": "audit_smb_shares", "error": str(e)}
+        sessions: list[dict[str, Any]] = []
+        try:
+            for c in conn.Win32_ServerConnection():
+                sessions.append({"user": str(c.UserName or ""), "computer": str(c.ComputerName or "")})
+        except Exception:
+            pass
+        return {
+            "status": "success",
+            "operation": "audit_smb_shares",
+            "shares": shares,
+            "sessions": sessions,
+        }
+    except Exception as e:
+        logger.exception("Error auditing SMB shares")
+        return {"status": "error", "operation": "audit_smb_shares", "error": str(e)}
+
+
+@mcp.tool()
+def list_shadow_copies() -> dict[str, Any]:
+    """VSS shadow copies (backup/restore points) via WMI.
+
+    ## Return Format
+    ```json
+    {"status": "success", "operation": "list_shadow_copies", "shadows": [...]}
+    ```
+
+    ## Examples
+        list_shadow_copies()
+    """
+    try:
+        if not is_admin():
+            return {
+                "status": "error",
+                "operation": "list_shadow_copies",
+                "error": "Administrator privileges required for shadow copy enumeration",
+            }
+
+        conn = _wmi_connect()
+        shadows: list[dict[str, Any]] = []
+        for s in conn.Win32_ShadowCopy():
+            shadows.append(
+                {
+                    "volume": str(s.VolumeName or ""),
+                    "created": str(s.InstallDate or "")[:14],
+                    "persistent": bool(s.Persistent),
+                }
+            )
+        return {"status": "success", "operation": "list_shadow_copies", "shadows": shadows}
+    except Exception as e:
+        logger.exception("Error listing shadow copies")
+        return {"status": "error", "operation": "list_shadow_copies", "error": str(e)}
+
+
+@mcp.tool()
+def audit_drivers(class_filter: str | None = None, max_results: int = 100) -> dict[str, Any]:
+    """Signed driver inventory: device, version, date, provider.
+
+    ## Return Format
+    ```json
+    {"status": "success", "operation": "audit_drivers", "drivers": [...]}
+    ```
+
+    ## Examples
+        audit_drivers()
+        audit_drivers(class_filter="Display")
+    """
+    try:
+
+        conn = _wmi_connect()
+        drivers: list[dict[str, Any]] = []
+        for d in conn.Win32_PnPSignedDriver():
+            name = str(d.DeviceName or "")
+            if not name or name == "Unknown":
+                continue
+            cls = str(d.DeviceClass or "")
+            if class_filter and class_filter.lower() not in cls.lower():
+                continue
+            drivers.append(
+                {
+                    "device": name,
+                    "class": cls,
+                    "version": str(d.DriverVersion or ""),
+                    "date": str(d.DriverDate or "")[:8],
+                    "provider": str(d.DriverProviderName or ""),
+                }
+            )
+            if len(drivers) >= max_results:
+                break
+        drivers.sort(key=lambda x: x["device"].lower())
+        return {"status": "success", "operation": "audit_drivers", "drivers": drivers}
+    except Exception as e:
+        logger.exception("Error auditing drivers")
+        return {"status": "error", "operation": "audit_drivers", "error": str(e)}
+
+
+@mcp.tool()
+def get_reliability_history(days_back: int = 7, max_results: int = 50) -> dict[str, Any]:
+    """Reliability Monitor records (failures, updates, installs).
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "get_reliability_history",
+      "records": [{"time": str, "source": str, "message": str}]
+    }
+    ```
+
+    ## Examples
+        get_reliability_history()
+        get_reliability_history(days_back=2)
+    """
+    try:
+
+        conn = _wmi_connect()
+        cutoff = datetime.now() - timedelta(days=days_back)
+        records: list[dict[str, Any]] = []
+        for r in conn.Win32_ReliabilityRecords():
+            try:
+                stamp = r.TimeGenerated
+                moment = stamp if isinstance(stamp, datetime) else datetime.fromtimestamp(stamp)
+            except Exception:
+                continue
+            if moment < cutoff:
+                continue
+            records.append(
+                {
+                    "time": moment.isoformat(),
+                    "event_id": int(r.EventIdentifier or 0),
+                    "source": str(r.SourceName or ""),
+                    "message": str(r.Message or "")[:300],
+                }
+            )
+        records.sort(key=lambda x: x["time"], reverse=True)
+        return {
+            "status": "success",
+            "operation": "get_reliability_history",
+            "records": records[:max_results],
+            "total": len(records),
+        }
+    except Exception as e:
+        logger.exception("Error reading reliability history")
+        return {"status": "error", "operation": "get_reliability_history", "error": str(e)}
+
+
+@mcp.tool()
+def winget_outdated(max_results: int = 30) -> dict[str, Any]:
+    """Packages with upgrades available via winget.
+
+    ## Return Format
+    ```json
+    {"status": "success", "operation": "winget_outdated", "upgrades": [...]}
+    ```
+
+    ## Examples
+        winget_outdated()
+    """
+    try:
+        import shutil
+
+        if not shutil.which("winget"):
+            return {
+                "status": "error",
+                "operation": "winget_outdated",
+                "error": "winget not found on PATH",
+            }
+        proc = subprocess.run(
+            ["winget", "upgrade", "--accept-source-agreements"],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=180,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        upgrades: list[dict[str, Any]] = []
+        parsing = False
+        for line in proc.stdout.splitlines():
+            if line.startswith("---"):
+                parsing = True
+                continue
+            if not parsing or not line.strip():
+                continue
+            parts = line.split()
+            if len(parts) >= 4:
+                upgrades.append(
+                    {"name": " ".join(parts[:-3]), "id": parts[-3], "installed": parts[-2], "available": parts[-1]}
+                )
+                if len(upgrades) >= max_results:
+                    break
+        return {"status": "success", "operation": "winget_outdated", "upgrades": upgrades}
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "operation": "winget_outdated", "error": "winget timed out"}
+    except Exception as e:
+        logger.exception("Error checking winget upgrades")
+        return {"status": "error", "operation": "winget_outdated", "error": str(e)}
+
+
+@mcp.tool()
+def audit_path_dross() -> dict[str, Any]:
+    """Machine + user PATH audit: missing dirs, duplicates, file counts.
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "audit_path_dross",
+      "missing": [...], "duplicates": [...], "entries": [...]
+    }
+    ```
+
+    ## Examples
+        audit_path_dross()
+    """
+    try:
+        machine = _reg_value(
+            winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment", "Path"
+        )
+        user = _reg_value(winreg.HKEY_CURRENT_USER, "Environment", "Path")
+        seen: set[str] = set()
+        duplicates: list[str] = []
+        missing: list[str] = []
+        entries: list[dict[str, Any]] = []
+        for scope, raw in (("machine", machine), ("user", user)):
+            for part in str(raw or "").split(";"):
+                entry = part.strip().strip('"')
+                if not entry:
+                    continue
+                key = os.path.normcase(os.path.expandvars(entry))
+                is_dup = key in seen
+                seen.add(key)
+                exists = os.path.isdir(os.path.expandvars(entry))
+                if is_dup:
+                    duplicates.append(entry)
+                if not exists:
+                    missing.append(entry)
+                entries.append({"dir": entry, "scope": scope, "exists": exists, "duplicate": is_dup})
+        return {
+            "status": "success",
+            "operation": "audit_path_dross",
+            "entries": entries,
+            "missing": sorted(set(missing)),
+            "duplicates": sorted(set(duplicates)),
+        }
+    except Exception as e:
+        logger.exception("Error auditing PATH")
+        return {"status": "error", "operation": "audit_path_dross", "error": str(e)}

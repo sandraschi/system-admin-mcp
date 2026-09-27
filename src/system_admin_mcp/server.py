@@ -390,10 +390,30 @@ async def get_logs(tail: int = 200, file: str | None = None) -> dict[str, Any]:
 
 @app.get("/api/volumes")
 async def api_volumes() -> dict[str, Any]:
-    """List volumes via MCP list_volumes."""
+    """List volumes with usage via MCP list_volumes + psutil."""
     try:
         result = await _run_tool("list_volumes")
-        return {"volumes": result if isinstance(result, list) else result.get("volumes", [])}
+        volumes = result if isinstance(result, list) else result.get("volumes", [])
+        fstype_by_drive = {p.device.rstrip("\\").lower(): p.fstype for p in psutil.disk_partitions()}
+        enriched: list[dict[str, Any]] = []
+        for v in volumes:
+            drive = v.get("drive", "") if isinstance(v, dict) else str(v)
+            item: dict[str, Any] = dict(v) if isinstance(v, dict) else {"drive": drive}
+            item.setdefault("fstype", fstype_by_drive.get(drive.rstrip("\\").lower(), ""))
+            try:
+                usage = psutil.disk_usage(drive)
+                item.update(
+                    {
+                        "total_gb": round(usage.total / (1024**3), 1),
+                        "used_gb": round(usage.used / (1024**3), 1),
+                        "free_gb": round(usage.free / (1024**3), 1),
+                        "percent": usage.percent,
+                    }
+                )
+            except Exception:
+                item.update({"total_gb": None, "used_gb": None, "free_gb": None, "percent": None})
+            enriched.append(item)
+        return {"volumes": enriched}
     except Exception as e:
         logger.exception("Error listing volumes")
         return {"volumes": [], "error": str(e)}
@@ -604,6 +624,105 @@ async def api_admin_toolbox() -> dict[str, Any]:
     except Exception as e:
         logger.exception("Error auditing admin toolbox")
         return {"status": "error", "error": str(e)}
+
+
+def _audit_error(operation: str, e: Exception) -> dict[str, Any]:
+    logger.exception(f"Error running {operation}")
+    return {"status": "error", "error": str(e)}
+
+
+@app.get("/api/firmware-posture")
+async def api_firmware_posture() -> dict[str, Any]:
+    """Firmware posture via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="get_firmware_posture")
+    except Exception as e:
+        return _audit_error("get_firmware_posture", e)
+
+
+@app.get("/api/scheduled-tasks")
+async def api_scheduled_tasks(max_results: int = 50) -> dict[str, Any]:
+    """Scheduled tasks via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="audit_scheduled_tasks", max_results=max_results)
+    except Exception as e:
+        return _audit_error("audit_scheduled_tasks", e)
+
+
+@app.get("/api/update-status")
+async def api_update_status() -> dict[str, Any]:
+    """Update status via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="get_update_status")
+    except Exception as e:
+        return _audit_error("get_update_status", e)
+
+
+@app.get("/api/local-admins")
+async def api_local_admins() -> dict[str, Any]:
+    """Local admins via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="audit_local_admins")
+    except Exception as e:
+        return _audit_error("audit_local_admins", e)
+
+
+@app.get("/api/smb-shares")
+async def api_smb_shares() -> dict[str, Any]:
+    """SMB shares via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="audit_smb_shares")
+    except Exception as e:
+        return _audit_error("audit_smb_shares", e)
+
+
+@app.get("/api/shadow-copies")
+async def api_shadow_copies() -> dict[str, Any]:
+    """Shadow copies via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="list_shadow_copies")
+    except Exception as e:
+        return _audit_error("list_shadow_copies", e)
+
+
+@app.get("/api/drivers")
+async def api_drivers(class_filter: str | None = None, max_results: int = 100) -> dict[str, Any]:
+    """Driver inventory via portmanteau system_admin tool."""
+    try:
+        return await _run_tool(
+            "system_admin", operation="audit_drivers", class_filter=class_filter, max_results=max_results
+        )
+    except Exception as e:
+        return _audit_error("audit_drivers", e)
+
+
+@app.get("/api/reliability-history")
+async def api_reliability_history(days_back: int = 7, max_results: int = 50) -> dict[str, Any]:
+    """Reliability history via portmanteau system_admin tool."""
+    try:
+        return await _run_tool(
+            "system_admin", operation="get_reliability_history", days_back=days_back, max_results=max_results
+        )
+    except Exception as e:
+        return _audit_error("get_reliability_history", e)
+
+
+@app.get("/api/winget-outdated")
+async def api_winget_outdated(max_results: int = 30) -> dict[str, Any]:
+    """Winget upgrades via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="winget_outdated", max_results=max_results)
+    except Exception as e:
+        return _audit_error("winget_outdated", e)
+
+
+@app.get("/api/path-dross")
+async def api_path_dross() -> dict[str, Any]:
+    """PATH audit via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="audit_path_dross")
+    except Exception as e:
+        return _audit_error("audit_path_dross", e)
 
 
 if __name__ == "__main__":

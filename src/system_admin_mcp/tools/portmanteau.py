@@ -12,14 +12,20 @@ from system_admin_mcp.tools.implementations import (
     analyze_minidump,
     analyze_top_folder_sizes,
     audit_admin_toolbox,
+    audit_drivers,
+    audit_local_admins,
     audit_network_ports,
+    audit_path_dross,
     audit_permissions,
+    audit_scheduled_tasks,
+    audit_smb_shares,
     check_disk_health,
     check_system_health_status,
     defragment_disk,
     disk_cleanup,
     get_bugcheck_history,
     get_event_log,
+    get_firmware_posture,
     get_gpu_info,
     get_gpu_processes,
     get_hardware_info,
@@ -28,10 +34,13 @@ from system_admin_mcp.tools.implementations import (
     get_performance_metrics,
     get_permissions,
     get_recent_event_errors,
+    get_reliability_history,
     get_top_resource_processes,
+    get_update_status,
     get_volume_info,
     health_check,
     list_crash_dumps,
+    list_shadow_copies,
     optimize_ssd,
     recover_file_ntfs,
     remove_permission,
@@ -40,6 +49,7 @@ from system_admin_mcp.tools.implementations import (
     take_ownership,
     validate_recovery,
     windbg_analyze,
+    winget_outdated,
 )
 from system_admin_mcp.tools.monitoring import watcher_manager
 from system_admin_mcp.tools.services_and_tasks import (
@@ -201,6 +211,17 @@ async def system_admin(
         "analyze_minidump",
         "windbg_analyze",
         "audit_admin_toolbox",
+        # System audit
+        "get_firmware_posture",
+        "audit_scheduled_tasks",
+        "get_update_status",
+        "audit_local_admins",
+        "audit_smb_shares",
+        "list_shadow_copies",
+        "audit_drivers",
+        "get_reliability_history",
+        "winget_outdated",
+        "audit_path_dross",
         # Windows Services
         "list_services",
         "get_service_stats",
@@ -246,6 +267,7 @@ async def system_admin(
     days_back: int = 7,
     dump_path: str | None = None,
     timeout_seconds: int = 120,
+    class_filter: str | None = None,
     # Services parameters
     service_name: str | None = None,
     filter_status: str | None = None,
@@ -310,6 +332,18 @@ async def system_admin(
     - analyze_minidump: SDK-free minidump triage parse (code, faulting module)
     - windbg_analyze: Full !analyze -v via cdb.exe (needs Debugging Tools)
     - audit_admin_toolbox: Inventory dev/AI/tcom/office/admin toolbox apps
+
+    System audit:
+    - get_firmware_posture: SVM/TPM/Secure Boot/VBS/BIOS in one card
+    - audit_scheduled_tasks: Task Scheduler listing
+    - get_update_status: Last patch, pending reboot, uptime
+    - audit_local_admins: Administrators members + local users
+    - audit_smb_shares: Shares and open sessions
+    - list_shadow_copies: VSS shadows (needs elevation)
+    - audit_drivers: Signed driver inventory
+    - get_reliability_history: Reliability Monitor records
+    - winget_outdated: Upgradable packages
+    - audit_path_dross: Missing/duplicate PATH entries
 
     Windows Services:
     - list_services: List Windows services with filtering
@@ -566,6 +600,36 @@ async def system_admin(
 
         elif operation == "audit_admin_toolbox":
             return audit_admin_toolbox()
+
+        elif operation == "get_firmware_posture":
+            return get_firmware_posture()
+
+        elif operation == "audit_scheduled_tasks":
+            return audit_scheduled_tasks(max_results)
+
+        elif operation == "get_update_status":
+            return get_update_status()
+
+        elif operation == "audit_local_admins":
+            return audit_local_admins()
+
+        elif operation == "audit_smb_shares":
+            return audit_smb_shares()
+
+        elif operation == "list_shadow_copies":
+            return list_shadow_copies()
+
+        elif operation == "audit_drivers":
+            return audit_drivers(class_filter, max_results)
+
+        elif operation == "get_reliability_history":
+            return get_reliability_history(days_back, max_results)
+
+        elif operation == "winget_outdated":
+            return winget_outdated(max_results)
+
+        elif operation == "audit_path_dross":
+            return audit_path_dross()
 
         elif operation == "get_gpu_info":
             return get_gpu_info()
