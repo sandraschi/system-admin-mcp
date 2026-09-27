@@ -62,6 +62,12 @@ web_sota/node_modules/
 *.mcpb
 mcpb/src/
 
+# Release assets (built binaries ship via GitHub Releases, never git)
+*.exe
+*.msi
+native/resources/
+src-tauri/binaries/
+
 # Backups (batch-mutation safety)
 *.bak
 *.bak.*

@@ -41,7 +41,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/volumes", label: "Volumes", icon: HardDrive },
     { href: "/file-owner", label: "File owner", icon: ShieldCheck },
     { href: "/file-recovery", label: "File recovery", icon: Archive },
-    { href: "/crash-postmortem", label: "Crash postmortem", icon: AlertTriangle },
+    {
+      href: "/crash-postmortem",
+      label: "Crash postmortem",
+      icon: AlertTriangle,
+    },
     { href: "/logs", label: "Logs", icon: FileText },
     { href: "/settings", label: "Settings", icon: Settings },
     { href: "/help", label: "Help", icon: HelpCircle },
