@@ -9,6 +9,7 @@ from fastmcp import Context
 from system_admin_mcp.app import mcp
 from system_admin_mcp.tools.implementations import (
     analyze_disk_usage_advanced,
+    analyze_minidump,
     analyze_top_folder_sizes,
     audit_network_ports,
     audit_permissions,
@@ -16,6 +17,7 @@ from system_admin_mcp.tools.implementations import (
     check_system_health_status,
     defragment_disk,
     disk_cleanup,
+    get_bugcheck_history,
     get_event_log,
     get_gpu_info,
     get_gpu_processes,
@@ -28,6 +30,7 @@ from system_admin_mcp.tools.implementations import (
     get_top_resource_processes,
     get_volume_info,
     health_check,
+    list_crash_dumps,
     optimize_ssd,
     recover_file_ntfs,
     remove_permission,
@@ -35,6 +38,7 @@ from system_admin_mcp.tools.implementations import (
     set_permissions,
     take_ownership,
     validate_recovery,
+    windbg_analyze,
 )
 from system_admin_mcp.tools.monitoring import watcher_manager
 from system_admin_mcp.tools.services_and_tasks import (
@@ -190,6 +194,11 @@ async def system_admin(
         "analyze_top_folder_sizes",
         "get_comprehensive_diagnostics",
         "forensic_scan",
+        # Crash Postmortem
+        "list_crash_dumps",
+        "get_bugcheck_history",
+        "analyze_minidump",
+        "windbg_analyze",
         # Windows Services
         "list_services",
         "get_service_stats",
@@ -232,6 +241,9 @@ async def system_admin(
     log_name: str | None = None,
     level: str | None = None,
     hours_back: int = 24,
+    days_back: int = 7,
+    dump_path: str | None = None,
+    timeout_seconds: int = 120,
     # Services parameters
     service_name: str | None = None,
     filter_status: str | None = None,
@@ -289,6 +301,12 @@ async def system_admin(
     - get_performance_metrics: Get real-time performance data
     - get_event_log: Query Windows event logs
     - health_check: Perform system health check
+
+    Crash Postmortem:
+    - list_crash_dumps: Inventory MEMORY.DMP, Minidump, LiveKernelReports, WER
+    - get_bugcheck_history: Correlate 41/1001/6008/1074 shutdown-crash events
+    - analyze_minidump: SDK-free minidump triage parse (code, faulting module)
+    - windbg_analyze: Full !analyze -v via cdb.exe (needs Debugging Tools)
 
     Windows Services:
     - list_services: List Windows services with filtering
@@ -530,6 +548,18 @@ async def system_admin(
 
         elif operation == "forensic_scan":
             return forensic_scan()
+
+        elif operation == "list_crash_dumps":
+            return list_crash_dumps()
+
+        elif operation == "get_bugcheck_history":
+            return get_bugcheck_history(days_back, max_results)
+
+        elif operation == "analyze_minidump":
+            return analyze_minidump(dump_path, max_results)
+
+        elif operation == "windbg_analyze":
+            return windbg_analyze(dump_path, timeout_seconds)
 
         elif operation == "get_gpu_info":
             return get_gpu_info()

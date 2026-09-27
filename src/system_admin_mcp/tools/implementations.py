@@ -1651,7 +1651,7 @@ async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, A
 
 
 def get_gpu_info() -> dict[str, Any]:
-    """Get GPU hardware status — name, VRAM, temperature, utilization.
+    """Get GPU hardware status - name, VRAM, temperature, utilization.
 
     Uses nvidia-smi for NVIDIA GPUs. Falls back to WMI Win32_VideoController.
     """
@@ -1899,7 +1899,7 @@ def testdisk_launch(drive: str | None = None) -> dict[str, Any]:
     """Launch TestDisk TUI in a new console window for interactive partition recovery.
 
     WARNING: TestDisk can WRITE to the partition table. This operation opens the
-    interactive TUI — the user is responsible for every action inside it.
+    interactive TUI - the user is responsible for every action inside it.
     The output log is written to testdisk.log in the current directory.
 
     Args:
@@ -2017,3 +2017,573 @@ def photorec_launch(drive: str | None = None, output_dir: str | None = None) -> 
         }
     except Exception as e:
         return {"status": "error", "message": f"Failed to launch PhotoRec: {e}"}
+
+
+# ============================================================================
+# CRASH POSTMORTEM OPERATIONS (GSOD/BSOD triage)
+# ============================================================================
+
+_CRASH_IDS = {41, 1001, 6008, 1074, 1076}
+
+
+def _stat_dump(path: str) -> dict[str, Any] | None:
+    try:
+        st = os.stat(path)
+        return {
+            "path": path,
+            "size_bytes": st.st_size,
+            "size_mb": round(st.st_size / (1024**2), 1),
+            "modified": datetime.fromtimestamp(st.st_mtime).isoformat(),
+        }
+    except OSError:
+        return None
+
+
+@mcp.tool()
+def list_crash_dumps() -> dict[str, Any]:
+    """Inventory kernel crash artefacts and dump configuration.
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "list_crash_dumps",
+      "memory_dmp": {...|null}, "minidumps": [...],
+      "live_kernel": [...], "wer": {"queue": int, "archive_recent": [...]},
+      "crash_control": {...}, "interpretation": str
+    }
+    ```
+
+    ## Examples
+        list_crash_dumps()
+    """
+    try:
+        windir = os.environ.get("SystemRoot", r"C:\Windows")
+        memory_dmp = _stat_dump(os.path.join(windir, "MEMORY.DMP"))
+
+        minidumps: list[dict[str, Any]] = []
+        minidir = os.path.join(windir, "Minidump")
+        try:
+            for name in sorted(os.listdir(minidir)):
+                if name.lower().endswith(".dmp"):
+                    info = _stat_dump(os.path.join(minidir, name))
+                    if info:
+                        minidumps.append(info)
+        except OSError:
+            pass
+        minidumps.sort(key=lambda d: d["modified"], reverse=True)
+
+        live: list[dict[str, Any]] = []
+        lkd = os.path.join(windir, "LiveKernelReports")
+        for root, _dirs, files in os.walk(lkd):
+            for name in files:
+                if name.lower().endswith(".dmp"):
+                    info = _stat_dump(os.path.join(root, name))
+                    if info:
+                        live.append(info)
+            if len(live) >= 20:
+                break
+        live.sort(key=lambda d: d["modified"], reverse=True)
+        live = live[:20]
+
+        wer_base = r"C:\ProgramData\Microsoft\Windows\WER"
+        queue_count = 0
+        archive_recent: list[dict[str, Any]] = []
+        try:
+            queue_count = len(os.listdir(os.path.join(wer_base, "ReportQueue")))
+        except OSError:
+            pass
+        try:
+            entries = [
+                (n, os.path.getmtime(os.path.join(wer_base, "ReportArchive", n)))
+                for n in os.listdir(os.path.join(wer_base, "ReportArchive"))
+            ]
+            entries.sort(key=lambda t: t[1], reverse=True)
+            for name, mtime in entries[:15]:
+                archive_recent.append({"name": name, "modified": datetime.fromtimestamp(mtime).isoformat()})
+        except OSError:
+            pass
+
+        crash_control: dict[str, Any] = {}
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\CrashControl") as key:
+                for value in ("CrashDumpEnabled", "DumpFile", "MinidumpDir", "Overwrite", "LogEvent"):
+                    try:
+                        crash_control[value], _ = winreg.QueryValueEx(key, value)
+                    except OSError:
+                        pass
+        except OSError as e:
+            crash_control["error"] = str(e)
+
+        if memory_dmp or minidumps:
+            interpretation = "Kernel dump artefacts present - parseable postmortem available."
+        elif live:
+            interpretation = "No full/mini kernel dump, but LiveKernelReports exist - watchdog-class events."
+        else:
+            interpretation = (
+                "No kernel dump artefacts. If Event Log also lacks BugCheck 1001, the OS never "
+                "got a chance to write a dump (hard hang, power loss, or storage dropout) - "
+                "check get_bugcheck_history for Kernel-Power 41 / EventLog 6008."
+            )
+
+        return {
+            "status": "success",
+            "operation": "list_crash_dumps",
+            "memory_dmp": memory_dmp,
+            "minidumps": minidumps,
+            "minidump_count": len(minidumps),
+            "live_kernel": live,
+            "wer": {"queue_count": queue_count, "archive_recent": archive_recent},
+            "crash_control": crash_control,
+            "interpretation": interpretation,
+        }
+    except Exception as e:
+        logger.exception("Error listing crash dumps")
+        return {"status": "error", "operation": "list_crash_dumps", "error": str(e)}
+
+
+@mcp.tool()
+def get_bugcheck_history(days_back: int = 7, max_results: int = 50) -> dict[str, Any]:
+    """Correlate shutdown/crash events around a GSOD/BSOD.
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "get_bugcheck_history",
+      "events": [{"time": str, "id": int, "source": str, "type": str, "message": str}],
+      "summary": {"41": int, "1001": int, "6008": int, ...},
+      "interpretation": str
+    }
+    ```
+
+    ## Examples
+        get_bugcheck_history()
+        get_bugcheck_history(days_back=2, max_results=20)
+    """
+    try:
+        if not is_admin():
+            return {
+                "status": "error",
+                "operation": "get_bugcheck_history",
+                "error": "Administrator privileges required for event log access",
+            }
+        cutoff = datetime.now() - timedelta(days=days_back)
+        flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+        collected: list[dict[str, Any]] = []
+
+        for log_name, wanted in (("System", _CRASH_IDS), ("Application", {1001})):
+            try:
+                hand = win32evtlog.OpenEventLog(None, log_name)
+            except Exception:
+                continue
+            try:
+                while len(collected) < max_results:
+                    try:
+                        batch = win32evtlog.ReadEventLog(hand, flags, 0)
+                    except Exception:
+                        break
+                    if not batch:
+                        break
+                    for evt in batch:
+                        eid = evt.EventID & 0xFFFF
+                        if eid not in wanted:
+                            continue
+                        ev_time = evt.TimeGenerated
+                        ev_dt = ev_time if isinstance(ev_time, datetime) else datetime.fromtimestamp(ev_time)
+                        if ev_dt < cutoff:
+                            continue
+                        try:
+                            msg = win32evtlogutil.SafeFormatMessage(evt, log_name)
+                        except Exception:
+                            msg = ""
+                        collected.append(
+                            {
+                                "time": ev_dt.isoformat(),
+                                "id": eid,
+                                "log": log_name,
+                                "source": evt.SourceName,
+                                "message": (msg or "")[:400],
+                            }
+                        )
+                        if len(collected) >= max_results:
+                            break
+            finally:
+                try:
+                    win32evtlog.CloseEventLog(hand)
+                except Exception:
+                    pass
+
+        collected.sort(key=lambda e: e["time"])
+        summary: dict[str, int] = {}
+        for e in collected:
+            summary[str(e["id"])] = summary.get(str(e["id"]), 0) + 1
+
+        if summary.get("1001"):
+            interpretation = "BugCheck 1001 present - OS handled the crash, pair with list_crash_dumps."
+        elif summary.get("41") or summary.get("6008"):
+            interpretation = (
+                "Unexpected shutdown (41/6008) with no BugCheck 1001 - OS never wrote a dump "
+                "(hard hang, power, or storage dropout). Suspect hardware/thermal/PSU."
+            )
+        else:
+            interpretation = "No crash-class events in window."
+
+        return {
+            "status": "success",
+            "operation": "get_bugcheck_history",
+            "days_back": days_back,
+            "events_found": len(collected),
+            "events": collected[-max_results:],
+            "summary": summary,
+            "interpretation": interpretation,
+        }
+    except Exception as e:
+        logger.exception("Error reading bugcheck history")
+        return {"status": "error", "operation": "get_bugcheck_history", "error": str(e)}
+
+
+# ============================================================================
+# MINIDUMP / WINDBG POSTMORTEM OPERATIONS
+# ============================================================================
+
+_MINIDUMP_SIGNATURE = 0x504D444D  # 'MDMP' little-endian
+_MINIDUMP_PURE_PARSE_LIMIT = 256 * 1024 * 1024  # pure parser refuses anything bigger
+
+_MINIDUMP_STREAM_NAMES = {
+    0: "Unused",
+    1: "Reserved0",
+    2: "Reserved1",
+    3: "ThreadList",
+    4: "ModuleList",
+    5: "MemoryList",
+    6: "Exception",
+    7: "SystemInfo",
+    8: "ThreadExList",
+    9: "Memory64List",
+    10: "CommentA",
+    11: "CommentW",
+    12: "HandleData",
+    13: "FunctionTable",
+    14: "UnloadedModuleList",
+    15: "MiscInfo",
+    16: "MemoryInfoList",
+    17: "ThreadInfoList",
+    18: "HandleOperationList",
+}
+
+_BUGCHECK_NAMES = {
+    0x0A: "IRQL_NOT_LESS_OR_EQUAL",
+    0x1A: "MEMORY_MANAGEMENT",
+    0x24: "NTFS_FILE_SYSTEM",
+    0x3B: "SYSTEM_SERVICE_EXCEPTION",
+    0x50: "PAGE_FAULT_IN_NONPAGED_AREA",
+    0x7E: "SYSTEM_THREAD_EXCEPTION_NOT_HANDLED",
+    0x7F: "UNEXPECTED_KERNEL_MODE_TRAP",
+    0x9F: "DRIVER_POWER_STATE_FAILURE",
+    0xBE: "ATTEMPTED_WRITE_TO_READONLY_MEMORY",
+    0xC4: "DRIVER_VERIFIER_DETECTED_VIOLATION",
+    0xD1: "DRIVER_IRQL_NOT_LESS_OR_EQUAL",
+    0xEF: "CRITICAL_PROCESS_DIED",
+    0xF7: "DRIVER_OVERRAN_STACK_BUFFER",
+    0x101: "CLOCK_WATCHDOG_TIMEOUT",
+    0x124: "WHEA_UNCORRECTABLE_ERROR",
+    0x133: "DPC_WATCHDOG_VIOLATION",
+    0x139: "KERNEL_SECURITY_CHECK_FAILURE",
+    0x13A: "KERNEL_MODE_HEAP_CORRUPTION",
+    0x1C8: "MANUALLY_INITIATED_CRASH",
+}
+
+
+def _default_minidump() -> str | None:
+    windir = os.environ.get("SystemRoot", r"C:\Windows")
+    minidir = os.path.join(windir, "Minidump")
+    newest: str | None = None
+    newest_mtime = -1.0
+    try:
+        for name in os.listdir(minidir):
+            if not name.lower().endswith(".dmp"):
+                continue
+            full = os.path.join(minidir, name)
+            try:
+                mtime = os.path.getmtime(full)
+            except OSError:
+                continue
+            if mtime > newest_mtime:
+                newest_mtime = mtime
+                newest = full
+    except OSError:
+        return None
+    return newest
+
+
+def _read_minidump_string(data: bytes, rva: int) -> str | None:
+    import struct
+
+    try:
+        (byte_len,) = struct.unpack_from("<I", data, rva)
+        raw = data[rva + 4 : rva + 4 + byte_len]
+        return raw.decode("utf-16-le", errors="replace").rstrip("\x00")
+    except Exception:
+        return None
+
+
+def _parse_minidump(data: bytes, max_drivers: int = 40) -> dict[str, Any]:
+    """Pure-python triage parse of a minidump image. Raises ValueError on bad input."""
+    import struct
+
+    if len(data) < 32:
+        raise ValueError("File too small to be a minidump")
+    sig, _ver, n_streams, dir_rva, _ck, _ts, _flags = struct.unpack_from("<IIIIIIQ", data, 0)
+    if sig != _MINIDUMP_SIGNATURE:
+        raise ValueError("Not a minidump (bad MDMP signature)")
+    streams: dict[int, tuple[int, int]] = {}
+    for i in range(n_streams):
+        off = dir_rva + i * 12
+        stype, size, rva = struct.unpack_from("<III", data, off)
+        streams[stype] = (size, rva)
+
+    parsed: dict[str, Any] = {
+        "stream_count": n_streams,
+        "streams": [_MINIDUMP_STREAM_NAMES.get(t, f"Unknown({t})") for t in streams],
+    }
+
+    modules: list[dict[str, Any]] = []
+    if 4 in streams:
+        size, rva = streams[4]
+        (count,) = struct.unpack_from("<I", data, rva)
+        for i in range(min(count, max_drivers)):
+            off = rva + 4 + i * 108
+            base, img_size, _chk, _ts2, name_rva = struct.unpack_from("<QIIII", data, off)
+            name = _read_minidump_string(data, name_rva)
+            modules.append(
+                {
+                    "base": f"0x{base:X}",
+                    "size": img_size,
+                    "name": name or f"<unnamed@{name_rva}>",
+                }
+            )
+        parsed["module_count"] = count
+        parsed["modules"] = modules
+
+    if 7 in streams:
+        size, rva = streams[7]
+        try:
+            arch, _lvl, _rev, _nproc, _ptype, major, minor, build = struct.unpack_from("<HHHBBIII", data, rva)
+            arch_names = {0: "x86", 5: "ARM", 6: "IA64", 9: "x64", 12: "ARM64"}
+            parsed["system"] = {
+                "arch": arch_names.get(arch, f"Unknown({arch})"),
+                "version": f"{major}.{minor}.{build}",
+            }
+            (csd_rva,) = struct.unpack_from("<I", data, rva + 28)
+            if csd_rva:
+                parsed["system"]["csd"] = _read_minidump_string(data, csd_rva)
+        except Exception:
+            pass
+
+    if 15 in streams:
+        size, rva = streams[15]
+        try:
+            _sz, flags1, pid = struct.unpack_from("<III", data, rva)
+            if flags1 & 0x1:
+                parsed["process_id"] = pid
+        except Exception:
+            pass
+
+    if 6 in streams:
+        size, rva = streams[6]
+        code, _fl, _rec, addr = struct.unpack_from("<IIQQ", data, rva + 8)
+        params: list[str] = []
+        try:
+            (nparam,) = struct.unpack_from("<I", data, rva + 8 + 24)
+            for i in range(min(nparam, 4)):
+                (p,) = struct.unpack_from("<Q", data, rva + 8 + 32 + i * 8)
+                params.append(f"0x{p:X}")
+        except Exception:
+            pass
+        parsed["exception_code"] = f"0x{code:X}"
+        parsed["exception_name"] = _BUGCHECK_NAMES.get(code, "Unknown - use windbg_analyze")
+        parsed["exception_address"] = f"0x{addr:X}"
+        parsed["exception_params"] = params
+        faulting = None
+        for m in modules:
+            try:
+                base = int(m["base"], 16)
+            except ValueError:
+                continue
+            if base <= addr < base + m["size"]:
+                faulting = m["name"]
+                break
+        parsed["faulting_module"] = faulting
+
+    return parsed
+
+
+@mcp.tool()
+def analyze_minidump(dump_path: str | None = None, max_drivers: int = 40) -> dict[str, Any]:
+    """Triage-parse a minidump without WinDbg (pure python, no SDK needed).
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "analyze_minidump",
+      "dump_path": str, "exception_code": str, "exception_name": str,
+      "faulting_module": str|null, "modules": [...], "system": {...}
+    }
+    ```
+
+    ## Examples
+        analyze_minidump()
+        analyze_minidump(dump_path="C:\\Windows\\Minidump\\092726-12345-01.dmp")
+    """
+    try:
+        target = dump_path or _default_minidump()
+        if not target:
+            return {
+                "status": "error",
+                "operation": "analyze_minidump",
+                "error": "No minidump found in C:\\Windows\\Minidump and no dump_path given",
+            }
+        try:
+            size = os.path.getsize(target)
+        except OSError as e:
+            return {"status": "error", "operation": "analyze_minidump", "error": str(e)}
+        if size > _MINIDUMP_PURE_PARSE_LIMIT:
+            return {
+                "status": "error",
+                "operation": "analyze_minidump",
+                "dump_path": target,
+                "error": f"File too large for pure parser ({size} bytes) - use windbg_analyze",
+            }
+        try:
+            with open(target, "rb") as f:
+                data = f.read()
+        except OSError as e:
+            return {
+                "status": "error",
+                "operation": "analyze_minidump",
+                "dump_path": target,
+                "error": f"Cannot read dump (run elevated?): {e}",
+            }
+        try:
+            parsed = _parse_minidump(data, max_drivers)
+        except ValueError as e:
+            return {
+                "status": "error",
+                "operation": "analyze_minidump",
+                "dump_path": target,
+                "error": str(e),
+            }
+        parsed["status"] = "success"
+        parsed["operation"] = "analyze_minidump"
+        parsed["dump_path"] = target
+        return parsed
+    except Exception as e:
+        logger.exception("Error analyzing minidump")
+        return {"status": "error", "operation": "analyze_minidump", "error": str(e)}
+
+
+def _find_cdb() -> str | None:
+    import glob
+    import shutil
+
+    found = shutil.which("cdb")
+    if found:
+        return found
+    for pattern in (
+        r"C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe",
+        r"C:\Program Files\Windows Kits\10\Debuggers\x64\cdb.exe",
+        r"C:\Program Files (x86)\Windows Kits\11\Debuggers\x64\cdb.exe",
+    ):
+        for hit in glob.glob(pattern):
+            if os.path.isfile(hit):
+                return hit
+    return None
+
+
+@mcp.tool()
+def windbg_analyze(dump_path: str | None = None, timeout_seconds: int = 120) -> dict[str, Any]:
+    """Run WinDbg !analyze -v on a dump via cdb.exe (needs Debugging Tools).
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "windbg_analyze",
+      "dump_path": str, "summary": {...}, "output": str, "truncated": bool
+    }
+    ```
+
+    ## Examples
+        windbg_analyze()
+        windbg_analyze(dump_path="C:\\Windows\\MEMORY.DMP", timeout_seconds=300)
+    """
+    try:
+        target = dump_path or _default_minidump()
+        if not target:
+            return {
+                "status": "error",
+                "operation": "windbg_analyze",
+                "error": "No minidump found in C:\\Windows\\Minidump and no dump_path given",
+            }
+        if not os.path.isfile(target):
+            return {
+                "status": "error",
+                "operation": "windbg_analyze",
+                "dump_path": target,
+                "error": "Dump file does not exist",
+            }
+        cdb = _find_cdb()
+        if not cdb:
+            return {
+                "status": "error",
+                "operation": "windbg_analyze",
+                "dump_path": target,
+                "error": (
+                    "cdb.exe not found. Install Debugging Tools for Windows "
+                    "(winget install Microsoft.WindowsSDK, Debugging Tools component) "
+                    "or use analyze_minidump for SDK-free triage."
+                ),
+            }
+        try:
+            proc = subprocess.run(
+                [cdb, "-z", target, "-c", "!analyze -v;q"],
+                capture_output=True,
+                text=True,
+                errors="replace",
+                timeout=timeout_seconds,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "status": "error",
+                "operation": "windbg_analyze",
+                "dump_path": target,
+                "error": f"cdb timed out after {timeout_seconds}s",
+            }
+        output = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
+        truncated = len(output) > 12000
+        if truncated:
+            output = output[:12000] + "\n[OUTPUT TRUNCATED]"
+        summary: dict[str, str] = {}
+        for line in output.splitlines():
+            for key in (
+                "BUGCHECK_STR",
+                "BUGCHECK_CODE",
+                "PROCESS_NAME",
+                "IMAGE_NAME",
+                "MODULE_NAME",
+                "FAILURE_BUCKET_ID",
+            ):
+                if line.startswith(key):
+                    summary[key.lower()] = line.split(":", 1)[1].strip() if ":" in line else ""
+        return {
+            "status": "success" if proc.returncode == 0 else "error",
+            "operation": "windbg_analyze",
+            "dump_path": target,
+            "cdb": cdb,
+            "exit_code": proc.returncode,
+            "summary": summary,
+            "output": output,
+            "truncated": truncated,
+        }
+    except Exception as e:
+        logger.exception("Error running windbg analysis")
+        return {"status": "error", "operation": "windbg_analyze", "error": str(e)}

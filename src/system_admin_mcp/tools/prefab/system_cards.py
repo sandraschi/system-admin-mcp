@@ -47,7 +47,7 @@ async def system_health_card(ctx: Context | None = None) -> Any:
 
     with Card(css_class="max-w-lg") as view:  # type: ignore[reportCallIssue]
         with CardHeader():
-            CardTitle("System Health — Goliath")
+            CardTitle("System Health - Goliath")
         with CardContent():
             Text(f"Health status: {health_status.upper()}")
             Text(f"CPU average: {cpu_avg:.1f}%  ({len(cpu)} cores, max {max(cpu):.1f}%)")
@@ -87,7 +87,7 @@ async def top_processes_card(
 
     with Card(css_class="max-w-xl") as view:  # type: ignore[reportCallIssue]
         with CardHeader():
-            CardTitle(f"Top Processes — by {sort_by.upper()}")
+            CardTitle(f"Top Processes - by {sort_by.upper()}")
         with CardContent():
             for p in procs:
                 name = p.get("name") or "?"
@@ -209,4 +209,57 @@ async def volume_status_card(
     return ToolResult(
         content=summary,
         structured_content=PrefabApp(view=view, title="Volume Status"),
+    )
+
+
+async def crash_postmortem_card(
+    ctx: Context | None = None,
+) -> Any:
+    """Display a rich card with crash-dump inventory and bugcheck correlation.
+
+    ## Return Format
+    ToolResult with PrefabApp Card.
+
+    ## Examples
+        crash_postmortem_card()
+    """
+    if ctx:
+        await ctx.info("Building crash postmortem card...")
+
+    from system_admin_mcp.tools.implementations import get_bugcheck_history, list_crash_dumps
+
+    dumps = list_crash_dumps()
+    try:
+        history = get_bugcheck_history(7, 20)
+    except Exception:
+        history = {"status": "error"}
+
+    if dumps.get("status") == "success":
+        summary = (
+            f"Minidumps: {dumps.get('minidump_count', 0)} | "
+            f"MEMORY.DMP: {'yes' if dumps.get('memory_dmp') else 'no'} | "
+            f"LiveKernel: {len(dumps.get('live_kernel', []))}"
+        )
+    else:
+        summary = f"Dump inventory failed: {dumps.get('error', '?')}"
+
+    with Card(css_class="max-w-2xl") as view:  # type: ignore[reportCallIssue]
+        with CardHeader():
+            CardTitle("Crash Postmortem")
+        with CardContent():
+            Text(summary)
+            if dumps.get("status") == "success":
+                Text(f"Dump mode: {dumps.get('crash_control', {}).get('CrashDumpEnabled', '?')}")
+                Text(f"Note: {dumps.get('interpretation', '')}")
+                for entry in dumps.get("wer", {}).get("archive_recent", [])[:5]:
+                    Text(f"WER: {entry.get('name', '?')[:60]}")
+            if history.get("status") == "success":
+                Text(f"Crash events (7d): {history.get('events_found', 0)} {history.get('summary', {})}")
+                Text(f"Read: {history.get('interpretation', '')}")
+            else:
+                Text("Event history needs elevation (run server as Administrator).")
+
+    return ToolResult(
+        content=summary,
+        structured_content=PrefabApp(view=view, title="Crash Postmortem"),
     )
