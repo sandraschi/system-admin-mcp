@@ -7,6 +7,7 @@ import {
 import { AppLayout } from "@/components/layout/app-layout";
 import { Apps } from "@/pages/apps";
 import { Chat } from "@/pages/chat";
+import { CrashPostmortem } from "@/pages/crash-postmortem";
 import { Dashboard } from "@/pages/dashboard";
 import { FileOwner } from "@/pages/file-owner";
 import { FileRecovery } from "@/pages/file-recovery";
@@ -33,6 +34,7 @@ function App() {
           <Route path="/volumes" element={<Volumes />} />
           <Route path="/file-owner" element={<FileOwner />} />
           <Route path="/file-recovery" element={<FileRecovery />} />
+          <Route path="/crash-postmortem" element={<CrashPostmortem />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/apps" element={<Apps />} />
           <Route path="/tools" element={<Tools />} />

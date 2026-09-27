@@ -68,7 +68,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Add CORS middleware — fleet standard: explicit origins + unconditional regex
+# Add CORS middleware - fleet standard: explicit origins + unconditional regex
 # covering Tauri webview, Tailscale, LAN IPs, Tailscale CGNAT, localhost.
 app.add_middleware(
     CORSMiddleware,
@@ -529,6 +529,70 @@ async def api_services(
     except Exception as e:
         logger.exception("Error listing services")
         return {"services": [], "total": 0, "error": str(e)}
+
+
+@app.get("/api/crash/dumps")
+async def api_crash_dumps() -> dict[str, Any]:
+    """Inventory crash artefacts via portmanteau system_admin tool."""
+    try:
+        result = await _run_tool("system_admin", operation="list_crash_dumps")
+        return result
+    except Exception as e:
+        logger.exception("Error listing crash dumps")
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/api/crash/bugcheck-history")
+async def api_crash_bugcheck_history(
+    days_back: int = 7,
+    max_results: int = 50,
+) -> dict[str, Any]:
+    """Correlate shutdown/crash events via portmanteau system_admin tool."""
+    try:
+        result = await _run_tool(
+            "system_admin",
+            operation="get_bugcheck_history",
+            days_back=days_back,
+            max_results=max_results,
+        )
+        return result
+    except Exception as e:
+        logger.exception("Error reading bugcheck history")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/api/crash/analyze-minidump")
+async def api_crash_analyze_minidump(request: Request) -> dict[str, Any]:
+    """Triage-parse a minidump via portmanteau system_admin tool."""
+    try:
+        body = await request.json()
+        result = await _run_tool(
+            "system_admin",
+            operation="analyze_minidump",
+            dump_path=body.get("dump_path") or None,
+            max_results=int(body.get("max_drivers", 40)),
+        )
+        return result
+    except Exception as e:
+        logger.exception("Error analyzing minidump")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/api/crash/windbg")
+async def api_crash_windbg(request: Request) -> dict[str, Any]:
+    """Run WinDbg !analyze -v via portmanteau system_admin tool."""
+    try:
+        body = await request.json()
+        result = await _run_tool(
+            "system_admin",
+            operation="windbg_analyze",
+            dump_path=body.get("dump_path") or None,
+            timeout_seconds=int(body.get("timeout_seconds", 120)),
+        )
+        return result
+    except Exception as e:
+        logger.exception("Error running windbg analysis")
+        return {"status": "error", "error": str(e)}
 
 
 if __name__ == "__main__":
