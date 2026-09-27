@@ -14,7 +14,9 @@ import { FileRecovery } from "@/pages/file-recovery";
 import { Help } from "@/pages/help";
 import { Inventory } from "@/pages/inventory";
 import Logs from "@/pages/logs";
+import { Maintenance } from "@/pages/maintenance";
 import { Processes } from "@/pages/processes";
+import { Security } from "@/pages/security";
 import { Services } from "@/pages/services";
 import { Settings } from "@/pages/settings";
 import { Skills } from "@/pages/skills";
@@ -36,6 +38,8 @@ function App() {
           <Route path="/file-owner" element={<FileOwner />} />
           <Route path="/file-recovery" element={<FileRecovery />} />
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/security" element={<Security />} />
+          <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/crash-postmortem" element={<CrashPostmortem />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/apps" element={<Apps />} />
