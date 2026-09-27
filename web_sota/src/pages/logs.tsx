@@ -35,7 +35,7 @@ export default function Logging() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [userScrolled, setUserScrolled] = useState(false);
   const afterIdRef = useRef<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const fetchLogs = useCallback(
     async (opts: { tail?: boolean; after_id?: string } = {}) => {

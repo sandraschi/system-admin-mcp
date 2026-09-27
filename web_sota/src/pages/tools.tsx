@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import API_BASE from "@/lib/api";
 
 export function Tools() {
-  const [tools, setTools] = useState<unknown[]>([]);
+  const [tools, setTools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Record<string, unknown>>({});
@@ -131,17 +131,14 @@ export function Tools() {
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {Object.entries(tool.parameters.properties).map(
-                        ([param, details]: [
-                          string,
-                          Record<string, unknown>,
-                        ]) => (
+                        ([param, details]: [string, any]) => (
                           <div key={param} className="space-y-1.5">
                             <Label className="text-xs text-slate-300">
                               {param}
                             </Label>
                             <Input
                               disabled
-                              placeholder={details.type}
+                              placeholder={details?.type}
                               className="h-8 bg-slate-900 border-slate-800 text-slate-500 text-xs"
                             />
                           </div>
@@ -151,7 +148,7 @@ export function Tools() {
                   </div>
                 )}
 
-                {results[tool.name] && (
+                {Boolean(results[tool.name]) && (
                   <div className="space-y-2">
                     <div className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1">
                       <Terminal className="w-3 h-3" /> Last Result

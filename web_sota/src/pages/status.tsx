@@ -19,7 +19,7 @@ import {
 import API_BASE from "@/lib/api";
 
 export function Status() {
-  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchStatus = useCallback(async () => {
