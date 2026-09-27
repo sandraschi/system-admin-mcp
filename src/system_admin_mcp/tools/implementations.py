@@ -2587,3 +2587,471 @@ def windbg_analyze(dump_path: str | None = None, timeout_seconds: int = 120) -> 
     except Exception as e:
         logger.exception("Error running windbg analysis")
         return {"status": "error", "operation": "windbg_analyze", "error": str(e)}
+
+
+# ============================================================================
+# ADMIN TOOLBOX INVENTORY
+# ============================================================================
+
+_ADMIN_TOOLBOX: list[dict[str, Any]] = [
+    # --- dev ---
+    {
+        "id": "vscode",
+        "label": "VS Code",
+        "category": "dev",
+        "names": ["Visual Studio Code"],
+        "bins": ["code"],
+        "procs": ["code"],
+        "winget": "Microsoft.VisualStudioCode",
+    },
+    {
+        "id": "cursor",
+        "label": "Cursor",
+        "category": "dev",
+        "names": ["Cursor"],
+        "bins": ["cursor"],
+        "procs": ["cursor"],
+        "winget": "Anysphere.Cursor",
+    },
+    {
+        "id": "antigravity",
+        "label": "Antigravity",
+        "category": "dev",
+        "names": ["Antigravity"],
+        "procs": ["antigravity"],
+        "winget": None,
+        "url": "https://antigravity.google",
+    },
+    {
+        "id": "opencode",
+        "label": "OpenCode",
+        "category": "dev",
+        "names": ["OpenCode"],
+        "bins": ["opencode"],
+        "procs": ["opencode"],
+        "winget": None,
+        "url": "https://opencode.ai",
+    },
+    {
+        "id": "claude-code",
+        "label": "Claude Code (CLI)",
+        "category": "dev",
+        "names": ["Claude Code"],
+        "bins": ["claude"],
+        "procs": ["claude"],
+        "winget": None,
+        "url": "https://muse.ai",
+    },
+    {
+        "id": "claude-desktop",
+        "label": "Claude Desktop",
+        "category": "dev",
+        "names": ["Claude"],
+        "procs": ["claude"],
+        "winget": "Anthropic.Claude",
+    },
+    {"id": "git", "label": "Git", "category": "dev", "names": ["Git version"], "bins": ["git"], "winget": "Git.Git"},
+    {
+        "id": "gh",
+        "label": "GitHub CLI",
+        "category": "dev",
+        "names": ["GitHub CLI"],
+        "bins": ["gh"],
+        "winget": "GitHub.cli",
+    },
+    {
+        "id": "github-desktop",
+        "label": "GitHub Desktop",
+        "category": "dev",
+        "names": ["GitHub Desktop"],
+        "winget": "GitHub.GitHubDesktop",
+    },
+    {
+        "id": "docker-desktop",
+        "label": "Docker Desktop",
+        "category": "dev",
+        "names": ["Docker Desktop"],
+        "bins": ["docker"],
+        "procs": ["docker desktop"],
+        "winget": "Docker.DockerDesktop",
+    },
+    {
+        "id": "nodejs",
+        "label": "Node.js",
+        "category": "dev",
+        "names": ["Node.js"],
+        "bins": ["node"],
+        "winget": "OpenJS.NodeJS",
+    },
+    {
+        "id": "python",
+        "label": "Python 3",
+        "category": "dev",
+        "names": ["Python 3"],
+        "bins": ["python"],
+        "procs": ["python"],
+        "winget": "Python.Python.3",
+    },
+    {
+        "id": "pwsh",
+        "label": "PowerShell 7",
+        "category": "dev",
+        "names": ["PowerShell 7"],
+        "bins": ["pwsh"],
+        "winget": "Microsoft.PowerShell",
+    },
+    {
+        "id": "winterminal",
+        "label": "Windows Terminal",
+        "category": "dev",
+        "names": ["Windows Terminal"],
+        "bins": ["wt"],
+        "procs": ["windowsterminal"],
+        "winget": "Microsoft.WindowsTerminal",
+    },
+    # --- local AI ---
+    {
+        "id": "ollama",
+        "label": "Ollama",
+        "category": "ai",
+        "names": ["Ollama"],
+        "bins": ["ollama"],
+        "procs": ["ollama"],
+        "winget": "Ollama.Ollama",
+    },
+    {
+        "id": "lmstudio",
+        "label": "LM Studio",
+        "category": "ai",
+        "names": ["LM Studio"],
+        "procs": ["lm studio"],
+        "winget": None,
+        "url": "https://lmstudio.ai",
+    },
+    {
+        "id": "vllm",
+        "label": "vLLM",
+        "category": "ai",
+        "names": [],
+        "bins": ["vllm"],
+        "procs": ["vllm"],
+        "winget": None,
+        "url": "pip install vllm (usually a server process, not an installed app)",
+    },
+    # --- tcom ---
+    {
+        "id": "tailscale",
+        "label": "Tailscale",
+        "category": "tcom",
+        "names": ["Tailscale"],
+        "bins": ["tailscale"],
+        "procs": ["tailscale"],
+        "winget": "Tailscale.Tailscale",
+    },
+    {
+        "id": "wireguard",
+        "label": "WireGuard",
+        "category": "tcom",
+        "names": ["WireGuard"],
+        "bins": ["wireguard"],
+        "winget": "WireGuard.WireGuard",
+    },
+    {
+        "id": "openvpn",
+        "label": "OpenVPN Connect",
+        "category": "tcom",
+        "names": ["OpenVPN"],
+        "winget": None,
+        "url": "https://openvpn.net/client-connect-vpn-for-windows/",
+    },
+    {
+        "id": "discord",
+        "label": "Discord",
+        "category": "tcom",
+        "names": ["Discord"],
+        "procs": ["discord"],
+        "winget": "Discord.Discord",
+    },
+    {
+        "id": "outlook",
+        "label": "Outlook (O365)",
+        "category": "tcom",
+        "names": ["Microsoft Outlook", "Microsoft 365"],
+        "paths": [r"%ProgramFiles%\Microsoft Office\root\Office16\OUTLOOK.EXE"],
+        "procs": ["outlook"],
+        "winget": "Microsoft.Office",
+    },
+    {
+        "id": "teams",
+        "label": "Microsoft Teams",
+        "category": "tcom",
+        "names": ["Microsoft Teams"],
+        "procs": ["ms-teams"],
+        "winget": "Microsoft.Teams",
+    },
+    # --- office ---
+    {
+        "id": "m365",
+        "label": "Microsoft 365 Apps",
+        "category": "office",
+        "names": ["Microsoft 365", "Office 16 Click-to-Run"],
+        "paths": [r"%ProgramFiles%\Microsoft Office\root\Office16\WINWORD.EXE"],
+        "winget": "Microsoft.Office",
+    },
+    {
+        "id": "onedrive",
+        "label": "OneDrive",
+        "category": "office",
+        "names": ["OneDrive"],
+        "procs": ["onedrive"],
+        "winget": "Microsoft.OneDrive",
+    },
+    # --- admin essentials ---
+    {
+        "id": "beyondcompare",
+        "label": "Beyond Compare",
+        "category": "admin",
+        "names": ["Beyond Compare"],
+        "bins": ["BCompare"],
+        "winget": "ScooterSoftware.BeyondCompare",
+    },
+    {
+        "id": "wizfile",
+        "label": "WizFile",
+        "category": "admin",
+        "names": ["WizFile"],
+        "bins": ["WizFile", "WizFile64"],
+        "procs": ["wizfile"],
+        "winget": "AntibodySoftware.WizFile",
+    },
+    {
+        "id": "wiztree",
+        "label": "WizTree",
+        "category": "admin",
+        "names": ["WizTree"],
+        "bins": ["WizTree64"],
+        "procs": ["wiztree"],
+        "winget": "AntibodySoftware.WizTree",
+    },
+    {
+        "id": "everything",
+        "label": "Everything",
+        "category": "admin",
+        "names": ["Everything"],
+        "bins": ["es"],
+        "procs": ["everything"],
+        "winget": "voidtools.Everything",
+    },
+    {
+        "id": "hasleo",
+        "label": "Hasleo Backup Suite",
+        "category": "admin",
+        "names": ["Hasleo Backup Suite"],
+        "winget": None,
+        "url": "https://www.hasleo.com",
+    },
+    {
+        "id": "macrium",
+        "label": "Macrium Reflect",
+        "category": "admin",
+        "names": ["Macrium Reflect"],
+        "winget": None,
+        "url": "https://www.macrium.com",
+    },
+    {
+        "id": "sysinternals",
+        "label": "Sysinternals Suite",
+        "category": "admin",
+        "names": ["Sysinternals"],
+        "bins": ["procexp", "autoruns"],
+        "procs": ["procexp", "autoruns", "procmon"],
+        "winget": "Microsoft.SysinternalsSuite",
+    },
+    {"id": "7zip", "label": "7-Zip", "category": "admin", "names": ["7-Zip"], "bins": ["7z"], "winget": "7zip.7zip"},
+    {
+        "id": "notepadpp",
+        "label": "Notepad++",
+        "category": "admin",
+        "names": ["Notepad++"],
+        "bins": ["notepad++"],
+        "procs": ["notepad++"],
+        "winget": "Notepad++.Notepad++",
+    },
+    {
+        "id": "putty",
+        "label": "PuTTY",
+        "category": "admin",
+        "names": ["PuTTY"],
+        "bins": ["putty"],
+        "winget": "PuTTY.PuTTY",
+    },
+    {
+        "id": "winscp",
+        "label": "WinSCP",
+        "category": "admin",
+        "names": ["WinSCP"],
+        "bins": ["winscp"],
+        "winget": "WinSCP.WinSCP",
+    },
+    {
+        "id": "wireshark",
+        "label": "Wireshark",
+        "category": "admin",
+        "names": ["Wireshark"],
+        "bins": ["wireshark", "tshark"],
+        "winget": "WiresharkFoundation.Wireshark",
+    },
+    {
+        "id": "hwinfo",
+        "label": "HWiNFO",
+        "category": "admin",
+        "names": ["HWiNFO"],
+        "procs": ["hwinfo64"],
+        "winget": "REALiX.HWiNFO",
+    },
+    {
+        "id": "cdi",
+        "label": "CrystalDiskInfo",
+        "category": "admin",
+        "names": ["CrystalDiskInfo"],
+        "bins": ["DiskInfo64"],
+        "procs": ["diskinfo"],
+        "winget": "CrystalDewWorld.CrystalDiskInfo",
+    },
+    {
+        "id": "magician",
+        "label": "Samsung Magician",
+        "category": "admin",
+        "names": ["Samsung Magician"],
+        "procs": ["samsungmagician"],
+        "winget": None,
+        "url": "https://www.samsung.com/semiconductor/minisite/ssd/download/tools/",
+    },
+    {
+        "id": "powertoys",
+        "label": "PowerToys",
+        "category": "admin",
+        "names": ["PowerToys"],
+        "bins": ["powertoys"],
+        "procs": ["powertoys"],
+        "winget": "Microsoft.PowerToys",
+    },
+]
+
+
+def _scan_uninstall(names: list[str]) -> tuple[str, str] | None:
+    import winreg
+
+    roots = (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER)
+    subs = (
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+        r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+    )
+    for root in roots:
+        for sub in subs:
+            try:
+                with winreg.OpenKey(root, sub) as key:
+                    for i in range(winreg.QueryInfoKey(key)[0]):
+                        try:
+                            with winreg.OpenKey(key, winreg.EnumKey(key, i)) as app:
+                                disp, _ = winreg.QueryValueEx(app, "DisplayName")
+                        except OSError:
+                            continue
+                        if not disp or not isinstance(disp, str):
+                            continue
+                        if any(n.lower() in disp.lower() for n in names):
+                            try:
+                                with winreg.OpenKey(key, winreg.EnumKey(key, i)) as app2:
+                                    ver, _ = winreg.QueryValueEx(app2, "DisplayVersion")
+                            except OSError:
+                                ver = ""
+                            return disp, ver if isinstance(ver, str) else ""
+            except OSError:
+                continue
+    return None
+
+
+def _running_process_names() -> set[str]:
+    try:
+        import psutil
+
+        return {(p.info.get("name") or "").lower() for p in psutil.process_iter(["name"])}
+    except Exception:
+        return set()
+
+
+@mcp.tool()
+def audit_admin_toolbox() -> dict[str, Any]:
+    """Inventory admin-relevant toolbox apps: dev, local AI, tcom, office, admin.
+
+    ## Return Format
+    ```json
+    {
+      "status": "success", "operation": "audit_admin_toolbox",
+      "found": [{...}], "missing": [{...}],
+      "found_count": int, "total_count": int
+    }
+    ```
+    Each entry: id, label, category, found, version, path, running, source,
+    install (winget id or download note).
+
+    ## Examples
+        audit_admin_toolbox()
+    """
+    try:
+        import shutil
+
+        running = _running_process_names()
+        found: list[dict[str, Any]] = []
+        missing: list[dict[str, Any]] = []
+        for entry in _ADMIN_TOOLBOX:
+            item: dict[str, Any] = {
+                "id": entry["id"],
+                "label": entry["label"],
+                "category": entry["category"],
+                "found": False,
+                "version": None,
+                "path": None,
+                "running": False,
+                "source": None,
+                "install": entry.get("winget") or entry.get("url"),
+            }
+            names = entry.get("names", [])
+            if names:
+                hit = _scan_uninstall(names)
+                if hit:
+                    item["found"] = True
+                    item["version"] = hit[1] or None
+                    item["source"] = "registry"
+            if not item["found"]:
+                for raw in entry.get("paths", []):
+                    cand = os.path.expandvars(raw)
+                    if os.path.isfile(cand):
+                        item["found"] = True
+                        item["path"] = cand
+                        item["source"] = "path"
+                        break
+            if not item["found"]:
+                for binary in entry.get("bins", []):
+                    hit = shutil.which(binary)
+                    if hit:
+                        item["found"] = True
+                        item["path"] = hit
+                        item["source"] = "bin"
+                        break
+            for proc in entry.get("procs", []):
+                if any(proc.lower() in name for name in running):
+                    item["running"] = True
+                    break
+            (found if item["found"] else missing).append(item)
+        return {
+            "status": "success",
+            "operation": "audit_admin_toolbox",
+            "found": found,
+            "missing": missing,
+            "found_count": len(found),
+            "total_count": len(_ADMIN_TOOLBOX),
+        }
+    except Exception as e:
+        logger.exception("Error auditing admin toolbox")
+        return {"status": "error", "operation": "audit_admin_toolbox", "error": str(e)}

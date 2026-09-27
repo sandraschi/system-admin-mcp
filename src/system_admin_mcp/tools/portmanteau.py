@@ -11,6 +11,7 @@ from system_admin_mcp.tools.implementations import (
     analyze_disk_usage_advanced,
     analyze_minidump,
     analyze_top_folder_sizes,
+    audit_admin_toolbox,
     audit_network_ports,
     audit_permissions,
     check_disk_health,
@@ -199,6 +200,7 @@ async def system_admin(
         "get_bugcheck_history",
         "analyze_minidump",
         "windbg_analyze",
+        "audit_admin_toolbox",
         # Windows Services
         "list_services",
         "get_service_stats",
@@ -307,6 +309,7 @@ async def system_admin(
     - get_bugcheck_history: Correlate 41/1001/6008/1074 shutdown-crash events
     - analyze_minidump: SDK-free minidump triage parse (code, faulting module)
     - windbg_analyze: Full !analyze -v via cdb.exe (needs Debugging Tools)
+    - audit_admin_toolbox: Inventory dev/AI/tcom/office/admin toolbox apps
 
     Windows Services:
     - list_services: List Windows services with filtering
@@ -560,6 +563,9 @@ async def system_admin(
 
         elif operation == "windbg_analyze":
             return windbg_analyze(dump_path, timeout_seconds)
+
+        elif operation == "audit_admin_toolbox":
+            return audit_admin_toolbox()
 
         elif operation == "get_gpu_info":
             return get_gpu_info()
