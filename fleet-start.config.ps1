@@ -5,7 +5,7 @@
     BackendPort  = 10861
     FrontendPort = 10860
     HealthPath   = '/api/health'
-    WebRoot      = 'D:\Dev\repos\system-admin-mcp\web_sota'
+    WebRoot      = 'web_sota'
     Backend = @{
         Kind          = 'uvicorn'
         UvicornTarget = 'system_admin_mcp.server:app'
