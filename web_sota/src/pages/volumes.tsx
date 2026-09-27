@@ -21,8 +21,18 @@ const DRIVE_TYPE_NAMES: Record<number, string> = {
   6: "RAM disk",
 };
 
+interface Volume {
+  drive: string;
+  type: number;
+  fstype?: string;
+  total_gb: number | null;
+  used_gb: number | null;
+  free_gb: number | null;
+  percent: number | null;
+}
+
 export function Volumes() {
-  const [volumes, setVolumes] = useState<{ drive: string; type: number }[]>([]);
+  const [volumes, setVolumes] = useState<Volume[]>([]);
   const [path, setPath] = useState("C:\\");
   const [usage, setUsage] = useState<Record<string, unknown> | null>(null);
   const [loadingVolumes, setLoadingVolumes] = useState(false);
@@ -69,19 +79,22 @@ export function Volumes() {
   }, [fetchVolumes]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="volumes-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white">
             Volumes
           </h1>
-          <p className="text-slate-400 text-sm">Drive listing and disk usage</p>
+          <p className="text-slate-400 text-sm">
+            Drive listing with filesystem and usage
+          </p>
         </div>
         <Button
           variant="outline"
           size="sm"
           onClick={fetchVolumes}
           disabled={loadingVolumes}
+          data-testid="volumes-refresh"
           className="border-slate-800 bg-slate-900/50 text-slate-300 hover:bg-slate-800 transition-all active:scale-95"
         >
           <RefreshCw
@@ -97,8 +110,8 @@ export function Volumes() {
             <HardDrive className="w-5 h-5 text-emerald-500" />
             <CardTitle className="text-white">Volume list</CardTitle>
           </div>
-          <CardDescription className="text-slate-400 text-xs">
-            System drives and their types
+          <CardDescription className="text-slate-400 text-sm">
+            System drives, filesystem, and space usage
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -108,14 +121,17 @@ export function Volumes() {
                 <tr className="border-b border-slate-800 bg-slate-950/80 text-left text-slate-400">
                   <th className="px-4 py-3 font-medium">Drive</th>
                   <th className="px-4 py-3 font-medium">Type</th>
+                  <th className="px-4 py-3 font-medium">FS</th>
+                  <th className="px-4 py-3 font-medium w-1/3">Usage</th>
+                  <th className="px-4 py-3 font-medium text-right">Free</th>
                 </tr>
               </thead>
               <tbody>
                 {volumes.length === 0 && (
                   <tr>
                     <td
-                      colSpan={2}
-                      className="px-4 py-8 text-center text-slate-500"
+                      colSpan={5}
+                      className="px-4 py-8 text-center text-slate-400"
                     >
                       {loadingVolumes ? "Loading..." : "No volumes returned."}
                     </td>
@@ -124,13 +140,40 @@ export function Volumes() {
                 {volumes.map((v) => (
                   <tr
                     key={v.drive}
-                    className="border-b border-slate-800/50 hover:bg-slate-800/30 text-slate-300"
+                    className="border-b border-slate-800/50 hover:bg-slate-800/30 text-slate-200"
                   >
-                    <td className="px-4 py-2 font-mono text-slate-400">
-                      {v.drive}
-                    </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2.5 font-mono">{v.drive}</td>
+                    <td className="px-4 py-2.5 text-slate-300">
                       {DRIVE_TYPE_NAMES[v.type] ?? "Unknown"}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-300">
+                      {v.fstype || "-"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {v.percent === null ||
+                      v.percent === undefined ||
+                      v.used_gb === null ||
+                      v.total_gb === null ? (
+                        <span className="text-slate-500">unavailable</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 rounded bg-slate-800 overflow-hidden">
+                            <div
+                              className={`h-full rounded ${v.percent > 90 ? "bg-red-500" : v.percent > 75 ? "bg-amber-500" : "bg-emerald-500"}`}
+                              style={{ width: `${Math.min(100, v.percent)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-slate-300 whitespace-nowrap">
+                            {v.used_gb.toFixed(1)} / {v.total_gb.toFixed(1)} GB
+                            ({v.percent.toFixed(0)}%)
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-slate-300">
+                      {v.free_gb === null || v.free_gb === undefined
+                        ? "-"
+                        : `${v.free_gb.toFixed(1)} GB`}
                     </td>
                   </tr>
                 ))}
@@ -146,7 +189,7 @@ export function Volumes() {
             <FolderOpen className="w-5 h-5 text-blue-500" />
             <CardTitle className="text-white">Disk usage</CardTitle>
           </div>
-          <CardDescription className="text-slate-400 text-xs">
+          <CardDescription className="text-slate-400 text-sm">
             Check disk usage for a path
           </CardDescription>
         </CardHeader>
@@ -166,7 +209,7 @@ export function Volumes() {
             </Button>
           </div>
           {usage && (
-            <pre className="text-xs text-slate-300 bg-slate-950 p-3 rounded border border-slate-800 whitespace-pre-wrap">
+            <pre className="text-sm text-slate-200 bg-slate-950 p-3 rounded border border-slate-800 whitespace-pre-wrap">
               {JSON.stringify(usage, null, 2)}
             </pre>
           )}
