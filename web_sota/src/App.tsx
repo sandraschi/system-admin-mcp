@@ -12,6 +12,7 @@ import { Dashboard } from "@/pages/dashboard";
 import { FileOwner } from "@/pages/file-owner";
 import { FileRecovery } from "@/pages/file-recovery";
 import { Help } from "@/pages/help";
+import { Inventory } from "@/pages/inventory";
 import Logs from "@/pages/logs";
 import { Processes } from "@/pages/processes";
 import { Services } from "@/pages/services";
@@ -34,6 +35,7 @@ function App() {
           <Route path="/volumes" element={<Volumes />} />
           <Route path="/file-owner" element={<FileOwner />} />
           <Route path="/file-recovery" element={<FileRecovery />} />
+          <Route path="/inventory" element={<Inventory />} />
           <Route path="/crash-postmortem" element={<CrashPostmortem />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/apps" element={<Apps />} />

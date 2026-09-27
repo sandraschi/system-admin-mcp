@@ -595,6 +595,17 @@ async def api_crash_windbg(request: Request) -> dict[str, Any]:
         return {"status": "error", "error": str(e)}
 
 
+@app.get("/api/admin-toolbox")
+async def api_admin_toolbox() -> dict[str, Any]:
+    """Inventory admin toolbox apps via portmanteau system_admin tool."""
+    try:
+        result = await _run_tool("system_admin", operation="audit_admin_toolbox")
+        return result
+    except Exception as e:
+        logger.exception("Error auditing admin toolbox")
+        return {"status": "error", "error": str(e)}
+
+
 if __name__ == "__main__":
     import uvicorn
 
