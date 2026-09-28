@@ -390,30 +390,39 @@ async def get_logs(tail: int = 200, file: str | None = None) -> dict[str, Any]:
 
 @app.get("/api/volumes")
 async def api_volumes() -> dict[str, Any]:
-    """List volumes with usage via MCP list_volumes + psutil."""
+    """List volumes with usage via MCP list_volumes + psutil.
+
+    Disk stat calls run in a worker thread: sleeping USB drives can stall
+    for seconds each, and blocking the event loop wedges every endpoint
+    (seen 2026-09-28: whole backend unresponsive behind one volumes call).
+    """
     try:
         result = await _run_tool("list_volumes")
         volumes = result if isinstance(result, list) else result.get("volumes", [])
-        fstype_by_drive = {p.device.rstrip("\\").lower(): p.fstype for p in psutil.disk_partitions()}
-        enriched: list[dict[str, Any]] = []
-        for v in volumes:
-            drive = v.get("drive", "") if isinstance(v, dict) else str(v)
-            item: dict[str, Any] = dict(v) if isinstance(v, dict) else {"drive": drive}
-            item.setdefault("fstype", fstype_by_drive.get(drive.rstrip("\\").lower(), ""))
-            try:
-                usage = psutil.disk_usage(drive)
-                item.update(
-                    {
-                        "total_gb": round(usage.total / (1024**3), 1),
-                        "used_gb": round(usage.used / (1024**3), 1),
-                        "free_gb": round(usage.free / (1024**3), 1),
-                        "percent": usage.percent,
-                    }
-                )
-            except Exception:
-                item.update({"total_gb": None, "used_gb": None, "free_gb": None, "percent": None})
-            enriched.append(item)
-        return {"volumes": enriched}
+
+        def _enrich() -> list[dict[str, Any]]:
+            fstype_by_drive = {p.device.rstrip("\\").lower(): p.fstype for p in psutil.disk_partitions()}
+            enriched: list[dict[str, Any]] = []
+            for v in volumes:
+                drive = v.get("drive", "") if isinstance(v, dict) else str(v)
+                item: dict[str, Any] = dict(v) if isinstance(v, dict) else {"drive": drive}
+                item.setdefault("fstype", fstype_by_drive.get(drive.rstrip("\\").lower(), ""))
+                try:
+                    usage = psutil.disk_usage(drive)
+                    item.update(
+                        {
+                            "total_gb": round(usage.total / (1024**3), 1),
+                            "used_gb": round(usage.used / (1024**3), 1),
+                            "free_gb": round(usage.free / (1024**3), 1),
+                            "percent": usage.percent,
+                        }
+                    )
+                except Exception:
+                    item.update({"total_gb": None, "used_gb": None, "free_gb": None, "percent": None})
+                enriched.append(item)
+            return enriched
+
+        return {"volumes": await asyncio.to_thread(_enrich)}
     except Exception as e:
         logger.exception("Error listing volumes")
         return {"volumes": [], "error": str(e)}
