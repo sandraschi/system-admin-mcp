@@ -1,44 +1,99 @@
-Param([switch]$Headless)
-$SkipFrontend = $Headless
+# Fleet unified launcher - do not edit logic here.
+# Change fleet-start.config.ps1 at the repo root instead.
+param(
+    [switch]$Headless,
+    [switch]$BackendOnly,
+    [switch]$FrontendOnly,
+    [switch]$NoBrowser,
+    [switch]$ReuseIfRunning
+)
 
-# --- SOTA Headless Standard ---
-if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
-    Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
-    exit
-}
-$WindowStyle = if ($Headless) { 'Hidden' } else { 'Normal' }
-# ------------------------------
+$ErrorActionPreference = 'Stop'
+$ReposRoot = if ($env:FLEET_REPOS_ROOT) { $env:FLEET_REPOS_ROOT } else { 'D:\Dev\repos' }
+$EnginePath = Join-Path $ReposRoot 'mcp-central-docs\scripts\Invoke-FleetWebappStart.ps1'
 
-$env:FASTMCP_LOG_LEVEL = 'WARNING'
-# system-admin-mcp Start - Standards-Compliant SOTA
-Write-Host 'Starting system-admin-mcp...' -ForegroundColor Cyan
-
-Set-Location $PSScriptRoot
-Write-Host 'Starting Standardized Fullstack Hybrid...' -ForegroundColor Green
-# --- SOTA PORT SAFETY START ---
-# NOTE: this script defines no $Port variable (ports live in fleet-start.config.ps1),
-# so fleet repair sweeps that anchor on "$Port = <n>" skip this file - that is why
-# the port-clear kept "regressing". Clear by literal ports instead. This block
-# contains the Get-NetTCPConnection -LocalPort marker so sweeps see it as fixed.
-$BackendPort = 10861
-$FrontendPort = 10860
-try {
-    $fleetCfg = . (Join-Path $PSScriptRoot 'fleet-start.config.ps1')
-    if ($fleetCfg.BackendPort) { $BackendPort = [int]$fleetCfg.BackendPort }
-    if ($fleetCfg.FrontendPort) { $FrontendPort = [int]$fleetCfg.FrontendPort }
-} catch { }
-foreach ($portNum in @($BackendPort, $FrontendPort)) {
-    Get-NetTCPConnection -LocalPort $portNum -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
-        if ($_.OwningProcess -ne $PID) {
-            Write-Host "Clearing stale listener on port $portNum (PID $($_.OwningProcess))..." -ForegroundColor Yellow
-            Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
-        }
+$configCandidates = @(
+    (Join-Path $PSScriptRoot 'fleet-start.config.ps1'),
+    (Join-Path (Split-Path -Parent $PSScriptRoot) 'fleet-start.config.ps1')
+)
+$configPath = $null
+foreach ($candidate in $configCandidates) {
+    if (Test-Path -LiteralPath $candidate) {
+        $configPath = $candidate
+        break
     }
 }
-Start-Sleep -Seconds 1
-# --- SOTA PORT SAFETY END ---
-# Launch backend Hidden by default to prevent console spam
-Start-Process pwsh -ArgumentList '-NoProfile', '-Command', 'uv run -m system_admin_mcp --web' -WindowStyle Hidden
-Set-Location web_sota
-if ($SkipFrontend) { return }
-npm run dev
+if (-not $configPath) {
+    Write-Host 'ERROR: Missing fleet-start.config.ps1 (repo root or beside start.ps1).' -ForegroundColor Red
+    exit 1
+}
+
+# Mode 1: Central Fleet Engine (when mcp-central-docs is available)
+if (Test-Path -LiteralPath $EnginePath) {
+    . $EnginePath
+    Start-FleetWebapp @PSBoundParameters -ConfigPath $configPath -LauncherRoot $PSScriptRoot
+    exit 0
+}
+
+# Mode 2: Standalone Fallback (Naked install on new machine / public user clone)
+Write-Host "Central fleet engine not found ($EnginePath) - starting in standalone mode." -ForegroundColor Yellow
+
+$cfg = . $configPath
+$repoRoot = Split-Path -Parent $PSScriptRoot
+if (Test-Path (Join-Path $PSScriptRoot 'pyproject.toml')) { $repoRoot = $PSScriptRoot }
+
+$backendPort = if ($cfg.BackendPort) { [int]$cfg.BackendPort } else { 10720 }
+$frontendPort = if ($cfg.FrontendPort) { [int]$cfg.FrontendPort } else { 10721 }
+
+$webRel = if ($cfg.WebRoot) { $cfg.WebRoot } else { 'webapp\frontend' }
+$webRoot = if ([System.IO.Path]::IsPathRooted($webRel)) { $webRel } else { Join-Path $repoRoot $webRel }
+if (-not (Test-Path -LiteralPath $webRoot)) { $webRoot = $PSScriptRoot }
+
+# 1. Start Backend
+if (-not $FrontendOnly -and $backendPort -gt 0 -and $cfg.Backend.Kind -ne 'none') {
+    Write-Host "Starting backend on :$backendPort ..." -ForegroundColor Cyan
+    $bWorkDir = if ($cfg.Backend.WorkDir) {
+        if ([System.IO.Path]::IsPathRooted($cfg.Backend.WorkDir)) { $cfg.Backend.WorkDir } else { Join-Path $repoRoot $cfg.Backend.WorkDir }
+    } else { $repoRoot }
+
+    $pyPath = if ($cfg.Backend.PythonPath) {
+        $parts = $cfg.Backend.PythonPath -split ';' | ForEach-Object {
+            if ([System.IO.Path]::IsPathRooted($_)) { $_ } else { Join-Path $repoRoot $_ }
+        }
+        $parts -join ';'
+    } else { "$repoRoot;$repoRoot\src" }
+
+    $backendExec = if ($cfg.Backend.Kind -eq 'module-serve') {
+        $mod = if ($cfg.Backend.Module) { $cfg.Backend.Module } else { $cfg.Name }
+        $args = if ($cfg.Backend.ServeArgs) { $cfg.Backend.ServeArgs } else { '--serve' }
+        "python -m $mod $args"
+    } elseif ($cfg.Backend.Kind -eq 'cli-serve') {
+        $mod = if ($cfg.Backend.Module) { $cfg.Backend.Module } else { $cfg.Name }
+        "$mod --serve --port $backendPort"
+    } else {
+        $target = if ($cfg.Backend.UvicornTarget) { $cfg.Backend.UvicornTarget } else { 'app.main:app' }
+        "uvicorn $target --host 127.0.0.1 --port $backendPort"
+    }
+
+    $bCmd = "`$env:PYTHONPATH = '$pyPath'; `$env:WEB_PORT = '$backendPort'; Set-Location '$bWorkDir'; uv run --project '$repoRoot' $backendExec"
+    Start-Process powershell.exe -ArgumentList @('-NoProfile', '-NoExit', '-Command', $bCmd) -WorkingDirectory $bWorkDir
+}
+
+# 2. Start Frontend
+if (-not $BackendOnly -and $frontendPort -gt 0 -and (Test-Path -LiteralPath $webRoot)) {
+    Write-Host "Starting frontend on :$frontendPort ..." -ForegroundColor Cyan
+    if ($cfg.Frontend.PortEnvVar) { Set-Item -Path "Env:$($cfg.Frontend.PortEnvVar)" -Value "$frontendPort" }
+    if ($cfg.Frontend.ApiTargetEnv) { Set-Item -Path "Env:$($cfg.Frontend.ApiTargetEnv)" -Value "http://127.0.0.1:$backendPort" }
+
+    $cmdFlag = if ($Headless) { '/c' } else { '/k' }
+    if ($cfg.Frontend.Kind -eq 'next') {
+        Start-Process cmd.exe -ArgumentList @($cmdFlag, "npm run dev -- -p $frontendPort -H 127.0.0.1") -WorkingDirectory $webRoot
+    } else {
+        Start-Process cmd.exe -ArgumentList @($cmdFlag, "npm run dev -- --port $frontendPort --host 127.0.0.1") -WorkingDirectory $webRoot
+    }
+}
+
+# 3. Open Browser
+if (-not $NoBrowser -and -not $Headless -and -not $BackendOnly -and $frontendPort -gt 0) {
+    Start-Process "http://127.0.0.1:$frontendPort/"
+}
