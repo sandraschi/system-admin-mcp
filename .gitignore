@@ -57,6 +57,8 @@ reports/
 # Node / webapp
 node_modules/
 web_sota/node_modules/
+web_sota/test-results/
+web_sota/playwright-report/
 
 # MCPB
 *.mcpb

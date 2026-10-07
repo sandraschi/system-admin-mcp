@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60000,
@@ -8,10 +9,18 @@ export default defineConfig({
     headless: true,
     screenshot: "only-on-failure",
   },
-  webServer: {
-    command: "uv run python -m system_admin_mcp.server --port 10861",
-    port: 10861,
-    timeout: 30000,
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      command: "uv run system-admin-mcp --web",
+      url: "http://127.0.0.1:10861/api/health",
+      timeout: 90000,
+      reuseExistingServer: true,
+    },
+    {
+      command: "npm run dev",
+      url: "http://127.0.0.1:10860",
+      timeout: 90000,
+      reuseExistingServer: true,
+    },
+  ],
 });
