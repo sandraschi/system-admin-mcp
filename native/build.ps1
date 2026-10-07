@@ -8,17 +8,21 @@ New-Item -ItemType Directory -Force -Path $ResourceDir, $DevDir | Out-Null
 
 Write-Host "=== ${RepoName} Tauri Release Build ===" -ForegroundColor Cyan
 
-# Step 1: TypeScript lint gate + frontend build
+# Step 1: TypeScript lint gate + frontend build (bun per BUN_STANDARDS.md; Node stays for Vite/Tauri CLIs)
+$bunExe = "$env:USERPROFILE\.bun\bin\bun.exe"
+if (-not (Test-Path -LiteralPath $bunExe)) { $bunExe = "bun" }
+$bunxExe = "$env:USERPROFILE\.bun\bin\bunx.exe"
+if (-not (Test-Path -LiteralPath $bunxExe)) { $bunxExe = "bunx" }
 $frontendDirs = @("web_sota", "webapp/frontend", "webapp")
 foreach ($dir in $frontendDirs) {
     $frontend = Join-Path $Root $dir
     if (Test-Path "$frontend\package.json") {
         Write-Host "-> [1/4] Building frontend ($dir)..." -ForegroundColor Yellow
         Push-Location $frontend
-        npm install --silent 2>$null
+        & $bunExe install --silent 2>$null
 
         Write-Host "  tsc --noEmit..." -ForegroundColor Gray
-        $tscOut = npx tsc --noEmit 2>&1
+        $tscOut = & $bunxExe tsc --noEmit 2>&1
         $tscExit = $LASTEXITCODE
         if ($tscExit -ne 0) {
             Write-Host "  TypeScript compilation FAILED - fix errors before building NSIS" -ForegroundColor Red
@@ -26,7 +30,7 @@ foreach ($dir in $frontendDirs) {
             throw "TypeScript compilation failed - fix all errors before building NSIS installer"
         }
 
-        npm run build
+        & $bunExe run build
         if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
         Pop-Location
         break
@@ -65,7 +69,37 @@ $src = "$Root\dist\${RepoName}-backend.exe"
 if (-not (Test-Path $src)) { throw "Backend exe not found at $src - PyInstaller step failed" }
 Copy-Item $src "$ResourceDir\${RepoName}-backend.exe" -Force
 Copy-Item $src "$DevDir\${RepoName}-backend-$Triple.exe" -Force
-Write-Host "  Backend exe: $((Get-Item $src).Length / 1MB) MB"
+$backendMB = (Get-Item $src).Length / 1MB
+Write-Host "  Backend exe: $([math]::Round($backendMB, 1)) MB"
+# Gate 0 (tauri_nsis_building.md): a runt backend means PyInstaller silently dropped imports.
+if ((Get-Item $src).Length -lt 5MB) { throw "Backend exe is only $([math]::Round($backendMB, 2)) MB (< 5 MB) - PyInstaller dropped imports, refusing to bundle" }
+
+# Frozen smoke test: boot the exe on a scratch port and probe /api/health.
+$smokePort = 11999
+$env:SYSTEMADMIN_TAURI = "1"
+$env:PORT = "$smokePort"
+$smokeLog = "$Root\dist\pyi-smoke.log"
+$smokeProc = Start-Process -FilePath $src -NoNewWindow -PassThru -RedirectStandardError $smokeLog
+try {
+    $smoked = $false
+    for ($i = 0; $i -lt 12; $i++) {
+        Start-Sleep -Seconds 5
+        if ($smokeProc.HasExited) { break }
+        try {
+            $r = Invoke-WebRequest "http://127.0.0.1:$smokePort/api/health" -UseBasicParsing -TimeoutSec 5
+            if ($r.StatusCode -eq 200) { $smoked = $true; break }
+        } catch { }
+    }
+    if (-not $smoked) {
+        $tail = if (Test-Path $smokeLog) { Get-Content $smokeLog -Raw } else { "(no log)" }
+        throw "Frozen backend smoke test failed on :$smokePort (exited=$($smokeProc.HasExited)). stderr: $tail"
+    }
+    Write-Host "  Frozen smoke test PASSED (:$smokePort /api/health 200)" -ForegroundColor Green
+} finally {
+    if (-not $smokeProc.HasExited) { $smokeProc.Kill() }
+    Remove-Item Env:\SYSTEMADMIN_TAURI -ErrorAction SilentlyContinue
+    Remove-Item Env:\PORT -ErrorAction SilentlyContinue
+}
 
 # Bundle .env.example (NOT .env - dev .env has personal API keys)
 $envExample = "$Root\.env.example"
@@ -94,4 +128,3 @@ if (Test-Path $strayExe) { Remove-Item $strayExe -Force; Write-Host "  Cleaned s
 
 Write-Host "=== Build complete ===" -ForegroundColor Green
 Write-Host "Ship: $nsisDir\*.exe"
-

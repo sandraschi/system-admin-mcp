@@ -57,13 +57,13 @@ build:
 build-dev:
     Set-Location '{{justfile_directory()}}'; uv sync --all-extras
 
-# Install npm dependencies for webapp
+# Install bun dependencies for webapp
 web-install:
-    Set-Location '{{justfile_directory()}}\web_sota'; npm install
+    Set-Location '{{justfile_directory()}}\web_sota'; & "$env:USERPROFILE\.bun\bin\bun.exe" install --frozen-lockfile
 
 # Full setup from scratch (Python + webapp)
 setup:
-    Set-Location '{{justfile_directory()}}'; uv sync --all-extras; Set-Location '{{justfile_directory()}}\web_sota'; npm install; Write-Host "Setup complete. Run 'just dev' to start." -ForegroundColor Green
+    Set-Location '{{justfile_directory()}}'; uv sync --all-extras; Set-Location '{{justfile_directory()}}\web_sota'; & "$env:USERPROFILE\.bun\bin\bun.exe" install; Write-Host "Setup complete. Run 'just dev' to start." -ForegroundColor Green
 
 # --- Development ---
 
@@ -84,7 +84,7 @@ web:
 
 # Start webapp frontend dev server on port 10860
 web-frontend:
-    Set-Location '{{justfile_directory()}}\web_sota'; npm run dev
+    Set-Location '{{justfile_directory()}}\web_sota'; & "$env:USERPROFILE\.bun\bin\bun.exe" run dev
 
 # Check Python venv is ready and admin status
 info:

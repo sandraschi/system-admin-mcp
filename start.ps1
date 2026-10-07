@@ -86,10 +86,13 @@ if (-not $BackendOnly -and $frontendPort -gt 0 -and (Test-Path -LiteralPath $web
     if ($cfg.Frontend.ApiTargetEnv) { Set-Item -Path "Env:$($cfg.Frontend.ApiTargetEnv)" -Value "http://127.0.0.1:$backendPort" }
 
     $cmdFlag = if ($Headless) { '/c' } else { '/k' }
+    # Bun-first (BUN_STANDARDS.md), npm fallback for naked PCs without bun.
+    $bunExe = "$env:USERPROFILE\.bun\bin\bun.exe"
+    $jsRunner = if (Test-Path -LiteralPath $bunExe) { "& '$bunExe' run" } else { "npm run" }
     if ($cfg.Frontend.Kind -eq 'next') {
-        Start-Process cmd.exe -ArgumentList @($cmdFlag, "npm run dev -- -p $frontendPort -H 127.0.0.1") -WorkingDirectory $webRoot
+        Start-Process cmd.exe -ArgumentList @($cmdFlag, "$jsRunner dev -- -p $frontendPort -H 127.0.0.1") -WorkingDirectory $webRoot
     } else {
-        Start-Process cmd.exe -ArgumentList @($cmdFlag, "npm run dev -- --port $frontendPort --host 127.0.0.1") -WorkingDirectory $webRoot
+        Start-Process cmd.exe -ArgumentList @($cmdFlag, "$jsRunner dev -- --port $frontendPort --host 127.0.0.1") -WorkingDirectory $webRoot
     }
 }
 

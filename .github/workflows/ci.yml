@@ -40,22 +40,22 @@ jobs:
       - name: Pyright typecheck
         run: uv run pyright src/
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
+          bun-version: latest
 
       - name: Install frontend dependencies
         working-directory: web_sota
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: TypeScript check
         working-directory: web_sota
-        run: npx tsc --noEmit
+        run: bunx tsc --noEmit
 
       - name: Biome check
         working-directory: web_sota
-        run: npx biome ci src/
+        run: bun run biome:ci
 
   test:
     name: Test with pytest
