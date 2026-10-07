@@ -8,6 +8,7 @@ import {
   User,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { streamChat } from "@/lib/llm";
 import { useLlmStore, useProviderModels } from "@/store/llm";
 
 const HISTORY_KEY = "system-admin-chat-history";
@@ -101,43 +102,48 @@ export function Chat() {
       content: text,
       ts: new Date().toISOString(),
     };
-    setMessages((prev) => {
-      const next = [...prev, userMsg];
-      return next.length > MAX_HISTORY ? next.slice(-MAX_HISTORY) : next;
-    });
+    const history = [...messages, userMsg].slice(-MAX_HISTORY);
+    setMessages(history);
     setInput("");
+    const assistantId = `m${msgIdRef.current++}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        ts: new Date().toISOString(),
+      },
+    ]);
+    const wire = history.map((m) => ({ role: m.role, content: m.content }));
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: text, provider, model }),
+      let acc = "";
+      await streamChat(provider, model, wire, (token) => {
+        acc += token;
+        const snapshot = acc;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: snapshot } : m,
+          ),
+        );
       });
-      const data = await res.json();
-      if (!res.ok || data.status !== "success") {
-        throw new Error(data.message || `HTTP ${res.status}`);
+      if (!acc.trim()) {
+        throw new Error("empty response");
       }
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `m${msgIdRef.current++}`,
-          role: "assistant",
-          content: data.response,
-          ts: new Date().toISOString(),
-        },
-      ]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `m${msgIdRef.current++}`,
-          role: "assistant",
-          ts: new Date().toISOString(),
-          content: `LLM unavailable: ${msg}\n\nStart Ollama (port 11434) or LM Studio (port 1234) to enable chat.`,
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? {
+                ...m,
+                content: `LLM unavailable: ${msg}\n\nStart Ollama (port 11434) or LM Studio (port 1234) to enable chat, or add a cloud key in Settings.`,
+              }
+            : m,
+        ),
+      );
     }
-  }, [input, provider, model]);
+  }, [input, messages, provider, model]);
 
   const exportChat = () => {
     const text = messages

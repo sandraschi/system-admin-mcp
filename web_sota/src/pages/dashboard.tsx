@@ -1,6 +1,8 @@
 import { Activity, Cpu, HardDrive, Server, Shield, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLlmStore, useLlmUsable } from "@/store/llm";
 
 interface SystemStatus {
   service: string;
@@ -36,6 +38,12 @@ export function Dashboard() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
+  const llmStatus = useLlmStore((s) => s.status);
+  const llmUsable = useLlmUsable();
+  const loadLlm = useLlmStore((s) => s.load);
+  useEffect(() => {
+    void loadLlm();
+  }, [loadLlm]);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,6 +126,17 @@ export function Dashboard() {
           </a>
         </div>
       </div>
+
+      {llmStatus === "ready" && !llmUsable && (
+        <Link
+          to="/settings"
+          data-testid="onboarding-cue"
+          className="block rounded-2xl border border-red-700/60 bg-red-950/40 p-4 text-sm text-red-200 hover:bg-red-900/30"
+        >
+          <strong>No usable AI provider.</strong> Start Ollama (:11434) or LM
+          Studio (:1234), or paste a cloud key in Settings — then chat works.
+        </Link>
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
