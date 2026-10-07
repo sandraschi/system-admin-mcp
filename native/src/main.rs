@@ -23,6 +23,7 @@ fn main() {
             if let tauri::RunEvent::Exit = event {
                 if let Some(mut child) = app.state::<BackendProcess>().0.lock().unwrap().take() {
                     let _ = child.kill();
+                    let _ = child.wait();
                 }
             }
         });

@@ -9,7 +9,7 @@ from PyInstaller.utils.hooks import copy_metadata
 import glob as _glob
 
 datas = [("src/system_admin_mcp", "system_admin_mcp")]
-for pkg in ("fastmcp", "fastapi", "uvicorn", "pydantic", "starlette", "httpx", "psutil", "docket", "burner_redis"):
+for pkg in ("fastmcp", "fastapi", "uvicorn", "pydantic", "starlette", "httpx", "psutil", "docket", "burner_redis", "mcp", "opentelemetry"):
     try:
         datas += copy_metadata(pkg)
     except Exception:
@@ -26,6 +26,7 @@ a = Analysis(
     datas=datas,
     hiddenimports=[
         "_datetime",
+        "mcp.types",
         "uvicorn.logging",
         "uvicorn.loops",
         "uvicorn.loops.asyncio",
@@ -38,6 +39,10 @@ a = Analysis(
         "system_admin_mcp.main",
         "system_admin_mcp.server",
         "_strptime",
+        "joserfc",
+        "joserfc.jwk",
+        "joserfc.jwt",
+        "cachetools",
         "burner_redis",
         "burner_redis.lock",
         "burner_redis.pipeline",
@@ -75,5 +80,3 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
-
-

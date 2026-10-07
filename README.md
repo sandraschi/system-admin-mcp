@@ -29,7 +29,7 @@ cd system-admin-mcp
 just
 ```
 
-This opens an interactive dashboard showing all available commands. Run `just bootstrap` to install dependencies, then `just serve` or `just dev` to start.
+This opens an interactive dashboard showing all available commands. Run `just bootstrap` to install dependencies, then `just serve` or `just dev` to start. Frontend deps install via Bun 1.3+ (`bun.lock` committed); Node 22+ stays for the Vite/Tauri CLIs.
 
 ### Manual Setup
 

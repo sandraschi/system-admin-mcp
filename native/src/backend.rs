@@ -14,7 +14,7 @@ use tauri::{AppHandle, Emitter, Manager};
 pub struct BackendProcess(pub Mutex<Option<Child>>);
 
 const BACKEND_NAME: &str = "system-admin-mcp-backend.exe";
-const BACKEND_PORT: u16 = 10861;
+const BACKEND_PORT: u16 = 11240;
 
 fn dev_backend_path() -> Option<PathBuf> {
     if !cfg!(debug_assertions) {
