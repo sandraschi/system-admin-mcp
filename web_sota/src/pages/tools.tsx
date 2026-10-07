@@ -66,7 +66,7 @@ export function Tools() {
   const filteredTools = tools.filter(
     (t) =>
       t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.description.toLowerCase().includes(search.toLowerCase()),
+      (t.description ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -143,7 +143,7 @@ export function Tools() {
                       <Code2 className="w-3 h-3" /> Parameters
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {Object.entries(tool.parameters.properties).map(
+                      {Object.entries(tool.parameters?.properties ?? {}).map(
                         ([param, details]: [string, ToolParam]) => (
                           <div key={param} className="space-y-1.5">
                             <Label className="text-xs text-slate-300">

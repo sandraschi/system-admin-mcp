@@ -18,7 +18,7 @@ disk maintenance, service + process orchestration, crash postmortem — via MCP 
 
 1. Right-click terminal → **Run as Administrator**.
 2. `git clone https://github.com/sandraschi/system-admin-mcp && cd system-admin-mcp`.
-3. `just setup` (Python deps + webapp `npm install`), then `just bootstrap` (pre-commit hooks).
+3. `just setup` (Python deps + webapp `bun install`), then `just bootstrap` (pre-commit hooks).
 4. `.\start.ps1` — backend on 10861, dashboard on 10860. The dashboard hero shows a
    backend status dot: green = connected, pulsing = still starting, red = see TROUBLESHOOTING.
 5. Safe first moves: Dashboard → `health_check`; Tools → `system_admin(operation="list_services")`;

@@ -1,4 +1,19 @@
 
+## [Unreleased] — 2026-10-07 (assfix final: bun + zustand + tauri)
+
+### Fixed
+- **Bun migration (Phase 1)**: `bun.lock` committed, `package-lock.json` deleted;
+  justfile/CI/build.ps1/start.ps1 on bun (fleet engine `PackageManager: bun`);
+  Node stays for Vite/Tauri CLIs. `bun run dev` + `bun run build` verified.
+- **Zustand LLM store**: new `store/llm.ts` + `lib/provider.ts`; chat + settings
+  share provider/model/detection/GPU state (persisted `llm_provider`/`llm_model`).
+- **Tauri audit**: dedicated operator ports (native 11239/11240, side-by-side
+  rule); `BACKEND_PORT=11240`; api.ts Tauri branch baked to operator port;
+  `run_server.py` frozen stderr guard + eager `_strptime`/`mcp.types`;
+  spec gains `joserfc*` + `mcp` metadata; build.ps1 size gate (5 MB) + frozen
+  smoke test; `main.rs` child `wait()`.
+- **Strict tsc fixes**: narrowed `tool.parameters`, `stats.uptime`, tool filter.
+
 ## [Unreleased] — 2026-10-07 (assfix follow-up)
 
 ### Fixed

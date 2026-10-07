@@ -2,14 +2,14 @@
 
 ## Prereqs (Windows 11, Admin terminal)
 
-- Python 3.12+, `uv` (`C:\Users\sandr\.local\bin\uv.exe`), Node 22 + npm, Tauri: Rust/Cargo for `native/`.
+- Python 3.12+, `uv` (`C:\Users\sandr\.local\bin\uv.exe`), Bun 1.3+ (`~/.bun/bin/bun.exe`, Node 22+ stays for Vite/Tauri CLIs), Tauri: Rust/Cargo for `native/`.
 - Run the terminal **as Administrator** — disk/service/recovery ops check elevation at runtime.
 
 ## Setup
 
 ```powershell
 uv sync --all-extras          # or: just build-dev
-cd web_sota; npm install      # or: just web-install
+cd web_sota; bun install      # or: just web-install
 uv run pre-commit install     # hooks: ruff, biome (web_sota), ps51-parse, hygiene
 ```
 
@@ -39,5 +39,5 @@ just e2e            # Playwright smoke (web_sota/e2e/smoke.spec.ts)
 ## Gates (must be green before commit)
 
 `ruff check src/` (incl. T20/S110/S112 — no ignores), `ruff format --check src/`,
-`pyright src/` (0 errors), `pytest tests/ -q`, `npx tsc --noEmit` + `npx biome ci src/`
+`pyright src/` (0 errors), `pytest tests/ -q`, `bunx tsc --noEmit` + `bun run biome:ci`
 in `web_sota/`, `actionlint .github/workflows/ci.yml`, `just --list` (justfile parses).
