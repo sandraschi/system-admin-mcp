@@ -1,7 +1,10 @@
+# MCPB Pack Exclusion List — SOTA v2.0
+
 # Logic/Dev Bloat
 .venv/
 node_modules/
 __pycache__/
+*.pyc
 .ruff_cache/
 .pytest_cache/
 tests/
@@ -13,26 +16,31 @@ llms-full.txt
 .git/
 .github/
 .vscode/
+.cursor/
+.windsurf/
 
 # Build Artifacts
 dist/
 build/
-*.mcpb
-
-# Editor / tooling backups (MCPB_PACKAGING_STANDARDS.md section 2.4)
+target/
+htmlcov/
 *.bak
-*.bak.*
-*.bak-*
-*.orig
-*.rej
+*.mcpb
+.coverage
+coverage.xml
 
-# Pack build tooling itself -- not runtime code
-mcpb/pack.ps1
-mcpb/verify_pack.py
-pack.ps1
-verify_pack.py
-
-# Non-MCP components detected in this repo
-web_sota/
-native/
+# Documents (not needed for runtime)
+docs/
+docs-private/
 scripts/
+installer/
+_llm_test_scripts/
+
+# Webapp source (standalone)
+web_sota/node_modules/
+web_sota/dist/
+
+# Rust artifacts (Zed extension, not needed for MCPB)
+Cargo.lock
+Cargo.toml
+target/

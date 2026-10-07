@@ -1,4 +1,4 @@
-﻿# Per-repo fleet start config for system-admin-mcp
+# Per-repo fleet start config for system-admin-mcp
 # Edit ports/backend target here - start.ps1 is fleet-standard.
 @{
     Name         = 'system-admin-mcp'
@@ -10,6 +10,7 @@
         Kind          = 'uvicorn'
         UvicornTarget = 'system_admin_mcp.server:app'
         SyncExtras    = @('dev')
+        SyncOnStart  = $true
         Env           = @{ WEB_PORT = '10861' }
     }
     Frontend = @{
