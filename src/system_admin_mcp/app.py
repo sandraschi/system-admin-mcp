@@ -94,3 +94,56 @@ from system_admin_mcp.tools import (
     services_and_tasks,  # noqa: F401
     system_ops,  # noqa: F401
 )
+
+
+@mcp.resource("systemadmin://status")
+def resource_status() -> str:
+    """Live server status snapshot (version, transport config, tool count)."""
+    import asyncio
+    import json
+
+    from system_admin_mcp.transport import get_transport_config
+
+    async def _count() -> int:
+        try:
+            return len(await mcp.list_tools())
+        except Exception:
+            return -1
+
+    # list_tools is async; resolve synchronously only when no loop is running,
+    # otherwise report -1 (the REST /api/status endpoint has the live count).
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        count = asyncio.run(_count())
+    else:
+        count = -1
+    return json.dumps(
+        {
+            "server": "system-admin-mcp",
+            "version": "0.4.0",
+            "transport": get_transport_config(),
+            "tool_count": count,
+            "requires_admin": True,
+        }
+    )
+
+
+@mcp.resource("systemadmin://config")
+def resource_config() -> str:
+    """Effective runtime configuration (ports, env-derived settings, no secrets)."""
+    import json
+    import os
+
+    from system_admin_mcp.transport import get_transport_config
+
+    cfg = get_transport_config()
+    return json.dumps(
+        {
+            "backend_port": int(os.getenv("WEBAPP_PORT", os.getenv("PORT", str(cfg["port"])))),
+            "frontend_port": 10860,
+            "transport": cfg["transport"],
+            "prefab_apps": os.getenv("SYSADMIN_PREFAB_APPS", "1") != "0",
+            "bridge_urls_configured": bool(os.getenv("MCP_BRIDGE_URLS", "")),
+        }
+    )

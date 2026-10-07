@@ -287,6 +287,62 @@ async def api_skills() -> dict[str, Any]:
     return {"skills": results}
 
 
+def _fleet_registry_file() -> Path | None:
+    """Locate the fleet port registry (mcp-central-docs checkout next to the repo)."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    candidates = [
+        repo_root.parent / "mcp-central-docs" / "operations" / "WEBAPP_PORTS.md",
+        Path(r"D:\Dev\repos\mcp-central-docs\operations\WEBAPP_PORTS.md"),
+    ]
+    for cand in candidates:
+        if cand.is_file():
+            return cand
+    return None
+
+
+@app.get("/api/fleet/apps")
+async def api_fleet_apps() -> dict[str, Any]:
+    """Fleet app discovery: registry entries as known, unregistered listeners as experimental."""
+    import re
+
+    known: list[dict[str, Any]] = []
+    known_ports: set[int] = set()
+    registry = _fleet_registry_file()
+    row_re = re.compile(r"^\|\s*(\d{4,5})\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|")
+    if registry is not None:
+        for line in registry.read_text(encoding="utf-8").splitlines():
+            m = row_re.match(line.strip())
+            if m:
+                port = int(m.group(1))
+                known.append({"port": port, "name": m.group(2).strip(), "description": m.group(3).strip()})
+                known_ports.add(port)
+    experimental: list[dict[str, Any]] = []
+    note = ""
+    try:
+        for conn in psutil.net_connections(kind="inet"):
+            laddr = getattr(conn, "laddr", None)
+            port = getattr(laddr, "port", None)
+            if not isinstance(port, int):
+                continue
+            if 10700 <= port <= 11999 and port not in known_ports:
+                known_ports.add(port)
+                experimental.append(
+                    {"port": port, "name": f"unknown-{port}", "description": "listening, not in registry"}
+                )
+    except Exception as e:
+        note = f"listener scan unavailable: {e}"
+    if registry is None:
+        note = (note + " " if note else "") + "port registry not found; showing listeners only"
+    return {
+        "success": True,
+        "known": known,
+        "experimental": experimental,
+        "count": len(known),
+        "registry": str(registry) if registry else "",
+        "note": note,
+    }
+
+
 @app.get("/api/v1/diagnostics")
 async def api_diagnostics() -> dict[str, Any]:
     """Full diagnostics for CUA-NSIS smoke testing: tools, system, errors."""
