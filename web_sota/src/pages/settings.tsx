@@ -14,9 +14,15 @@ function LLMSettings() {
   const [detected, setDetected] = useState<Record<string, boolean>>({});
   const [selectedProvider, setSelectedProvider] = useState("ollama");
   const [selectedModel, setSelectedModel] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [gpuMessage, setGpuMessage] = useState<string | null>(null);
   useEffect(() => {
     fetch(`${API_BASE}/api/llm/discover`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`/api/llm/discover: HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         const byName: Record<string, { name: string }[]> = {};
         const det: Record<string, boolean> = {};
@@ -36,10 +42,27 @@ function LLMSettings() {
             ? savedM
             : models[0]?.name || "",
         );
+        setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        setLoadError(String(err));
         setProviders({ ollama: [{ name: "llama3.2:3b" }] });
         setSelectedModel(localStorage.getItem("llm_model") || "llama3.2:3b");
+        setLoading(false);
+      });
+    fetch(`${API_BASE}/api/tools/call`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "get_gpu_info", arguments: {} }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        const msg: string | undefined =
+          d?.result?.message || d?.message || undefined;
+        if (d?.status === "success" && msg) setGpuMessage(msg);
+      })
+      .catch(() => {
+        /* GPU probe is best-effort; absence just hides the row */
       });
   }, []);
   const save = (p: string, m: string) => {
@@ -48,8 +71,31 @@ function LLMSettings() {
   };
   const models =
     providers[selectedProvider === "ollama" ? "ollama" : "lm_studio"] || [];
+  const anyDetected = detected.ollama || detected.lm_studio;
+  if (loading) {
+    return <p className="text-sm text-slate-300">Probing LLM providers…</p>;
+  }
   return (
     <div className="space-y-3">
+      {loadError && (
+        <p className="rounded border border-amber-700/50 bg-amber-950/40 p-2 text-sm text-amber-200">
+          Provider discovery failed ({loadError}); showing cached defaults.
+        </p>
+      )}
+      {gpuMessage && !anyDetected && (
+        <p
+          data-testid="llm-gpu-prompt"
+          className="rounded border border-emerald-700/50 bg-emerald-950/40 p-2 text-sm text-emerald-200"
+        >
+          GPU detected ({gpuMessage}) but no local LLM is running — start Ollama
+          (:11434) or LM Studio (:1234) to enable chat.
+        </p>
+      )}
+      {gpuMessage && (
+        <p className="text-sm text-slate-300" data-testid="llm-gpu-info">
+          GPU: {gpuMessage}
+        </p>
+      )}
       <div className="flex items-center gap-2 text-xs text-slate-400">
         <span
           className={`w-2 h-2 rounded-full ${detected[selectedProvider] ? "bg-emerald-500" : "bg-slate-600"}`}

@@ -55,9 +55,25 @@ export function Dashboard() {
     };
     load();
     const iv = setInterval(load, 10000);
+    // Tauri WebView: also listen for backend-status events (HTTP poll above stays as fallback).
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        const off = await listen<string>("backend-status", (event) => {
+          if (!cancelled && event.payload === "ready") setBackendOk(true);
+        });
+        unlisten = () => {
+          off();
+        };
+      } catch {
+        /* not running under Tauri — HTTP polling covers us */
+      }
+    })();
     return () => {
       cancelled = true;
       clearInterval(iv);
+      unlisten?.();
     };
   }, []);
 
