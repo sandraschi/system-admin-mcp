@@ -1,4 +1,19 @@
 
+## [Unreleased] — 2026-10-08 (cloud providers + dual-GPU)
+
+### Added
+- **Cloud provider stack** (fleet §VI.10): vendored `llm_providers.py`
+  (16 providers: 3 local + 13 cloud), 0600 keystore (`data/llm_keys.json`,
+  env wins, `SYSTEMADMIN_LLM_KEYSTORE` test override), full endpoint set
+  (`providers/models/test/settings/chat+stream/onboarding/install/gpus/
+  ollama-state`), verified live against Ollama (chat + SSE verbatim).
+- **Dual-GPU placement + resident-first** (§VI.8/9): target-GPU select,
+  VRAM-filtered dropdowns, `llm_gpu` persistence, `/api/ps`-aware defaults.
+- **Frontend**: `lib/llm.ts` (streamChat), provider cards with key save/test/
+  clear, dashboard `onboarding-cue`, chat migrated to streaming SSE.
+- **Tests**: `tests/test_llm_stack.py` (21 tests incl. live-Ollama stream,
+  no-key-leak, key roundtrip). New `docs/LLM.md`.
+
 ## [Unreleased] — 2026-10-07 (assfix final: bun + zustand + tauri)
 
 ### Fixed

@@ -80,3 +80,6 @@ reports/
 # Environment (single source of truth is .env.example)
 .env
 *.bak-*
+
+# LLM provider keys (0600 keystore, never committed; env vars win)
+data/llm_keys.json

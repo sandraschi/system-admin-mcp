@@ -12,6 +12,7 @@ from fastapi import Body, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from system_admin_mcp.app import mcp
+from system_admin_mcp.llm_providers import register_llm_routes
 
 # Configure structured logging
 logging.basicConfig(
@@ -91,6 +92,9 @@ START_TIME = time.time()
 
 registered_tools = _get_registered_tools()
 logger.info(f"FastAPI Backend: Initialized with {len(registered_tools)} registered tools: {registered_tools}")
+
+# Fleet LLM contracts (providers, keys, chat proxy, onboarding, install, GPUs).
+register_llm_routes(app)
 
 
 @app.get("/api/health")
