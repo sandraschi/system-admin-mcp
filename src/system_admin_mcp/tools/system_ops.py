@@ -2,12 +2,20 @@
 
 import ctypes
 import logging
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 # Import the FastMCP instance from app module
 from system_admin_mcp.app import mcp
 
 logger = logging.getLogger(__name__)
+
+from mcp.types import ToolAnnotations
+
+# Fleet tool-annotation standard (TOOL_DESIGN_STANDARDS.md S9).
+_READ_ONLY = ToolAnnotations(readOnlyHint=True)
+_DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
 
 # Lazy import UserBridge to avoid startup failures
 try:
@@ -44,13 +52,13 @@ def is_admin() -> bool:
         bool: True if running as administrator, False otherwise
     """
     try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
     except Exception as e:
         logger.warning(f"Failed to check admin status: {e}")
         return False
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 async def list_volumes() -> list[dict]:
     """List all available volumes on the system.
 
@@ -79,15 +87,17 @@ async def list_volumes() -> list[dict]:
     return volumes
 
 
-@mcp.tool()
-async def get_file_owner(file_path: str) -> dict:
+@mcp.tool(annotations=_READ_ONLY)
+async def get_file_owner(file_path: Annotated[str, Field(description="Path to the file or directory")]) -> dict:
     """Get the owner of a file or directory.
 
-    Args:
-        file_path: Path to the file or directory
+    ## Return Format
+    `{file: str, owner: "DOMAIN\\User", sid: str}`.
 
-    Returns:
-        Dictionary containing owner information
+    ## Examples
+    ```python
+    get_file_owner("C:\\Windows")
+    ```
     """
     import win32security
 
@@ -105,16 +115,21 @@ async def get_file_owner(file_path: str) -> dict:
         raise
 
 
-@mcp.tool()
-async def recover_file(original_path: str, output_dir: str) -> dict:
+@mcp.tool(annotations=_DESTRUCTIVE)
+async def recover_file(
+    original_path: Annotated[str, Field(description="Original path of the deleted file")],
+    output_dir: Annotated[str, Field(description="Directory to save the recovered file")],
+) -> dict:
     """Attempt to recover a deleted file from NTFS volume.
 
-    Args:
-        original_path: Original path of the deleted file
-        output_dir: Directory to save the recovered file
+    ## Return Format
+    `{status: "success" | "error", ...}` with recovery details or an
+    `error: {code, message}` payload (e.g. `admin_required`).
 
-    Returns:
-        Dictionary with recovery status
+    ## Examples
+    ```python
+    recover_file("C:/deleted/file.docx", "D:/Recovery")
+    ```
     """
     if not is_admin():
         return {
@@ -141,15 +156,17 @@ async def recover_file(original_path: str, output_dir: str) -> dict:
         return {"status": "error", "error": {"code": "recovery_failed", "message": str(e)}}
 
 
-@mcp.tool()
-async def get_disk_usage(path: str) -> dict:
+@mcp.tool(annotations=_READ_ONLY)
+async def get_disk_usage(path: Annotated[str, Field(description="Path to check (file or directory)")]) -> dict:
     """Get disk usage information for a path.
 
-    Args:
-        path: Path to check (file or directory)
+    ## Return Format
+    Bridge result dict with total/used/free bytes for the path.
 
-    Returns:
-        Dictionary containing disk usage information
+    ## Examples
+    ```python
+    get_disk_usage("C:\\")
+    ```
     """
     bridge = get_bridge()
     if bridge is None:
@@ -161,15 +178,17 @@ async def get_disk_usage(path: str) -> dict:
         raise
 
 
-@mcp.tool()
-async def get_process_info(pid: int) -> dict:
+@mcp.tool(annotations=_READ_ONLY)
+async def get_process_info(pid: Annotated[int, Field(description="Process ID")]) -> dict:
     """Get information about a running process.
 
-    Args:
-        pid: Process ID
+    ## Return Format
+    Bridge result dict with process details for the PID.
 
-    Returns:
-        Dictionary containing process information
+    ## Examples
+    ```python
+    get_process_info(1234)
+    ```
     """
     bridge = get_bridge()
     if bridge is None:
@@ -181,7 +200,7 @@ async def get_process_info(pid: int) -> dict:
         raise
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 async def ping() -> dict:
     """Check if the System Admin MCP service is responsive.
 
@@ -214,7 +233,7 @@ async def ping() -> dict:
         }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 async def get_system_info() -> dict:
     """Get system information from the service.
 
@@ -230,16 +249,21 @@ async def get_system_info() -> dict:
         raise
 
 
-@mcp.tool()
-async def help(level: str = "basic", topic: str | None = None) -> str:
+@mcp.tool(annotations=_READ_ONLY)
+async def help(
+    level: Annotated[str, Field(description='Detail level: "basic", "intermediate", or "advanced"')] = "basic",
+    topic: Annotated[str | None, Field(description="Focus topic: file_recovery, security, volume, diagnostics")] = None,
+) -> str:
     """Get help information about System Admin MCP.
 
-    Args:
-        level: Detail level - "basic", "intermediate", or "advanced"
-        topic: Optional topic to focus on (file_recovery, security, volume, diagnostics)
+    ## Return Format
+    Markdown help text for the requested level.
 
-    Returns:
-        Help text for the server
+    ## Examples
+    ```python
+    help("basic")
+    help("intermediate", topic="security")
+    ```
     """
     if level == "basic":
         return """# System Admin MCP Help
@@ -303,16 +327,20 @@ See individual tool docstrings for detailed information.
 """
 
 
-@mcp.tool()
-async def status(level: str = "basic", focus: str | None = None) -> str:
+@mcp.tool(annotations=_READ_ONLY)
+async def status(
+    level: Annotated[str, Field(description='Detail level: "basic", "intermediate", or "advanced"')] = "basic",
+    focus: Annotated[str | None, Field(description="Focus area: tools, service, system")] = None,
+) -> str:
     """Get server status and diagnostics.
 
-    Args:
-        level: Detail level - "basic", "intermediate", or "advanced"
-        focus: Optional focus area (tools, service, system)
+    ## Return Format
+    Markdown status text for the requested level.
 
-    Returns:
-        Status information
+    ## Examples
+    ```python
+    status("basic")
+    ```
     """
     try:
         bridge = get_bridge()

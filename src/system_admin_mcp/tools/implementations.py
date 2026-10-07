@@ -11,7 +11,7 @@ import sys
 import time
 import winreg
 from datetime import datetime, timedelta
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
 import psutil
 import win32api
@@ -19,6 +19,7 @@ import win32evtlog
 import win32evtlogutil
 import win32file
 import win32security
+from pydantic import Field
 
 from system_admin_mcp.app import mcp
 
@@ -46,6 +47,12 @@ except ImportError:
     wmi: Any = None
 
 logger = logging.getLogger(__name__)
+
+from mcp.types import ToolAnnotations
+
+# Fleet tool-annotation standard (TOOL_DESIGN_STANDARDS.md S9).
+_READ_ONLY = ToolAnnotations(readOnlyHint=True)
+_DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
 
 
 def is_admin() -> bool:
@@ -77,17 +84,21 @@ def _wmi_connect() -> Any:
 # ============================================================================
 
 
-@mcp.tool()
-def scan_volume(drive: str, file_pattern: str | None = None, max_results: int = 100) -> dict[str, Any]:
+@mcp.tool(annotations=_READ_ONLY)
+def scan_volume(
+    drive: Annotated[str, Field(description='Drive letter, e.g. "C:"')],
+    file_pattern: Annotated[str | None, Field(description='File pattern, e.g. "*.docx"')] = None,
+    max_results: Annotated[int, Field(description="Maximum number of results", ge=1)] = 100,
+) -> dict[str, Any]:
     """Scan NTFS volume for deleted files using PowerShell and NTFS MFT.
 
-    Args:
-        drive: Drive letter (e.g., "C:")
-        file_pattern: File pattern to search for (e.g., "*.docx")
-        max_results: Maximum number of results to return
+    ## Return Format
+    `{status: "success" | "error", ...}` with scan results.
 
-    Returns:
-        Dictionary with scan results
+    ## Examples
+    ```python
+    scan_volume("C:", "*.docx", 50)
+    ```
     """
     try:
         if not drive.endswith(":"):
@@ -166,7 +177,7 @@ def scan_volume(drive: str, file_pattern: str | None = None, max_results: int = 
         return {"status": "error", "operation": "scan_volume", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 def recover_file_ntfs(source_path: str, destination_path: str) -> dict[str, Any]:
     """Recover a deleted file from NTFS volume.
 
@@ -229,7 +240,7 @@ def recover_file_ntfs(source_path: str, destination_path: str) -> dict[str, Any]
         return {"status": "error", "operation": "recover_file", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def validate_recovery(file_path: str) -> dict[str, Any]:
     """Validate recovered file integrity."""
     try:
@@ -282,7 +293,7 @@ def validate_recovery(file_path: str) -> dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_permissions(path: str) -> dict[str, Any]:
     """Get file/folder permissions and ACLs."""
     try:
@@ -362,7 +373,7 @@ def get_permissions(path: str) -> dict[str, Any]:
         return {"status": "error", "operation": "get_permissions", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 def set_permissions(path: str, principal: str, rights: str, inheritance: str | None = None) -> dict[str, Any]:
     """Set file/folder permissions."""
     try:
@@ -427,7 +438,7 @@ def set_permissions(path: str, principal: str, rights: str, inheritance: str | N
         return {"status": "error", "operation": "set_permissions", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 def remove_permission(path: str, principal: str) -> dict[str, Any]:
     """Remove specific permission from file/folder."""
     try:
@@ -495,7 +506,7 @@ def remove_permission(path: str, principal: str) -> dict[str, Any]:
         return {"status": "error", "operation": "remove_permission", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 def take_ownership(path: str) -> dict[str, Any]:
     """Take ownership of file/folder."""
     try:
@@ -538,7 +549,7 @@ def take_ownership(path: str) -> dict[str, Any]:
         return {"status": "error", "operation": "take_ownership", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def audit_permissions(path: str) -> dict[str, Any]:
     """Audit permissions and identify security issues."""
     try:
@@ -583,7 +594,7 @@ def audit_permissions(path: str) -> dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def check_disk_health(drive: str) -> dict[str, Any]:
     """Check disk SMART status and health using WMI."""
     try:
@@ -636,7 +647,7 @@ def check_disk_health(drive: str) -> dict[str, Any]:
         return {"status": "error", "operation": "check_disk_health", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
     """Advanced disk usage analysis with folder breakdown."""
     try:
@@ -701,7 +712,7 @@ def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
         return {"status": "error", "operation": "analyze_disk_usage", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 def disk_cleanup(drive: str, cleanup_targets: list[str] | None = None, dry_run: bool = True) -> dict[str, Any]:
     """Clean up disk space by removing temp files and other cleanup targets."""
     try:
@@ -796,7 +807,7 @@ def disk_cleanup(drive: str, cleanup_targets: list[str] | None = None, dry_run: 
         return {"status": "error", "operation": "disk_cleanup", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 def defragment_disk(drive: str, thorough: bool = False) -> dict[str, Any]:
     """Defragment HDD (HDDs only - do not use on SSDs!)."""
     try:
@@ -857,7 +868,7 @@ def defragment_disk(drive: str, thorough: bool = False) -> dict[str, Any]:
         return {"status": "error", "operation": "defragment_disk", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 def optimize_ssd(drive: str) -> dict[str, Any]:
     """Optimize SSD with TRIM operation."""
     try:
@@ -892,7 +903,7 @@ def optimize_ssd(drive: str) -> dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_hardware_info() -> dict[str, Any]:
     """Get comprehensive hardware information using WMI and psutil."""
     try:
@@ -984,7 +995,7 @@ def get_hardware_info() -> dict[str, Any]:
         return {"status": "error", "operation": "get_hardware_info", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_os_info() -> dict[str, Any]:
     """Get operating system information."""
     try:
@@ -1029,7 +1040,7 @@ def get_os_info() -> dict[str, Any]:
         return {"status": "error", "operation": "get_os_info", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_installed_software() -> dict[str, Any]:
     """Get list of installed software from registry."""
     try:
@@ -1078,7 +1089,7 @@ def get_installed_software() -> dict[str, Any]:
         }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_performance_metrics() -> dict[str, Any]:
     """Get real-time performance metrics."""
     try:
@@ -1152,7 +1163,7 @@ def get_performance_metrics() -> dict[str, Any]:
         }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_event_log(log_name: str = "System", level: str | None = None, hours_back: int = 24) -> dict[str, Any]:
     """Query Windows event logs."""
     try:
@@ -1238,7 +1249,7 @@ def get_event_log(log_name: str = "System", level: str | None = None, hours_back
         return {"status": "error", "operation": "get_event_log", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def health_check() -> dict[str, Any]:
     """Perform comprehensive system health check."""
     try:
@@ -1288,7 +1299,7 @@ def health_check() -> dict[str, Any]:
         return {"status": "error", "operation": "health_check", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_volume_info(drive: str) -> dict[str, Any]:
     """Get detailed volume information."""
     try:
@@ -1350,16 +1361,20 @@ def get_volume_info(drive: str) -> dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool()
-async def get_recent_event_errors(log_type: str = "System", count: int = 10) -> dict[str, Any]:
+@mcp.tool(annotations=_READ_ONLY)
+async def get_recent_event_errors(
+    log_type: Annotated[str, Field(description='Log to read, e.g. "System", "Application"')] = "System",
+    count: Annotated[int, Field(description="Profile the last N events", ge=1)] = 10,
+) -> dict[str, Any]:
     """Get the most recent Error and Warning events from Windows Event Logs.
 
-    Args:
-        log_type: Log to read (e.g., "System", "Application")
-        count: Profile the last N events
+    ## Return Format
+    `{status: "success" | "error", ...}` with an event summary.
 
-    Returns:
-        Dictionary with event summary
+    ## Examples
+    ```python
+    get_recent_event_errors("System", 5)
+    ```
     """
     try:
         # Event type constants
@@ -1419,16 +1434,19 @@ async def get_recent_event_errors(log_type: str = "System", count: int = 10) -> 
         return {"status": "error", "error": str(e)}
 
 
-@mcp.tool()
-async def audit_network_ports(include_established: bool = True) -> dict[str, Any]:
+@mcp.tool(annotations=_READ_ONLY)
+async def audit_network_ports(
+    include_established: Annotated[bool, Field(description="Whether to include ESTABLISHED connections")] = True,
+) -> dict[str, Any]:
     """List all processes listening or established on network ports.
 
-    Args:
-        include_established: Whether to include ESTABLISHED connections
+    ## Return Format
+    `{status: "success" | "error", ...}` with port audit results.
 
-    Returns:
-        Dictionary with port audit results
-    }
+    ## Examples
+    ```python
+    audit_network_ports()
+    ```
     """
     try:
         connections = []
@@ -1461,15 +1479,19 @@ async def audit_network_ports(include_established: bool = True) -> dict[str, Any
         return {"status": "error", "error": str(e)}
 
 
-@mcp.tool()
-async def get_top_resource_processes(count: int = 5) -> dict[str, Any]:
+@mcp.tool(annotations=_READ_ONLY)
+async def get_top_resource_processes(
+    count: Annotated[int, Field(description="Number of processes per category", ge=1)] = 5,
+) -> dict[str, Any]:
     """Find the top processes consuming the most CPU and Memory.
 
-    Args:
-        count: Number of processes to return per category
+    ## Return Format
+    `{status: "success" | "error", ...}` with top processes.
 
-    Returns:
-        Dictionary with top processes
+    ## Examples
+    ```python
+    get_top_resource_processes(10)
+    ```
     """
     try:
         processes = []
@@ -1513,7 +1535,7 @@ async def get_top_resource_processes(count: int = 5) -> dict[str, Any]:
         return {"status": "error", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 async def check_system_health_status() -> dict[str, Any]:
     """Check system uptime and detect pending reboots from registry.
 
@@ -1579,16 +1601,20 @@ async def check_system_health_status() -> dict[str, Any]:
         return {"status": "error", "error": str(e)}
 
 
-@mcp.tool()
-async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, Any]:
+@mcp.tool(annotations=_READ_ONLY)
+async def analyze_top_folder_sizes(
+    path: Annotated[str, Field(description='Root path to analyze, e.g. "C:\\Users"')],
+    max_depth: Annotated[int, Field(description="Maximum recursion depth", ge=1)] = 1,
+) -> dict[str, Any]:
     """Identify the largest subfolders in a given directory using PowerShell.
 
-    Args:
-        path: Root path to analyze (e.g., "C:\\Users")
-        max_depth: Maximum recursion depth for size calculation
+    ## Return Format
+    `{status: "success" | "error", ...}` with the top 10 largest folders.
 
-    Returns:
-        Dictionary with top 10 largest folders
+    ## Examples
+    ```python
+    analyze_top_folder_sizes("C:\\Users", 2)
+    ```
     """
     try:
         if not os.path.exists(path):
@@ -1877,11 +1903,10 @@ def testdisk_version() -> dict[str, Any]:
     }
 
 
-def testdisk_analyse(drive: str) -> dict[str, Any]:
+def testdisk_analyse(
+    drive: Annotated[str, Field(description="Physical drive path, e.g. '\\\\?\\PhysicalDrive0' or 'C:'")],
+) -> dict[str, Any]:
     """Run TestDisk /list on a drive to analyse partition tables (read-only).
-
-    Args:
-        drive: Physical drive path, e.g. '\\\\?\\PhysicalDrive0' or '\\\\.\\C:' or 'C:'.
 
     Returns partition table structure, geometry, and status codes.
     """
@@ -1914,16 +1939,17 @@ def testdisk_analyse(drive: str) -> dict[str, Any]:
         return {"status": "error", "message": f"TestDisk failed: {e}"}
 
 
-def testdisk_launch(drive: str | None = None) -> dict[str, Any]:
+def testdisk_launch(
+    drive: Annotated[
+        str | None,
+        Field(description="Optional physical drive path to pre-select; if omitted, TestDisk lists drives"),
+    ] = None,
+) -> dict[str, Any]:
     """Launch TestDisk TUI in a new console window for interactive partition recovery.
 
     WARNING: TestDisk can WRITE to the partition table. This operation opens the
     interactive TUI - the user is responsible for every action inside it.
     The output log is written to testdisk.log in the current directory.
-
-    Args:
-        drive: Optional physical drive path to pre-select (e.g. '\\\\?\\PhysicalDrive0').
-               If omitted, TestDisk will list available drives.
     """
     td_path = _find_testdisk()
     if not td_path:
@@ -1947,7 +1973,13 @@ def testdisk_launch(drive: str | None = None) -> dict[str, Any]:
         return {"status": "error", "message": f"Failed to launch TestDisk: {e}"}
 
 
-def photorec_recover(drive: str, output_dir: str, file_types: str | None = None) -> dict[str, Any]:
+def photorec_recover(
+    drive: Annotated[str, Field(description="Physical drive to scan, e.g. '\\\\?\\PhysicalDrive0'")],
+    output_dir: Annotated[str, Field(description="Directory on a DIFFERENT drive to write recovered files")],
+    file_types: Annotated[
+        str | None, Field(description="Optional comma-separated extensions (e.g. 'jpg,png,docx'); all if omitted")
+    ] = None,
+) -> dict[str, Any]:
     """Recover deleted files from a drive using PhotoRec CLI (read-only on source).
 
     Scans the drive sector-by-sector for known file signatures and writes
@@ -1955,12 +1987,6 @@ def photorec_recover(drive: str, output_dir: str, file_types: str | None = None)
 
     WARNING: This takes a LONG time (hours for full drives). Output goes to a
     separate drive to avoid overwriting the data being recovered.
-
-    Args:
-        drive: Physical drive to scan, e.g. '\\\\?\\PhysicalDrive0' or '\\\\.\\D:'.
-        output_dir: Directory on a DIFFERENT drive to write recovered files.
-        file_types: Optional comma-separated extensions to target (e.g. 'jpg,png,docx,pdf').
-                    If omitted, all supported types are scanned.
     """
     pr_path = _find_photorec()
     if not pr_path:
@@ -2006,15 +2032,14 @@ def photorec_recover(drive: str, output_dir: str, file_types: str | None = None)
         return {"status": "error", "message": f"PhotoRec failed: {e}"}
 
 
-def photorec_launch(drive: str | None = None, output_dir: str | None = None) -> dict[str, Any]:
+def photorec_launch(
+    drive: Annotated[str | None, Field(description="Optional physical drive to pre-select")] = None,
+    output_dir: Annotated[str | None, Field(description="Optional output directory on a different drive")] = None,
+) -> dict[str, Any]:
     """Launch PhotoRec TUI in a new console window for interactive file recovery.
 
     PhotoRec is read-only on the source drive. All recovered files are written
     to the output directory. The TUI lets you select file types interactively.
-
-    Args:
-        drive: Optional physical drive to pre-select.
-        output_dir: Optional output directory on a different drive.
     """
     pr_path = _find_photorec()
     if not pr_path:
@@ -2058,7 +2083,7 @@ def _stat_dump(path: str) -> dict[str, Any] | None:
         return None
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def list_crash_dumps() -> dict[str, Any]:
     """Inventory kernel crash artefacts and dump configuration.
 
@@ -2160,7 +2185,7 @@ def list_crash_dumps() -> dict[str, Any]:
         return {"status": "error", "operation": "list_crash_dumps", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_bugcheck_history(days_back: int = 7, max_results: int = 50) -> dict[str, Any]:
     """Correlate shutdown/crash events around a GSOD/BSOD.
 
@@ -2439,7 +2464,7 @@ def _parse_minidump(data: bytes, max_drivers: int = 40) -> dict[str, Any]:
     return parsed
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def analyze_minidump(dump_path: str | None = None, max_drivers: int = 40) -> dict[str, Any]:
     """Triage-parse a minidump without WinDbg (pure python, no SDK needed).
 
@@ -2521,7 +2546,7 @@ def _find_cdb() -> str | None:
     return None
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def windbg_analyze(dump_path: str | None = None, timeout_seconds: int = 120) -> dict[str, Any]:
     """Run WinDbg !analyze -v on a dump via cdb.exe (needs Debugging Tools).
 
@@ -3002,7 +3027,7 @@ def _running_process_names() -> set[str]:
         return set()
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def audit_admin_toolbox() -> dict[str, Any]:
     """Inventory admin-relevant toolbox apps: dev, local AI, tcom, office, admin.
 
@@ -3093,7 +3118,7 @@ def _reg_value(root: Any, path: str, name: str) -> Any:
         return None
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_firmware_posture() -> dict[str, Any]:
     """Firmware and virtualization posture: SVM, TPM, Secure Boot, VBS, BIOS.
 
@@ -3164,7 +3189,7 @@ def get_firmware_posture() -> dict[str, Any]:
         return {"status": "error", "operation": "get_firmware_posture", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def audit_scheduled_tasks(max_results: int = 50) -> dict[str, Any]:
     """List scheduled tasks (name, next run, status) via schtasks.
 
@@ -3208,7 +3233,7 @@ def audit_scheduled_tasks(max_results: int = 50) -> dict[str, Any]:
         return {"status": "error", "operation": "audit_scheduled_tasks", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_update_status() -> dict[str, Any]:
     """Windows Update status: last install, pending reboot, uptime.
 
@@ -3261,7 +3286,7 @@ def get_update_status() -> dict[str, Any]:
         return {"status": "error", "operation": "get_update_status", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def audit_local_admins() -> dict[str, Any]:
     """Local users and Administrators group membership.
 
@@ -3302,7 +3327,7 @@ def audit_local_admins() -> dict[str, Any]:
         return {"status": "error", "operation": "audit_local_admins", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def audit_smb_shares() -> dict[str, Any]:
     """SMB shares (name, path, description) and open sessions.
 
@@ -3349,7 +3374,7 @@ def audit_smb_shares() -> dict[str, Any]:
         return {"status": "error", "operation": "audit_smb_shares", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def list_shadow_copies() -> dict[str, Any]:
     """VSS shadow copies (backup/restore points) via WMI.
 
@@ -3385,7 +3410,7 @@ def list_shadow_copies() -> dict[str, Any]:
         return {"status": "error", "operation": "list_shadow_copies", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def audit_drivers(class_filter: str | None = None, max_results: int = 100) -> dict[str, Any]:
     """Signed driver inventory: device, version, date, provider.
 
@@ -3426,7 +3451,7 @@ def audit_drivers(class_filter: str | None = None, max_results: int = 100) -> di
         return {"status": "error", "operation": "audit_drivers", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_reliability_history(days_back: int = 7, max_results: int = 50) -> dict[str, Any]:
     """Reliability Monitor records (failures, updates, installs).
 
@@ -3475,7 +3500,7 @@ def get_reliability_history(days_back: int = 7, max_results: int = 50) -> dict[s
         return {"status": "error", "operation": "get_reliability_history", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def winget_outdated(max_results: int = 30) -> dict[str, Any]:
     """Packages with upgrades available via winget.
 
@@ -3527,7 +3552,7 @@ def winget_outdated(max_results: int = 30) -> dict[str, Any]:
         return {"status": "error", "operation": "winget_outdated", "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def audit_path_dross() -> dict[str, Any]:
     """Machine + user PATH audit: missing dirs, duplicates, file counts.
 

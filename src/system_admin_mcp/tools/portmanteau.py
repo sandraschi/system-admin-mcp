@@ -2,11 +2,19 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastmcp import Context
+from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from system_admin_mcp.app import mcp
+
+# Fleet tool-annotation standard (TOOL_DESIGN_STANDARDS.md S9). The portmanteau
+# fans out to destructive ops (kill/defrag/ACL), so it is marked destructive.
+_DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
+_READ_ONLY = ToolAnnotations(readOnlyHint=True)
+_MUTATING = ToolAnnotations()
 from system_admin_mcp.tools.implementations import (
     analyze_disk_usage_advanced,
     analyze_minidump,
@@ -73,12 +81,12 @@ from system_admin_mcp.tools.services_and_tasks import (
 )
 
 
-@mcp.tool(task=True)
+@mcp.tool(task=True, annotations=_MUTATING)
 async def manage_filesystem_watch(
-    operation: str,
-    path: str | None = None,
-    recursive: bool = True,
-    auto_sample: bool = False,
+    operation: Annotated[str, Field(description="Operation: start, stop, list, get_events")],
+    path: Annotated[str | None, Field(description="Path to monitor (required for start/stop)")] = None,
+    recursive: Annotated[bool, Field(description="Whether to monitor subdirectories")] = True,
+    auto_sample: Annotated[bool, Field(description="(Experimental) Use ctx.sample() to analyze events")] = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Manage background filesystem monitoring.
@@ -88,12 +96,6 @@ async def manage_filesystem_watch(
     - stop: Stop monitoring a directory.
     - list: List all active watches.
     - get_events: Retrieve captured filesystem events.
-
-    Args:
-        operation: start, stop, list, get_events.
-        path: Path to monitor (required for start/stop).
-        recursive: Whether to monitor subdirectories.
-        auto_sample: (Experimental) Use ctx.sample() to analyze events.
 
     ## Return Format
     `{success: bool, message: str, ...}` — `status` is `"success"` (with a
@@ -179,128 +181,133 @@ def get_bridge() -> Any | None:
     return _bridge
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 async def system_admin(
-    operation: Literal[
-        # File Recovery
-        "scan_volume",
-        "recover_file",
-        "validate_recovery",
-        "batch_recover",
-        # Security Management
-        "get_permissions",
-        "set_permissions",
-        "remove_permission",
-        "take_ownership",
-        "audit_permissions",
-        "modify_acl",
-        # Volume Maintenance
-        "check_disk_health",
-        "analyze_disk_usage",
-        "disk_cleanup",
-        "defragment_disk",
-        "optimize_ssd",
-        "get_volume_info",
-        # System Diagnostics
-        "get_gpu_info",
-        "get_gpu_processes",
-        "get_hardware_info",
-        "get_os_info",
-        "get_installed_software",
-        "get_performance_metrics",
-        "get_event_log",
-        "get_recent_event_errors",
-        "health_check",
-        "check_system_health_status",
-        "get_top_resource_processes",
-        "audit_network_ports",
-        "analyze_top_folder_sizes",
-        "get_comprehensive_diagnostics",
-        "forensic_scan",
-        # Crash Postmortem
-        "list_crash_dumps",
-        "get_bugcheck_history",
-        "analyze_minidump",
-        "windbg_analyze",
-        "audit_admin_toolbox",
-        # System audit
-        "get_firmware_posture",
-        "audit_scheduled_tasks",
-        "get_update_status",
-        "audit_local_admins",
-        "audit_smb_shares",
-        "list_shadow_copies",
-        "audit_drivers",
-        "get_reliability_history",
-        "winget_outdated",
-        "audit_path_dross",
-        # Windows Services
-        "list_services",
-        "get_service_stats",
-        "get_service_info",
-        "start_service",
-        "stop_service",
-        "set_service_startup",
-        # Tasks/Processes
-        "list_processes",
-        "analyze_process",
-        "kill_process",
-        # Windows Startup
-        "list_startup_programs",
-        "add_startup_program",
-        "remove_startup_program",
-        # Taskbar Management
-        "find_taskbar_blocking_processes",
-        "kill_taskbar_blocking_processes",
-        "get_taskbar_settings",
-        "set_taskbar_autohide",
+    operation: Annotated[
+        Literal[
+            # File Recovery
+            "scan_volume",
+            "recover_file",
+            "validate_recovery",
+            "batch_recover",
+            # Security Management
+            "get_permissions",
+            "set_permissions",
+            "remove_permission",
+            "take_ownership",
+            "audit_permissions",
+            "modify_acl",
+            # Volume Maintenance
+            "check_disk_health",
+            "analyze_disk_usage",
+            "disk_cleanup",
+            "defragment_disk",
+            "optimize_ssd",
+            "get_volume_info",
+            # System Diagnostics
+            "get_gpu_info",
+            "get_gpu_processes",
+            "get_hardware_info",
+            "get_os_info",
+            "get_installed_software",
+            "get_performance_metrics",
+            "get_event_log",
+            "get_recent_event_errors",
+            "health_check",
+            "check_system_health_status",
+            "get_top_resource_processes",
+            "audit_network_ports",
+            "analyze_top_folder_sizes",
+            "get_comprehensive_diagnostics",
+            "forensic_scan",
+            # Crash Postmortem
+            "list_crash_dumps",
+            "get_bugcheck_history",
+            "analyze_minidump",
+            "windbg_analyze",
+            "audit_admin_toolbox",
+            # System audit
+            "get_firmware_posture",
+            "audit_scheduled_tasks",
+            "get_update_status",
+            "audit_local_admins",
+            "audit_smb_shares",
+            "list_shadow_copies",
+            "audit_drivers",
+            "get_reliability_history",
+            "winget_outdated",
+            "audit_path_dross",
+            # Windows Services
+            "list_services",
+            "get_service_stats",
+            "get_service_info",
+            "start_service",
+            "stop_service",
+            "set_service_startup",
+            # Tasks/Processes
+            "list_processes",
+            "analyze_process",
+            "kill_process",
+            # Windows Startup
+            "list_startup_programs",
+            "add_startup_program",
+            "remove_startup_program",
+            # Taskbar Management
+            "find_taskbar_blocking_processes",
+            "kill_taskbar_blocking_processes",
+            "get_taskbar_settings",
+            "set_taskbar_autohide",
+        ],
+        Field(description="The operation to perform (required)"),
     ],
     # File Recovery parameters
-    drive: str | None = None,
-    file_pattern: str | None = None,
-    mft_entry: int | None = None,
-    source_path: str | None = None,
-    destination_path: str | None = None,
-    verify_integrity: bool = True,
-    max_results: int = 100,
+    drive: Annotated[str | None, Field(description='Drive letter for volume ops, e.g. "C:"')] = None,
+    file_pattern: Annotated[str | None, Field(description='File glob for scanning, e.g. "*.docx"')] = None,
+    mft_entry: Annotated[int | None, Field(description="MFT entry number for file recovery")] = None,
+    source_path: Annotated[str | None, Field(description="Source file path for recovery")] = None,
+    destination_path: Annotated[str | None, Field(description="Destination path for recovered file")] = None,
+    verify_integrity: Annotated[bool, Field(description="Verify file integrity after recovery")] = True,
+    max_results: Annotated[int, Field(description="Maximum results for scanning", ge=1)] = 100,
     # Security parameters
-    path: str | None = None,
-    principal: str | None = None,
-    rights: str | None = None,
-    inheritance: str | None = None,
+    path: Annotated[str | None, Field(description="File/folder path for security operations")] = None,
+    principal: Annotated[str | None, Field(description='User/group for permission ops, e.g. "DOMAIN\\User"')] = None,
+    rights: Annotated[str | None, Field(description="Permission rights: Read, Write, Modify, FullControl")] = None,
+    inheritance: Annotated[str | None, Field(description="Inheritance setting for permissions")] = None,
     # Volume parameters
-    cleanup_targets: list[str] | None = None,
-    dry_run: bool = True,
-    thorough: bool = False,
+    cleanup_targets: Annotated[
+        list[str] | None, Field(description="Cleanup targets: temp_files, recycle_bin, etc.")
+    ] = None,
+    dry_run: Annotated[bool, Field(description="Preview changes without applying")] = True,
+    thorough: Annotated[bool, Field(description="Thorough operation (defrag, etc.)")] = False,
     # Diagnostics parameters
-    log_name: str | None = None,
-    level: str | None = None,
-    hours_back: int = 24,
-    days_back: int = 7,
-    dump_path: str | None = None,
-    timeout_seconds: int = 120,
-    class_filter: str | None = None,
+    log_name: Annotated[str | None, Field(description="Event log name: System, Application, Security")] = None,
+    level: Annotated[str | None, Field(description="Event log level: Error, Warning, Information")] = None,
+    hours_back: Annotated[int, Field(description="Hours to look back in event logs", ge=1)] = 24,
+    days_back: Annotated[int, Field(description="Days to look back (bugcheck/reliability)", ge=1)] = 7,
+    dump_path: Annotated[str | None, Field(description="Path to crash dump for analysis")] = None,
+    timeout_seconds: Annotated[int, Field(description="Timeout for long operations", ge=1)] = 120,
+    class_filter: Annotated[str | None, Field(description="Driver class filter for audit_drivers")] = None,
     # Services parameters
-    service_name: str | None = None,
-    filter_status: str | None = None,
-    filter_name: str | None = None,
-    include_system: bool = True,
-    wait_timeout: int = 30,
-    startup_type: str | None = None,
+    service_name: Annotated[str | None, Field(description="Service name for service operations")] = None,
+    filter_status: Annotated[str | None, Field(description="Filter services/processes by status")] = None,
+    filter_name: Annotated[str | None, Field(description="Filter by name (services/processes)")] = None,
+    include_system: Annotated[bool, Field(description="Include system services in results")] = True,
+    wait_timeout: Annotated[int, Field(description="Timeout for service start/stop", ge=1)] = 30,
+    startup_type: Annotated[str | None, Field(description="Service startup type: Auto, Manual, Disabled")] = None,
     # Process parameters
-    pid: int | None = None,
-    filter_user: str | None = None,
-    sort_by: str = "cpu",
-    page: int = 1,
-    page_size: int = 50,
-    force: bool = False,
+    pid: Annotated[int | None, Field(description="Process ID for process operations")] = None,
+    filter_user: Annotated[str | None, Field(description="Filter processes by username")] = None,
+    sort_by: Annotated[str, Field(description="Sort processes by: cpu, memory, name")] = "cpu",
+    page: Annotated[int, Field(description="Result page number", ge=1)] = 1,
+    page_size: Annotated[int, Field(description="Results per page", ge=1, le=500)] = 50,
+    force: Annotated[bool, Field(description="Force kill processes")] = False,
     # Startup parameters
-    startup_name: str | None = None,
-    startup_command: str | None = None,
-    startup_location: str = "HKCU",
+    startup_name: Annotated[str | None, Field(description="Program name for startup operations")] = None,
+    startup_command: Annotated[str | None, Field(description="Command/path for startup program")] = None,
+    startup_location: Annotated[str, Field(description="Startup scope: HKCU or HKLM")] = "HKCU",
     # Taskbar parameters
-    autohide: bool | None = None,
-    process_names: list[str] | None = None,
+    autohide: Annotated[bool | None, Field(description="Enable/disable taskbar autohide")] = None,
+    process_names: Annotated[list[str] | None, Field(description="Process names for taskbar operations")] = None,
 ) -> dict[str, Any]:
     """Comprehensive system administration portmanteau tool.
 
@@ -381,42 +388,9 @@ async def system_admin(
     - get_taskbar_settings: Get current taskbar settings
     - set_taskbar_autohide: Enable/disable taskbar autohide
 
-    Args:
-        operation: The operation to perform (required)
-        drive: Drive letter (e.g., "C:") for volume operations
-        file_pattern: File pattern for scanning (e.g., "*.docx")
-        mft_entry: MFT entry number for file recovery
-        source_path: Source file path for recovery
-        destination_path: Destination path for recovery
-        verify_integrity: Verify file integrity after recovery
-        max_results: Maximum results for scanning
-        path: File/folder path for security operations
-        principal: User/group for permission operations
-        rights: Permission rights (Read, Write, Modify, FullControl)
-        inheritance: Inheritance setting for permissions
-        cleanup_targets: List of cleanup targets (temp_files, recycle_bin, etc.)
-        dry_run: Preview changes without applying
-        thorough: Perform thorough operation (defrag, etc.)
-        log_name: Event log name (System, Application, Security)
-        level: Event log level (Error, Warning, Information)
-        hours_back: Hours to look back in event logs
-        service_name: Service name for service operations
-        filter_status: Filter services/processes by status
-        filter_name: Filter by name (services/processes)
-        include_system: Include system services in results
-        startup_type: Service startup type (Auto, Manual, Disabled)
-        wait_timeout: Timeout for service start/stop operations
-        pid: Process ID for process operations
-        filter_user: Filter processes by username
-        sort_by: Sort processes by (cpu, memory, name)
-        force: Force kill processes
-        name: Program name for startup operations
-        command: Command/path for startup program
-        scope: Scope for startup (current_user, all_users)
-        enabled: Enable/disable flag for taskbar operations
-
-    Returns:
-        Dictionary with operation-specific results
+    Parameter details live on the signature via Annotated[..., Field(...)];
+    only the params each operation needs are required (all default to None
+    except listed defaults).
 
     ## Return Format
     `{status: "success" | "error", ...}` — every path returns a `status` key.
@@ -739,7 +713,7 @@ async def system_admin(
         }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 async def get_comprehensive_diagnostics() -> dict[str, Any]:
     """Perform a comprehensive system health and resource audit.
 

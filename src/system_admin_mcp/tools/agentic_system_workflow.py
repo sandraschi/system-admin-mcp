@@ -7,20 +7,28 @@ No simulation stubs - all phases execute actual tool calls.
 
 import json
 import logging
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
 from fastmcp import Context
+from pydantic import Field
 
 from system_admin_mcp.app import mcp
 
 logger = logging.getLogger(__name__)
 
+from mcp.types import ToolAnnotations
 
-@mcp.tool()
+# Fleet tool-annotation standard (TOOL_DESIGN_STANDARDS.md S9). Orchestrators can
+# fan out to mutating ops, so they are explicitly NOT read-only.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True)
+_MUTATING = ToolAnnotations()
+
+
+@mcp.tool(annotations=_MUTATING)
 async def agentic_system_workflow(
-    workflow_prompt: str,
-    available_tools: list[str],
-    max_iterations: int = 5,
+    workflow_prompt: Annotated[str, Field(description="Plain-language description of the workflow to execute")],
+    available_tools: Annotated[list[str], Field(description="system_admin operations to make available")],
+    max_iterations: Annotated[int, Field(description="Max sampling loops", ge=1, le=20)] = 5,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """
@@ -29,24 +37,17 @@ async def agentic_system_workflow(
     The server borrows the client LLM via ctx.sample() to autonomously orchestrate
     multi-step system operations without client round-trips.
 
-    Args:
-        workflow_prompt: Plain-language description of the workflow to execute.
-        available_tools: List of system_admin operations to make available.
-        max_iterations: Max sampling loops (default 5).
-        ctx: FastMCP Context (required for sampling).
+    ## Return Format
+    `{success: bool, ...}` with findings, recommendations, and actions taken —
+    or `success: False` with an `error` string when context is missing.
 
-    Returns:
-        Structured result with findings, recommendations, and actions taken.
-
-    Examples:
-        agentic_system_workflow(
-            workflow_prompt="Diagnose why the system is running slowly",
-            available_tools=["get_performance_metrics", "list_processes", "get_recent_event_errors"]
-        )
-        agentic_system_workflow(
-            workflow_prompt="Audit security permissions on D:/Shared",
-            available_tools=["audit_permissions", "get_permissions", "audit_network_ports"]
-        )
+    ## Examples
+    ```python
+    agentic_system_workflow(
+        workflow_prompt="Diagnose why the system is running slowly",
+        available_tools=["get_performance_metrics", "list_processes", "get_recent_event_errors"],
+    )
+    ```
     """
     if not ctx:
         return {"success": False, "error": "Context required for agentic workflow (sampling)."}
@@ -138,9 +139,9 @@ async def agentic_system_workflow(
     }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 async def autonomous_system_troubleshooter(
-    problem_description: str,
+    problem_description: Annotated[str, Field(description="Plain-language description of the problem")],
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """
@@ -150,9 +151,13 @@ async def autonomous_system_troubleshooter(
     Phase 2: Samples for root cause analysis.
     Phase 3: Returns prioritised remediation steps.
 
-    Args:
-        problem_description: Plain-language description of the problem.
-        ctx: FastMCP Context (required).
+    ## Return Format
+    `{success: True, problem: str, diagnostics_collected: [...], root_cause_analysis: str}`.
+
+    ## Examples
+    ```python
+    autonomous_system_troubleshooter("machine is slow after login")
+    ```
     """
     if not ctx:
         return {"success": False, "error": "Context required."}

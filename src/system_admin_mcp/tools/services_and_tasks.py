@@ -8,15 +8,23 @@ import time
 import winreg
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import wait as _futures_wait
-from typing import Any
+from typing import Annotated, Any
 
 import psutil
 import win32service
 import win32serviceutil
+from pydantic import Field
 
 from system_admin_mcp.app import mcp
 
 logger = logging.getLogger(__name__)
+
+from mcp.types import ToolAnnotations
+
+# Fleet tool-annotation standard (TOOL_DESIGN_STANDARDS.md S9).
+_READ_ONLY = ToolAnnotations(readOnlyHint=True)
+_MUTATING = ToolAnnotations()
+_DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
 
 # Per-process probing runs in a per-call pool so wedged syscalls
 # (observed 2026-09-29: psutil status()/memory_info() hang forever on
@@ -73,23 +81,15 @@ def _get_startup_type_name(startup_type: int) -> str:
 
 
 def list_services(
-    filter_status: str | None = None,
-    filter_name: str | None = None,
-    include_system: bool = True,
-    page: int = 1,
-    page_size: int = 50,
+    filter_status: Annotated[str | None, Field(description='Filter by status ("running", "stopped", "all")')] = None,
+    filter_name: Annotated[str | None, Field(description="Filter by service name (partial match)")] = None,
+    include_system: Annotated[bool, Field(description="Include system services")] = True,
+    page: Annotated[int, Field(description="Page number (1-based)", ge=1)] = 1,
+    page_size: Annotated[int, Field(description="Items per page", ge=1)] = 50,
 ) -> dict[str, Any]:
     """List Windows services with filtering and pagination.
 
-    Args:
-        filter_status: Filter by status ("running", "stopped", "all")
-        filter_name: Filter by service name (partial match)
-        include_system: Include system services
-        page: Page number (1-based)
-        page_size: Items per page
-
-    Returns:
-        Dictionary with services list
+    Returns a dictionary with the services list.
     """
     try:
         if not is_admin():
@@ -237,15 +237,13 @@ def get_service_stats() -> dict[str, Any]:
         return {"status": "error", "operation": "get_service_stats", "error": str(e)}
 
 
-def start_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
+def start_service(
+    service_name: Annotated[str, Field(description="Name of the service to start")],
+    wait_timeout: Annotated[int, Field(description="Max seconds to wait for start", ge=1)] = 30,
+) -> dict[str, Any]:
     """Start a Windows service.
 
-    Args:
-        service_name: Name of the service to start
-        wait_timeout: Maximum time to wait for service to start (seconds)
-
-    Returns:
-        Dictionary with operation result
+    Returns a dictionary with the operation result.
     """
     try:
         if not is_admin():
@@ -294,15 +292,13 @@ def start_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
         return {"status": "error", "operation": "start_service", "error": str(e)}
 
 
-def stop_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
+def stop_service(
+    service_name: Annotated[str, Field(description="Name of the service to stop")],
+    wait_timeout: Annotated[int, Field(description="Max seconds to wait for stop", ge=1)] = 30,
+) -> dict[str, Any]:
     """Stop a Windows service.
 
-    Args:
-        service_name: Name of the service to stop
-        wait_timeout: Maximum time to wait for service to stop (seconds)
-
-    Returns:
-        Dictionary with operation result
+    Returns a dictionary with the operation result.
     """
     try:
         if not is_admin():
@@ -344,14 +340,10 @@ def stop_service(service_name: str, wait_timeout: int = 30) -> dict[str, Any]:
         return {"status": "error", "operation": "stop_service", "error": str(e)}
 
 
-def get_service_info(service_name: str) -> dict[str, Any]:
+def get_service_info(service_name: Annotated[str, Field(description="Name of the service to query")]) -> dict[str, Any]:
     """Get detailed information about a Windows service.
 
-    Args:
-        service_name: Name of the service to query
-
-    Returns:
-        Dictionary with service details
+    Returns a dictionary with service details.
     """
     try:
         if not is_admin():
@@ -393,15 +385,13 @@ def get_service_info(service_name: str) -> dict[str, Any]:
         return {"status": "error", "operation": "get_service_info", "error": str(e)}
 
 
-def set_service_startup(service_name: str, startup_type: str) -> dict[str, Any]:
+def set_service_startup(
+    service_name: Annotated[str, Field(description="Name of the service")],
+    startup_type: Annotated[str, Field(description='Startup type ("automatic", "manual", "disabled)')],
+) -> dict[str, Any]:
     """Set service startup type.
 
-    Args:
-        service_name: Name of the service
-        startup_type: Startup type ("automatic", "manual", "disabled")
-
-    Returns:
-        Dictionary with operation result
+    Returns a dictionary with the operation result.
     """
     try:
         if not is_admin():
@@ -525,23 +515,15 @@ def _psutil_heavy_ok(pool: ThreadPoolExecutor, pids: list[int]) -> bool:
 
 
 def list_processes(
-    filter_name: str | None = None,
-    filter_user: str | None = None,
-    sort_by: str = "cpu",
-    page: int = 1,
-    page_size: int = 50,
+    filter_name: Annotated[str | None, Field(description="Filter by process name (partial match)")] = None,
+    filter_user: Annotated[str | None, Field(description="Filter by username")] = None,
+    sort_by: Annotated[str, Field(description='Sort by "cpu", "memory", "name", or "pid"')] = "cpu",
+    page: Annotated[int, Field(description="Page number (1-based)", ge=1)] = 1,
+    page_size: Annotated[int, Field(description="Items per page", ge=1)] = 50,
 ) -> dict[str, Any]:
     """List running processes with filtering, sorting, and pagination.
 
-    Args:
-        filter_name: Filter by process name (partial match)
-        filter_user: Filter by username
-        sort_by: Sort by "cpu", "memory", "name", or "pid"
-        page: Page number (1-based)
-        page_size: Items per page
-
-    Returns:
-        Dictionary with processes list, count, page, page_size
+    Returns a dictionary with the processes list, count, page, and page_size.
     """
     try:
         processes = []
@@ -662,12 +644,8 @@ def list_processes(
         return {"status": "error", "operation": "list_processes", "error": str(e)}
 
 
-def analyze_process(pid: int) -> dict[str, Any]:
-    """Analyze a specific process in detail including CPU, Memory, and IO metrics.
-
-    Args:
-        pid: Process ID
-    """
+def analyze_process(pid: Annotated[int, Field(description="Process ID")]) -> dict[str, Any]:
+    """Analyze a specific process in detail including CPU, Memory, and IO metrics."""
     try:
         process = psutil.Process(pid)
 
@@ -721,15 +699,13 @@ def analyze_process(pid: int) -> dict[str, Any]:
         return {"status": "error", "operation": "analyze_process", "error": str(e)}
 
 
-def kill_process(pid: int, force: bool = False) -> dict[str, Any]:
+def kill_process(
+    pid: Annotated[int, Field(description="Process ID")],
+    force: Annotated[bool, Field(description="If True, force kill (SIGKILL equivalent)")] = False,
+) -> dict[str, Any]:
     """Kill a process.
 
-    Args:
-        pid: Process ID
-        force: If True, force kill (SIGKILL equivalent)
-
-    Returns:
-        Dictionary with operation result
+    Returns a dictionary with the operation result.
     """
     try:
         process = psutil.Process(pid)
@@ -778,7 +754,7 @@ def kill_process(pid: int, force: bool = False) -> dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def list_startup_programs() -> dict[str, Any]:
     """List programs that start with Windows.
 
@@ -851,17 +827,21 @@ def list_startup_programs() -> dict[str, Any]:
         return {"status": "error", "operation": "list_startup_programs", "error": str(e)}
 
 
-@mcp.tool()
-def add_startup_program(name: str, command: str, location: str = "HKCU") -> dict[str, Any]:
+@mcp.tool(annotations=_DESTRUCTIVE)
+def add_startup_program(
+    name: Annotated[str, Field(description="Program name")],
+    command: Annotated[str, Field(description="Command to execute")],
+    location: Annotated[str, Field(description='"HKCU" (current user) or "HKLM" (all users, requires admin)')] = "HKCU",
+) -> dict[str, Any]:
     """Add a program to Windows startup.
 
-    Args:
-        name: Program name
-        command: Command to execute
-        location: "HKCU" (current user) or "HKLM" (all users, requires admin)
+    ## Return Format
+    `{status: "success" | "error", ...}` with the operation result.
 
-    Returns:
-        Dictionary with operation result
+    ## Examples
+    ```python
+    add_startup_program("MyApp", "C:\\Apps\\app.exe")
+    ```
     """
     try:
         if location == "HKLM" and not is_admin():
@@ -893,16 +873,20 @@ def add_startup_program(name: str, command: str, location: str = "HKCU") -> dict
         return {"status": "error", "operation": "add_startup_program", "error": str(e)}
 
 
-@mcp.tool()
-def remove_startup_program(name: str, location: str = "HKCU") -> dict[str, Any]:
+@mcp.tool(annotations=_DESTRUCTIVE)
+def remove_startup_program(
+    name: Annotated[str, Field(description="Program name")],
+    location: Annotated[str, Field(description='"HKCU" (current user) or "HKLM" (all users, requires admin)')] = "HKCU",
+) -> dict[str, Any]:
     """Remove a program from Windows startup.
 
-    Args:
-        name: Program name
-        location: "HKCU" (current user) or "HKLM" (all users, requires admin)
+    ## Return Format
+    `{status: "success" | "error", ...}` with the operation result.
 
-    Returns:
-        Dictionary with operation result
+    ## Examples
+    ```python
+    remove_startup_program("MyApp")
+    ```
     """
     try:
         if location == "HKLM" and not is_admin():
@@ -944,7 +928,7 @@ def remove_startup_program(name: str, location: str = "HKCU") -> dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY)
 def get_taskbar_settings() -> dict[str, Any]:
     """Get current taskbar settings.
 
@@ -981,15 +965,19 @@ def get_taskbar_settings() -> dict[str, Any]:
         return {"status": "error", "operation": "get_taskbar_settings", "error": str(e)}
 
 
-@mcp.tool()
-def set_taskbar_autohide(enabled: bool) -> dict[str, Any]:
+@mcp.tool(annotations=_MUTATING)
+def set_taskbar_autohide(
+    enabled: Annotated[bool, Field(description="True to enable autohide, False to disable")],
+) -> dict[str, Any]:
     """Set taskbar autohide setting.
 
-    Args:
-        enabled: True to enable autohide, False to disable
+    ## Return Format
+    `{status: "success" | "error", ...}` with the operation result.
 
-    Returns:
-        Dictionary with operation result
+    ## Examples
+    ```python
+    set_taskbar_autohide(True)
+    ```
     """
     try:
         # Use PowerShell to set taskbar autohide
@@ -1119,15 +1107,15 @@ def find_taskbar_blocking_processes() -> dict[str, Any]:
         }
 
 
-def kill_taskbar_blocking_processes(process_names: list[str] | None = None, force: bool = False) -> dict[str, Any]:
+def kill_taskbar_blocking_processes(
+    process_names: Annotated[
+        list[str] | None, Field(description="Process names to kill (None kills common blockers)")
+    ] = None,
+    force: Annotated[bool, Field(description="Force kill processes")] = False,
+) -> dict[str, Any]:
     """Kill processes that prevent taskbar autohide.
 
-    Args:
-        process_names: List of process names to kill (if None, kills common blockers)
-        force: Force kill processes
-
-    Returns:
-        Dictionary with operation result
+    Returns a dictionary with the operation result.
     """
     try:
         if process_names is None:
