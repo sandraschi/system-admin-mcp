@@ -13,8 +13,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import API_BASE from "@/lib/api";
 
+interface ToolParam {
+  type?: string;
+  description?: string;
+}
+
+interface ToolInfo {
+  name: string;
+  description?: string;
+  parameters?: {
+    properties?: Record<string, ToolParam>;
+  };
+}
+
 export function Tools() {
-  const [tools, setTools] = useState<any[]>([]);
+  const [tools, setTools] = useState<ToolInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Record<string, unknown>>({});
@@ -131,7 +144,7 @@ export function Tools() {
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {Object.entries(tool.parameters.properties).map(
-                        ([param, details]: [string, any]) => (
+                        ([param, details]: [string, ToolParam]) => (
                           <div key={param} className="space-y-1.5">
                             <Label className="text-xs text-slate-300">
                               {param}

@@ -18,8 +18,27 @@ import {
 } from "@/components/ui/card";
 import API_BASE from "@/lib/api";
 
+interface StatusMemory {
+  percent?: number;
+  used?: number;
+  total?: number;
+}
+
+interface StatusSystem {
+  cpu_usage_percent?: number;
+  cpu_count?: number;
+  memory?: StatusMemory;
+  disk?: StatusMemory;
+}
+
+interface StatusData {
+  status?: string;
+  version?: string;
+  system?: StatusSystem;
+}
+
 export function Status() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<StatusData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchStatus = useCallback(async () => {
