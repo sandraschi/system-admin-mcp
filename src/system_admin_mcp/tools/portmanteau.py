@@ -94,6 +94,18 @@ async def manage_filesystem_watch(
         path: Path to monitor (required for start/stop).
         recursive: Whether to monitor subdirectories.
         auto_sample: (Experimental) Use ctx.sample() to analyze events.
+
+    ## Return Format
+    `{success: bool, message: str, ...}` — `status` is `"success"` (with a
+    human-readable `message`) or `"error"` (with an `error` string).
+    `list` returns `active_watches`; `get_events` returns `count` + `events`.
+
+    ## Examples
+    ```python
+    manage_filesystem_watch(operation="start", path="C:\\Data")
+    manage_filesystem_watch(operation="get_events", path="C:\\Data")
+    manage_filesystem_watch(operation="stop", path="C:\\Data")
+    ```
     """
     try:
         if operation == "start":
@@ -406,7 +418,12 @@ async def system_admin(
     Returns:
         Dictionary with operation-specific results
 
-    Examples:
+    ## Return Format
+    `{status: "success" | "error", ...}` — every path returns a `status` key.
+    Mutating ops return a human-readable `message`; destructive ops are
+    dry-run-first (`dry_run=True` previews, `dry_run=False` applies).
+
+    ## Examples:
         # Scan for deleted files
         system_admin("scan_volume", drive="C:", file_pattern="*.docx", max_results=50)
 
@@ -731,6 +748,15 @@ async def get_comprehensive_diagnostics() -> dict[str, Any]:
     - Top resource consumers (CPU/Memory)
     - Recent system event errors
     - Critical volume usage
+
+    ## Return Format
+    `{status: "success" | "error", timestamp: str, health: dict,
+    top_processes: dict, recent_errors: dict, volume_usage: dict}`.
+
+    ## Examples
+    ```python
+    get_comprehensive_diagnostics()
+    ```
     """
     try:
         health = await check_system_health_status()

@@ -7,7 +7,7 @@
   "type": "mcp_server",
   "status": "beta",
   "framework": "FastMCP 3.4.4",
-  "tools": 44,
+  "tools": 63,
   "transport": ["stdio", "streamable-http"],
   "keywords": [
     "windows",

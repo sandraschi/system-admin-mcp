@@ -1,4 +1,30 @@
 
+## [Unreleased] — 2026-10-07 (assfix)
+
+### Fixed
+- **CI valid again**: Pyright step de-indented (was invalid YAML — type gate never ran); `actionlint` clean.
+- **Ruff S110/S112/T20 enforced**: dropped `S110`/`S112` from ignore, added `T20`; 30 silent
+  `except: pass/continue` now `logger.debug(..., exc_info=True)`; `__main__`/CLI prints covered by
+  per-file-ignores (`user_bridge/bridge.py`, `elevated_service/service.py`).
+- **Pyright 1 -> 0 errors**: `None` guard on minidump `csd` string (`implementations.py`).
+- **Justfile**: all recipe bodies `;`-joined (lone `Set-Location` lines never applied); fixed broken
+  `setup` recipe (mixed indent — `just --list` failed); `e2e`/`e2e-install` use joined `Set-Location`.
+- **Webapp**: added `@tauri-apps/api ^2.2.0` (required with `native/`); `tsc` + `biome` green.
+- **MCPB**: `scripts/mcpb-pack.ps1` shim → canonical fleet pack script (`just mcpb-pack` works again).
+- **Tool docstrings**: `## Return Format` + `## Examples` on all 3 portmanteau wrappers.
+- **Docs**: new `docs/CONFIGURATION.md`, `DEVELOPMENT.md`, `TOOLS.md`, `TROUBLESHOOTING.md`,
+  `docs/ONBOARDING.md`; `glama.json` tools count 44 -> 63; fleet pre-commit template
+  (`.pre-commit-config.yaml` + hook installed) and `.gitattributes` (LF) vendored.
+- **Fleet launcher**: `mcp-central-docs/starts/system-admin-mcp-start.bat` created (README row existed).
+
+### Deferred (open, with reasons)
+- Coverage gate red (9.5% vs `--cov-fail-under=20`): needs a test-writing pass, not a config tweak.
+- `Args:` -> `Annotated+Field` docstring migration: signature-level refactor, see `docs/TOOL_DOCSTRING_MIGRATION.md`.
+- Tool `annotations=` (READ_ONLY/MUTATING): per-tool judgment call, follow-up run.
+- npm -> bun migration: repo is consistently npm+package-lock; switch risks lock churn.
+- Zustand LLM store, fleet `/api/fleet/apps` discovery, Tauri `backend-status` listen, GPU prompt,
+  page error/empty states: webapp follow-up batch.
+
 ## [Unreleased] — 2026-08-07 (assfix re-run)
 
 ### Fixed
@@ -125,4 +151,3 @@ When making changes, add them under the appropriate section:
 - **Removed** for now removed features
 - **Fixed** for any bug fixes
 - **Security** for vulnerability fixes
-
