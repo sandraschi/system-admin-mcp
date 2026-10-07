@@ -52,8 +52,13 @@ line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "S", "UP", "RUF"]
-ignore = ["S101", "B008", "S603", "S607", "S106", "S110", "S112", "S101", "B008", "S603", "S607", "S106", "S110", "S112", "RUF012", "S324", "E402", "E501"]
+select = ["E", "F", "W", "I", "B", "S", "UP", "RUF", "T20"]
+ignore = ["S101", "B008", "S603", "S607", "S106", "RUF012", "S324", "E402", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# CLI/demo entry points: stderr + __main__ prints are the interface, not server logging.
+"src/system_admin_mcp/user_bridge/bridge.py" = ["T201"]
+"src/system_admin_mcp/elevated_service/service.py" = ["T201"]
 
 [tool.ruff.format]
 quote-style = "double"

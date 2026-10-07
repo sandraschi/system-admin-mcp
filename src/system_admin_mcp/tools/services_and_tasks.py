@@ -6,6 +6,8 @@ import os
 import subprocess
 import time
 import winreg
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait as _futures_wait
 from typing import Any
 
 import psutil
@@ -15,6 +17,20 @@ import win32serviceutil
 from system_admin_mcp.app import mcp
 
 logger = logging.getLogger(__name__)
+
+# Per-process probing runs in a per-call pool so wedged syscalls
+# (observed 2026-09-29: psutil status()/memory_info() hang forever on
+# transient pids, once froze the whole single-worker event loop via
+# /api/processes) cost a bounded wait, not the server. A shared pool
+# would exhaust its threads on stuck probes across requests; a per-call
+# pool is always fresh. Hung pids are skipped for _HUNG_PID_TTL_S.
+_PROC_POOL_WORKERS = 32
+_PROC_TOTAL_BUDGET_S = 15.0
+_CANARY_TIMEOUT_S = 3.0
+_CANARY_SAMPLES = 5
+_CANARY_MIN_OK = 4
+_HUNG_PID_TTL_S = 600.0
+_hung_pids: dict[int, float] = {}
 
 
 def is_admin() -> bool:
@@ -199,6 +215,7 @@ def get_service_stats() -> dict[str, Any]:
                     elif startup_type == win32service.SERVICE_DISABLED:
                         disabled += 1
                 except Exception:
+                    logger.debug("skipping process/service entry after query failure", exc_info=True)
                     continue
 
         finally:
@@ -438,6 +455,75 @@ def set_service_startup(service_name: str, startup_type: str) -> dict[str, Any]:
 # ============================================================================
 
 
+def _probe_process_safe(pid: int) -> dict[str, Any] | None:
+    """Safe-tier probe: pid/name/username only.
+
+    Measured 2026-09-29 on a box where 768/1041 pids wedge psutil's heavy
+    per-process syscalls (status/memory_info/cpu_times/create_time): the
+    name/username family completes for ALL pids. Never add a heavy call
+    here without re-measuring first.
+    """
+    try:
+        proc = psutil.Process(pid)
+        return {
+            "pid": pid,
+            "name": proc.name(),
+            "username": proc.username(),
+        }
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return None
+
+
+def _probe_process_heavy(pid: int) -> dict[str, Any] | None:
+    """Heavy-tier probe: status/memory/cpu/create_time. May wedge per pid."""
+    try:
+        proc = psutil.Process(pid)
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return None
+    try:
+        # oneshot batches the per-process syscalls into one shot:
+        # fewer kernel round-trips per proc, smaller hang surface.
+        with proc.oneshot():
+            return {
+                "cpu_percent": proc.cpu_percent(interval=0),
+                "memory_info": proc.memory_info()._asdict(),
+                "status": proc.status(),
+                "create_time": proc.create_time(),
+            }
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return None
+
+
+def _psutil_heavy_ok(pool: ThreadPoolExecutor, pids: list[int]) -> bool:
+    """Canary: heavy-probe a small pid sample through the heavy syscall family.
+
+    A single self-probe is not representative — measured 2026-09-29 with
+    self passing while 600+ other pids wedged. Sample several pids in
+    parallel; proceed only when nearly all succeed. Costs <= _CANARY_TIMEOUT_S.
+    """
+    if not pids:
+        return True
+    step = max(1, len(pids) // _CANARY_SAMPLES)
+    sample = pids[::step][:_CANARY_SAMPLES]
+    futures = {pool.submit(_probe_process_heavy, pid): pid for pid in sample}
+    try:
+        done, not_done = _futures_wait(futures.keys(), timeout=_CANARY_TIMEOUT_S)
+        ok = 0
+        for future in done:
+            try:
+                if future.result(timeout=0) is not None:
+                    ok += 1
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                ok += 1  # exited/masked pid: query path itself works
+            except Exception:
+                logger.debug("process query future failed; excluding from count", exc_info=True)
+        for future in not_done:
+            future.cancel()
+        return ok >= min(_CANARY_MIN_OK, len(sample))
+    except Exception:
+        return False
+
+
 def list_processes(
     filter_name: str | None = None,
     filter_user: str | None = None,
@@ -459,26 +545,92 @@ def list_processes(
     """
     try:
         processes = []
+        degraded = False
+        degraded_reason = ""
+        now = time.monotonic()
+        # Drop expired hang-skips so a recovered pid rejoins automatically.
+        for pid in [p for p, ts in _hung_pids.items() if now - ts > _HUNG_PID_TTL_S]:
+            del _hung_pids[pid]
 
-        for proc in psutil.process_iter(["pid", "name", "username", "cpu_percent", "memory_percent"]):
-            try:
-                proc_info = proc.info
-                proc_info["cpu_percent"] = proc.cpu_percent(interval=0)
-                proc_info["memory_info"] = proc.memory_info()._asdict()
-                proc_info["status"] = proc.status()
-                proc_info["create_time"] = proc.create_time()
+        # pids() is one syscall with no per-process queries — unlike
+        # process_iter(attrs) + proc.info, it cannot hang on a wedged proc.
+        pids = [pid for pid in psutil.pids() if pid not in _hung_pids]
 
+        # Fresh pool per call: a shared pool would exhaust its threads on
+        # stuck probes across requests. Never `with` it — context exit waits
+        # for stuck threads forever; shutdown(wait=False) instead.
+        pool = ThreadPoolExecutor(max_workers=_PROC_POOL_WORKERS, thread_name_prefix="proc-probe")
+        try:
+            # Tier 1 (safe): pid/name/username complete even when heavy
+            # per-process syscalls wedge box-wide.
+            safe_futures = {pool.submit(_probe_process_safe, pid): pid for pid in pids}
+            safe_done, safe_not_done = _futures_wait(safe_futures.keys(), timeout=_PROC_TOTAL_BUDGET_S)
+            for future in safe_not_done:
+                pid = safe_futures[future]
+                future.cancel()
+                _hung_pids[pid] = time.monotonic()
+            by_pid: dict[int, dict[str, Any]] = {}
+            for future in safe_done:
+                try:
+                    info = future.result(timeout=0)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+                except Exception:
+                    logger.debug("skipping process/service entry after query failure", exc_info=True)
+                    continue
+                if info is not None:
+                    by_pid[info["pid"]] = info
+
+            # Tier 2 (heavy): gated by a sampled canary. When the environment is
+            # wedging heavy queries, skip the pass entirely (degraded) rather
+            # than burning the full budget on hundreds of stuck probes.
+            if _psutil_heavy_ok(pool, pids):
+                heavy_skipped = 0
+                heavy_futures = {pool.submit(_probe_process_heavy, pid): pid for pid in by_pid}
+                heavy_done, heavy_not_done = _futures_wait(heavy_futures.keys(), timeout=_PROC_TOTAL_BUDGET_S)
+                for future in heavy_done:
+                    pid = heavy_futures[future]
+                    try:
+                        heavy = future.result(timeout=0)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        by_pid.pop(pid, None)
+                        continue
+                    except Exception:
+                        logger.debug("heavy process query failed for pid %s; dropping entry", pid, exc_info=True)
+                        by_pid.pop(pid, None)
+                        continue
+                    if heavy is None:
+                        by_pid.pop(pid, None)
+                    else:
+                        by_pid[pid].update(heavy)
+                for future in heavy_not_done:
+                    pid = heavy_futures[future]
+                    future.cancel()
+                    heavy_skipped += 1
+                    _hung_pids[pid] = time.monotonic()
+                    by_pid.pop(pid, None)
+                if heavy_skipped:
+                    degraded = True
+                    degraded_reason = (
+                        f"{heavy_skipped} pids unqueryable for status/memory on this host; "
+                        "returning pid/name/username for the rest"
+                    )
+                    logger.warning("list_processes: %s", degraded_reason)
+            else:
+                degraded = True
+                degraded_reason = (
+                    "per-process status/memory queries are wedged on this host; returning pid/name/username only"
+                )
+                logger.warning("list_processes: %s", degraded_reason)
+
+            for proc_info in by_pid.values():
                 if filter_name and filter_name.lower() not in proc_info["name"].lower():
                     continue
-
                 if filter_user and proc_info.get("username") != filter_user:
                     continue
-
                 processes.append(proc_info)
-
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
         if sort_by == "cpu":
             processes.sort(key=lambda x: x.get("cpu_percent", 0), reverse=True)
         elif sort_by == "memory":
@@ -501,6 +653,8 @@ def list_processes(
             "total": total,
             "page": page,
             "page_size": page_size,
+            "degraded": degraded,
+            "degraded_reason": degraded_reason,
         }
 
     except Exception as e:
@@ -664,6 +818,7 @@ def list_startup_programs() -> dict[str, Any]:
                 finally:
                     winreg.CloseKey(key)
             except Exception:
+                logger.debug("skipping registry/service entry after query failure", exc_info=True)
                 continue
 
         # Also check Startup folder
@@ -944,6 +1099,7 @@ def find_taskbar_blocking_processes() -> dict[str, Any]:
                     continue
 
             except Exception:
+                logger.debug("skipping registry/service entry after query failure", exc_info=True)
                 continue
 
         return {

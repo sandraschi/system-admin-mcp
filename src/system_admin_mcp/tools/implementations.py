@@ -68,7 +68,7 @@ def _wmi_connect() -> Any:
     try:
         pythoncom.CoInitialize()
     except Exception:
-        pass
+        logger.debug("COM already initialized on this thread; continuing", exc_info=True)
     return wmi_module.WMI()
 
 
@@ -626,6 +626,7 @@ def check_disk_health(drive: str) -> dict[str, Any]:
                 # Note: Full SMART data requires admin and may not be available on all systems
                 break
             except Exception:
+                logger.debug("skipping item after probe failure", exc_info=True)
                 continue
 
         return health_data
@@ -679,7 +680,7 @@ def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
                 if not isinstance(top_dirs, list):
                     top_dirs = [top_dirs]
             except Exception:
-                pass
+                logger.debug("optional enrichment probe failed; continuing with partial data", exc_info=True)
 
         return {
             "status": "success",
@@ -912,7 +913,7 @@ def get_hardware_info() -> dict[str, Any]:
                 hw_info["cpu"]["name"] = cpu.Name.strip() if hasattr(cpu, "Name") else None
                 hw_info["cpu"]["manufacturer"] = cpu.Manufacturer if hasattr(cpu, "Manufacturer") else None
             except Exception:
-                pass
+                logger.debug("optional enrichment probe failed; continuing with partial data", exc_info=True)
 
         # Memory Info
         mem = psutil.virtual_memory()
@@ -946,6 +947,7 @@ def get_hardware_info() -> dict[str, Any]:
                     }
                 )
             except Exception:
+                logger.debug("skipping item after probe failure", exc_info=True)
                 continue
 
         # Network Info
@@ -973,7 +975,7 @@ def get_hardware_info() -> dict[str, Any]:
                         }
                     )
             except Exception:
-                pass
+                logger.debug("optional enrichment probe failed; continuing with partial data", exc_info=True)
 
         return hw_info
 
@@ -1014,7 +1016,7 @@ def get_os_info() -> dict[str, Any]:
                         int(os_wmi.TotalVisibleMemorySize) * 1024 if hasattr(os_wmi, "TotalVisibleMemorySize") else None
                     )
                 except Exception:
-                    pass
+                    logger.debug("best-effort enrichment failed; using fallback value", exc_info=True)
 
         # Boot time
         os_info["boot_time"] = datetime.fromtimestamp(psutil.boot_time()).isoformat()
@@ -1058,7 +1060,7 @@ def get_installed_software() -> dict[str, Any]:
                 if not isinstance(software_list, list):
                     software_list = [software_list]
             except Exception:
-                pass
+                logger.debug("optional enrichment probe failed; continuing with partial data", exc_info=True)
 
         return {
             "status": "success",
@@ -1257,6 +1259,7 @@ def health_check() -> dict[str, Any]:
                     "free_gb": usage.free / (1024**3),
                 }
             except Exception:
+                logger.debug("skipping item after probe failure", exc_info=True)
                 continue
 
         # Check memory
@@ -1659,7 +1662,7 @@ async def analyze_top_folder_sizes(path: str, max_depth: int = 1) -> dict[str, A
             try:
                 process.kill()
             except Exception:
-                pass
+                logger.debug("optional enrichment probe failed; continuing with partial data", exc_info=True)
             return {"status": "error", "error": f"Folder analysis timed out after 120s: {path}"}
     except Exception as e:
         logger.exception(f"Error during folder analysis of {path}")
@@ -1778,7 +1781,7 @@ def get_gpu_processes() -> dict[str, Any]:
                         )
                         name = proc_name
                 except Exception:
-                    pass
+                    logger.debug("best-effort enrichment failed; using fallback value", exc_info=True)
                 mem = "N/A"
             processes.append({"pid": pid, "name": os.path.basename(name), "vram": mem})
 
@@ -2190,6 +2193,7 @@ def get_bugcheck_history(days_back: int = 7, max_results: int = 50) -> dict[str,
             try:
                 hand = win32evtlog.OpenEventLog(None, log_name)
             except Exception:
+                logger.debug("skipping item after probe failure", exc_info=True)
                 continue
             try:
                 while len(collected) < max_results:
@@ -2226,7 +2230,7 @@ def get_bugcheck_history(days_back: int = 7, max_results: int = 50) -> dict[str,
                 try:
                     win32evtlog.CloseEventLog(hand)
                 except Exception:
-                    pass
+                    logger.debug("best-effort enrichment failed; using fallback value", exc_info=True)
 
         collected.sort(key=lambda e: e["time"])
         summary: dict[str, int] = {}
@@ -2391,9 +2395,11 @@ def _parse_minidump(data: bytes, max_drivers: int = 40) -> dict[str, Any]:
             }
             (csd_rva,) = struct.unpack_from("<I", data, rva + 28)
             if csd_rva:
-                parsed["system"]["csd"] = _read_minidump_string(data, csd_rva)
+                csd = _read_minidump_string(data, csd_rva)
+                if csd is not None:
+                    parsed["system"]["csd"] = csd
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
 
     if 15 in streams:
         size, rva = streams[15]
@@ -2402,7 +2408,7 @@ def _parse_minidump(data: bytes, max_drivers: int = 40) -> dict[str, Any]:
             if flags1 & 0x1:
                 parsed["process_id"] = pid
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
 
     if 6 in streams:
         size, rva = streams[6]
@@ -2414,7 +2420,7 @@ def _parse_minidump(data: bytes, max_drivers: int = 40) -> dict[str, Any]:
                 (p,) = struct.unpack_from("<Q", data, rva + 8 + 32 + i * 8)
                 params.append(f"0x{p:X}")
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
         parsed["exception_code"] = f"0x{code:X}"
         parsed["exception_name"] = _BUGCHECK_NAMES.get(code, "Unknown - use windbg_analyze")
         parsed["exception_address"] = f"0x{addr:X}"
@@ -3104,7 +3110,6 @@ def get_firmware_posture() -> dict[str, Any]:
         get_firmware_posture()
     """
     try:
-
         conn = _wmi_connect()
         virt = slat = None
         try:
@@ -3112,19 +3117,19 @@ def get_firmware_posture() -> dict[str, Any]:
             virt = bool(cpu.VirtualizationFirmwareEnabled)
             slat = bool(cpu.SecondLevelAddressTranslationExtensions)
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
         board = bios_ver = bios_date = None
         try:
             bb = conn.Win32_BaseBoard()[0]
             board = f"{bb.Manufacturer} {bb.Product}".strip()
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
         try:
             bi = conn.Win32_BIOS()[0]
             bios_ver = bi.SMBIOSBIOSVersion
             bios_date = str(bi.ReleaseDate or "")[:8]
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
         tpm_present = tpm_enabled = None
         try:
             tpm = conn.Win32_Tpm()[0]
@@ -3272,7 +3277,6 @@ def audit_local_admins() -> dict[str, Any]:
         audit_local_admins()
     """
     try:
-
         conn = _wmi_connect()
         admins: list[str] = []
         try:
@@ -3280,13 +3284,13 @@ def audit_local_admins() -> dict[str, Any]:
                 for user in group.associators("Win32_GroupUser"):
                     admins.append(str(user.Name))
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
         users: list[dict[str, Any]] = []
         try:
             for u in conn.Win32_UserAccount(LocalAccount=True):
                 users.append({"name": str(u.Name), "disabled": bool(u.Disabled)})
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
         return {
             "status": "success",
             "operation": "audit_local_admins",
@@ -3314,7 +3318,6 @@ def audit_smb_shares() -> dict[str, Any]:
         audit_smb_shares()
     """
     try:
-
         conn = _wmi_connect()
         shares: list[dict[str, Any]] = []
         try:
@@ -3334,7 +3337,7 @@ def audit_smb_shares() -> dict[str, Any]:
             for c in conn.Win32_ServerConnection():
                 sessions.append({"user": str(c.UserName or ""), "computer": str(c.ComputerName or "")})
         except Exception:
-            pass
+            logger.debug("best-effort WMI/minidump probe failed; continuing with partial data", exc_info=True)
         return {
             "status": "success",
             "operation": "audit_smb_shares",
@@ -3396,7 +3399,6 @@ def audit_drivers(class_filter: str | None = None, max_results: int = 100) -> di
         audit_drivers(class_filter="Display")
     """
     try:
-
         conn = _wmi_connect()
         drivers: list[dict[str, Any]] = []
         for d in conn.Win32_PnPSignedDriver():
@@ -3441,7 +3443,6 @@ def get_reliability_history(days_back: int = 7, max_results: int = 50) -> dict[s
         get_reliability_history(days_back=2)
     """
     try:
-
         conn = _wmi_connect()
         cutoff = datetime.now() - timedelta(days=days_back)
         records: list[dict[str, Any]] = []
@@ -3450,6 +3451,7 @@ def get_reliability_history(days_back: int = 7, max_results: int = 50) -> dict[s
                 stamp = r.TimeGenerated
                 moment = stamp if isinstance(stamp, datetime) else datetime.fromtimestamp(stamp)
             except Exception:
+                logger.debug("skipping item after probe failure", exc_info=True)
                 continue
             if moment < cutoff:
                 continue

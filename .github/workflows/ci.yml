@@ -37,8 +37,8 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check src/
 
-        - name: Pyright typecheck
-          run: uv run pyright src/
+      - name: Pyright typecheck
+        run: uv run pyright src/
 
       - name: Set up Node
         uses: actions/setup-node@v4

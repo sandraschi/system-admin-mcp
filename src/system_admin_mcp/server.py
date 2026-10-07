@@ -229,7 +229,7 @@ async def llm_discover() -> dict[str, Any]:
                     models = [m.get(field) for m in items if m.get(field)]
                     return {"name": name, "base": base, "detected": True, "models": models}
         except Exception:
-            pass
+            logger.debug("LLM provider probe failed for %s; marking undetected", name, exc_info=True)
         return {"name": name, "base": base, "detected": False, "models": []}
 
     providers = await asyncio.gather(
@@ -482,11 +482,18 @@ async def api_processes(
     page: int = 1,
     page_size: int = 50,
 ) -> dict[str, Any]:
-    """List processes via portmanteau system_admin tool."""
+    """List processes via portmanteau system_admin tool.
+
+    NOTE (2026-09-29): runs the sync psutil implementation in a worker
+    thread on purpose. It used to go through the async portmanteau wrapper
+    in-loop, where one wedged proc.status() froze the whole event loop
+    (single worker: even /api/health starved).
+    """
     try:
-        result = await _run_tool(
-            "system_admin",
-            operation="list_processes",
+        from system_admin_mcp.tools.services_and_tasks import list_processes
+
+        result = await asyncio.to_thread(
+            list_processes,
             filter_name=filter_name or None,
             filter_user=filter_user or None,
             sort_by=sort_by,
