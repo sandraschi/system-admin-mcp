@@ -1,5 +1,29 @@
 
-## [Unreleased] — 2026-10-07 (assfix)
+## [Unreleased] — 2026-10-07 (assfix follow-up)
+
+### Fixed
+- **Coverage gate green**: 9.5% -> 42.9% via `tests/test_assfix_coverage.py`
+  (58 hermetic tests: transport, prompts, monitoring, system_ops, full REST
+  surface, minidump parsers, dispatch, main, lifespan, resources).
+- **Annotated+Field migration (tool surface)**: all 59 `@mcp.tool` signatures now
+  `Annotated[..., Field(description=...)]`; `Args:` blocks removed; added
+  `pydantic>=2.0` dependency. Schemas verified live (descriptions + hints).
+- **Tool annotations**: 59/59 tools carry `ToolAnnotations` (34 read-only,
+  destructive on recovery/ACL/cleanup/defrag/startup/portmanteau).
+- **CORS-absolute URL (missed HIGH, self-found)**: `lib/api.ts` is now
+  same-origin except behind a Tauri gate — 14 pages fixed by the one-line root.
+- **Fleet Apps Hub**: new `GET /api/fleet/apps` (registry + listener scan);
+  `apps.tsx` rewritten as live discovery (loading/error/empty/refresh).
+- **MCP resources**: `systemadmin://status` + `systemadmin://config`.
+- **Settings**: loading/error states, GPU row + no-LLM opportunity prompt.
+- **Dashboard**: Tauri `backend-status` listener with HTTP-poll fallback.
+- **renovate.json** (fleet standard); `is_admin()` returns real `bool`;
+  `just build` uses `--all-extras` (plain `uv sync` pruned pytest).
+- Removed PS7-only legacy scripts blocking the 5.1 gate (in history).
+
+### Deferred (open, with reasons)
+- npm -> bun; Zustand LLM store (per-page state works; migration needs both
+  chat+settings moved atomically); `help.tsx` is static (no async state to guard).
 
 ### Fixed
 - **CI valid again**: Pyright step de-indented (was invalid YAML — type gate never ran); `actionlint` clean.

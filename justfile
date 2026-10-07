@@ -49,9 +49,9 @@ test-cov:
 
 # --- Build  Sync ---
 
-# Sync dependencies and install package
+# Sync dependencies and install package (all extras: plain `uv sync` prunes dev test deps)
 build:
-    Set-Location '{{justfile_directory()}}'; uv sync
+    Set-Location '{{justfile_directory()}}'; uv sync --all-extras
 
 # Sync with all extras (dev)
 build-dev:
