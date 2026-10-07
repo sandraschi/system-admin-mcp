@@ -8,6 +8,7 @@ import {
   User,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLlmStore, useProviderModels } from "@/store/llm";
 
 const HISTORY_KEY = "system-admin-chat-history";
 const PERSONALITY_KEY = "system-admin-chat-personality";
@@ -64,11 +65,17 @@ export function Chat() {
     }
   });
   const [input, setInput] = useState("");
-  const [provider, setProvider] = useState("ollama");
-  const [model, setModel] = useState("llama3.2:3b");
+  const provider = useLlmStore((s) => s.selectedProvider);
+  const model = useLlmStore((s) => s.selectedModel);
+  const models = useProviderModels();
+  const providerStatus = useLlmStore((s) => s.status);
+  const detected = useLlmStore((s) => s.detected);
+  const providerOk =
+    providerStatus === "probing" ? null : detected[provider] || false;
+  const selectProvider = useLlmStore((s) => s.selectProvider);
+  const selectModel = useLlmStore((s) => s.selectModel);
+  const loadLlm = useLlmStore((s) => s.load);
   const msgIdRef = useRef(0);
-  const [models, setModels] = useState<string[]>([]);
-  const [providerOk, setProviderOk] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,24 +89,8 @@ export function Chat() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/llm/discover")
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        const found = (d.providers || []).find(
-          (p: { name: string }) => p.name === provider,
-        );
-        setProviderOk(!!found?.detected);
-        setModels(found?.models?.length ? found.models : ["llama3.2:3b"]);
-      })
-      .catch(() => {
-        if (!cancelled) setProviderOk(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [provider]);
+    void loadLlm();
+  }, [loadLlm]);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -231,7 +222,7 @@ export function Chat() {
           <select
             data-testid="llm-provider-select"
             value={provider}
-            onChange={(e) => setProvider(e.target.value)}
+            onChange={(e) => selectProvider(e.target.value)}
             className="w-[150px] h-8 bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded px-2"
           >
             <option value="ollama">Ollama (Local)</option>
@@ -242,7 +233,7 @@ export function Chat() {
           <select
             data-testid="llm-model-select"
             value={model}
-            onChange={(e) => setModel(e.target.value)}
+            onChange={(e) => selectModel(e.target.value)}
             className="w-[200px] h-8 bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded px-2"
           >
             {models.map((m) => (

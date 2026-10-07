@@ -1,78 +1,28 @@
 import { Settings as SettingsIcon, Shield, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import API_BASE from "@/lib/api";
+import { useLlmStore, useProviderModels } from "@/store/llm";
 
 function LLMSettings() {
-  const [providers, setProviders] = useState<
-    Record<string, { name: string }[]>
-  >({});
-  const [detected, setDetected] = useState<Record<string, boolean>>({});
-  const [selectedProvider, setSelectedProvider] = useState("ollama");
-  const [selectedModel, setSelectedModel] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [gpuMessage, setGpuMessage] = useState<string | null>(null);
+  const detected = useLlmStore((s) => s.detected);
+  const selectedProvider = useLlmStore((s) => s.selectedProvider);
+  const selectedModel = useLlmStore((s) => s.selectedModel);
+  const status = useLlmStore((s) => s.status);
+  const loadError = useLlmStore((s) => s.loadError);
+  const gpuMessage = useLlmStore((s) => s.gpuMessage);
+  const load = useLlmStore((s) => s.load);
+  const selectProvider = useLlmStore((s) => s.selectProvider);
+  const selectModel = useLlmStore((s) => s.selectModel);
+  const models = useProviderModels();
   useEffect(() => {
-    fetch(`${API_BASE}/api/llm/discover`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`/api/llm/discover: HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((d) => {
-        const byName: Record<string, { name: string }[]> = {};
-        const det: Record<string, boolean> = {};
-        for (const p of d.providers || []) {
-          byName[p.name] = (p.models || []).map((m: string) => ({ name: m }));
-          det[p.name] = !!p.detected;
-        }
-        setProviders(byName);
-        setDetected(det);
-        const savedP = localStorage.getItem("llm_provider") || "ollama";
-        const savedM = localStorage.getItem("llm_model") || "";
-        setSelectedProvider(savedP);
-        const models =
-          byName[savedP === "ollama" ? "ollama" : "lm_studio"] || [];
-        setSelectedModel(
-          savedM && models.some((m: { name: string }) => m.name === savedM)
-            ? savedM
-            : models[0]?.name || "",
-        );
-        setLoading(false);
-      })
-      .catch((err) => {
-        setLoadError(String(err));
-        setProviders({ ollama: [{ name: "llama3.2:3b" }] });
-        setSelectedModel(localStorage.getItem("llm_model") || "llama3.2:3b");
-        setLoading(false);
-      });
-    fetch(`${API_BASE}/api/tools/call`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "get_gpu_info", arguments: {} }),
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        const msg: string | undefined =
-          d?.result?.message || d?.message || undefined;
-        if (d?.status === "success" && msg) setGpuMessage(msg);
-      })
-      .catch(() => {
-        /* GPU probe is best-effort; absence just hides the row */
-      });
-  }, []);
-  const save = (p: string, m: string) => {
-    localStorage.setItem("llm_provider", p);
-    localStorage.setItem("llm_model", m);
-  };
-  const models =
-    providers[selectedProvider === "ollama" ? "ollama" : "lm_studio"] || [];
+    void load();
+  }, [load]);
   const anyDetected = detected.ollama || detected.lm_studio;
-  if (loading) {
+  if (status === "probing") {
     return <p className="text-sm text-slate-300">Probing LLM providers…</p>;
   }
   return (
@@ -109,8 +59,7 @@ function LLMSettings() {
         className="h-9 w-full rounded-md border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
         value={selectedProvider}
         onChange={(e) => {
-          setSelectedProvider(e.target.value);
-          save(e.target.value, "");
+          selectProvider(e.target.value);
         }}
       >
         <option value="ollama">Ollama</option>
@@ -121,13 +70,12 @@ function LLMSettings() {
         className="h-9 w-full rounded-md border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
         value={selectedModel}
         onChange={(e) => {
-          setSelectedModel(e.target.value);
-          save(selectedProvider, e.target.value);
+          selectModel(e.target.value);
         }}
       >
         {models.map((m) => (
-          <option key={m.name} value={m.name}>
-            {m.name}
+          <option key={m} value={m}>
+            {m}
           </option>
         ))}
       </select>

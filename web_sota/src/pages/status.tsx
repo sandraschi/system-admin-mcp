@@ -34,6 +34,7 @@ interface StatusSystem {
 interface StatusData {
   status?: string;
   version?: string;
+  uptime?: number;
   system?: StatusSystem;
 }
 
