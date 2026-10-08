@@ -1,4 +1,13 @@
 
+## [Unreleased] — 2026-10-08 (webapp gap fill Phase 1)
+
+### Added
+- **Metrics card** on status page (`GET /api/metrics`: net I/O + load avg).
+- **One-click Ollama install**: shared `InstallOllamaButton` (POST install +
+  status polling) on the dashboard onboarding-cue and the Ollama provider card.
+- **Legacy decisions**: `/api/chat` kept + tested (422 contract);
+  `/api/v1/diagnostics` documented as test-only.
+
 ## [Unreleased] — 2026-10-08 (cloud providers + dual-GPU)
 
 ### Added

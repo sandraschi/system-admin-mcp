@@ -37,7 +37,9 @@ Local (free): `ollama` (:11434, native `/api/chat`), `lmstudio` (:1234),
 | `GET /api/llm/gpus` | `[{index, name, vramMb}]` from nvidia-smi (dual-GPU placement) |
 | `GET /api/llm/ollama/state` | `{engine, loaded, installed}` (resident-first inputs) |
 
-Legacy `/api/chat` (`{query, provider, model}`) is retained for existing clients.
+Legacy `/api/chat` (`{query, provider, model}`) is retained for existing
+clients. `/api/v1/diagnostics` is test-only (CUA-NSIS smoke); the dashboard
+fetches `/api/status` + `/api/processes` directly.
 
 ## Dual-GPU placement (§VI.8) + resident-first (§VI.9)
 

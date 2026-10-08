@@ -108,6 +108,10 @@ class TestKeystore:
 
 
 class TestChatContracts:
+    def test_legacy_chat_requires_query(self, client):
+        r = client.post("/api/chat", json={})
+        assert r.status_code == 422
+
     def test_chat_validates_body(self, client):
         assert client.post("/api/llm/chat", json={}).json()["status"] == "error"
         body = client.post("/api/llm/chat", json={"provider": "ollama", "model": "", "messages": []}).json()
