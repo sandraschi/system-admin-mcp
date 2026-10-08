@@ -297,6 +297,18 @@ class TestServerRest:
         names = {a["name"] for a in body["known"]}
         assert "system-admin-mcp" in names
 
+    def test_network_ports(self):
+        body = client.get("/api/network-ports").json()
+        assert body["status"] == "success"
+        assert isinstance(body.get("connections"), list)
+
+    def test_protection_bundle(self):
+        body = client.get("/api/protection").json()
+        assert body["status"] == "success"
+        for leg in ("defender", "vpn", "tailscale"):
+            assert leg in body
+            assert body[leg]["status"] in ("success", "error")
+
 
 # --------------------------------------------------------------------------
 # minidump pure parsers — crafted bytes, no dump file needed
@@ -344,6 +356,27 @@ class TestTaskbarOps:
         ).json()
         assert body["status"] == "success"
         assert body["result"]["status"] == "success"
+
+
+class TestProtectionOps:
+    async def test_defender_shape(self):
+        result = await pm.system_admin(operation="get_defender_status")
+        assert result["status"] in ("success", "error")
+        if result["status"] == "success":
+            assert isinstance(result["realtime_protection"], bool)
+
+    async def test_vpn_shape(self):
+        result = await pm.system_admin(operation="get_vpn_status")
+        assert result["status"] in ("success", "error")
+        if result["status"] == "success":
+            assert isinstance(result["profiles"], list)
+            assert result["count"] == len(result["profiles"])
+
+    async def test_tailscale_shape(self):
+        result = await pm.system_admin(operation="get_tailscale_status")
+        assert result["status"] == "success"
+        assert isinstance(result["installed"], bool)
+        assert isinstance(result["running"], bool)
 
 
 # --------------------------------------------------------------------------

@@ -752,6 +752,32 @@ async def api_smb_shares() -> dict[str, Any]:
         return _audit_error("audit_smb_shares", e)
 
 
+@app.get("/api/network-ports")
+async def api_network_ports(include_established: bool = True) -> dict[str, Any]:
+    """Listening/established ports via portmanteau system_admin tool."""
+    try:
+        return await _run_tool("system_admin", operation="audit_network_ports", include_established=include_established)
+    except Exception as e:
+        return _audit_error("audit_network_ports", e)
+
+
+@app.get("/api/protection")
+async def api_protection() -> dict[str, Any]:
+    """Basic protection posture: Defender + Windows VPN + Tailscale.
+
+    BASIC ONLY by design — full Tailscale mesh management lives in
+    tailscale-mcp; each leg degrades independently so one failure never
+    blanks the other two.
+    """
+    out: dict[str, Any] = {"status": "success"}
+    for op in ("get_defender_status", "get_vpn_status", "get_tailscale_status"):
+        try:
+            out[op.removeprefix("get_").removesuffix("_status")] = await _run_tool("system_admin", operation=op)
+        except Exception as e:
+            out[op.removeprefix("get_").removesuffix("_status")] = {"status": "error", "error": str(e)}
+    return out
+
+
 @app.get("/api/shadow-copies")
 async def api_shadow_copies() -> dict[str, Any]:
     """Shadow copies via portmanteau system_admin tool."""

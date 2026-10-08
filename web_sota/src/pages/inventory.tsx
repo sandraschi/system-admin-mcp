@@ -32,6 +32,164 @@ const CATEGORY_NAMES: Record<string, string> = {
 
 const CATEGORY_ORDER = ["dev", "ai", "tcom", "office", "admin"];
 
+function str(v: unknown): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+interface SoftwareItem {
+  DisplayName?: string;
+  DisplayVersion?: string;
+  Publisher?: string;
+  InstallDate?: string;
+}
+
+async function callOp(
+  operation: string,
+): Promise<{ status?: string; [key: string]: unknown }> {
+  const res = await fetch(`${API_BASE}/api/tools/call`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "system_admin", arguments: { operation } }),
+  });
+  const data = await res.json();
+  if (data.status !== "success") throw new Error(data.message || operation);
+  return (data.result || {}) as { status?: string; [key: string]: unknown };
+}
+
+function SysinfoSection() {
+  const [hw, setHw] = useState<Record<string, unknown> | null>(null);
+  const [os, setOs] = useState<Record<string, unknown> | null>(null);
+  const [perf, setPerf] = useState<Record<string, unknown> | null>(null);
+  const [software, setSoftware] = useState<SoftwareItem[]>([]);
+  const [query, setQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      callOp("get_hardware_info"),
+      callOp("get_os_info"),
+      callOp("get_performance_metrics"),
+      callOp("get_installed_software"),
+    ])
+      .then(([h, o, p, s]) => {
+        if (cancelled) return;
+        setHw(h);
+        setOs(o);
+        setPerf(p);
+        const list = (s.software || s.installed_software || s.programs) as
+          | SoftwareItem[]
+          | undefined;
+        setSoftware(Array.isArray(list) ? list : []);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const swList = software.filter(
+    (s) =>
+      !query.trim() ||
+      `${s.DisplayName || ""} ${s.Publisher || ""}`
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()),
+  );
+
+  const rows: [string, unknown][] = [
+    [
+      "OS",
+      `${str(os?.name)} ${str(os?.version)} (${str(os?.windows_edition)})`,
+    ],
+    ["Build", str(os?.build_number)],
+    [
+      "CPU",
+      `${str((hw?.cpu as Record<string, unknown> | undefined)?.physical_cores)}C/${str((hw?.cpu as Record<string, unknown> | undefined)?.logical_cores)}T @ ${str((hw?.cpu as Record<string, unknown> | undefined)?.frequency_mhz)} MHz`,
+    ],
+    ["Boot", str(os?.last_boot)],
+  ];
+
+  return (
+    <Card
+      className="bg-slate-900/50 border-slate-800 backdrop-blur-xl"
+      data-testid="sysinfo-card"
+    >
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Package className="w-5 h-5 text-sky-500" />
+          <CardTitle className="text-white">System</CardTitle>
+        </div>
+        <CardDescription className="text-slate-400 text-xs">
+          Hardware, OS, live performance, installed software
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && <p className="text-sm text-red-300">{error}</p>}
+        <div className="grid gap-2 md:grid-cols-2">
+          {rows.map(([k, v]) => (
+            <div key={k} className="flex gap-2 text-sm">
+              <span className="w-20 shrink-0 text-slate-500">{k}</span>
+              <span className="text-slate-200">{str(v)}</span>
+            </div>
+          ))}
+          <div className="flex gap-2 text-sm">
+            <span className="w-20 shrink-0 text-slate-500">CPU now</span>
+            <span className="text-slate-200">
+              {str(
+                (perf?.cpu as Record<string, unknown> | undefined)?.percent ??
+                  (perf?.cpu as number | undefined),
+              )}
+              %
+            </span>
+          </div>
+          <div className="flex gap-2 text-sm">
+            <span className="w-20 shrink-0 text-slate-500">Memory</span>
+            <span className="text-slate-200">
+              {str(
+                (perf?.memory as Record<string, unknown> | undefined)?.percent,
+              )}
+              %
+            </span>
+          </div>
+        </div>
+        <div>
+          <input
+            data-testid="sysinfo-search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={`Search ${software.length} installed programs…`}
+            className="mb-2 h-8 w-64 rounded-md border border-slate-700 bg-slate-950 px-3 text-xs text-slate-200"
+          />
+          <div className="max-h-64 overflow-auto rounded border border-slate-800">
+            <table className="w-full text-xs">
+              <tbody>
+                {swList.slice(0, 100).map((s) => (
+                  <tr
+                    key={`${s.DisplayName}-${s.DisplayVersion}-${s.Publisher}-${s.InstallDate}`}
+                    className="border-t border-slate-800/60 text-slate-300"
+                  >
+                    <td className="px-2 py-1">{s.DisplayName || "—"}</td>
+                    <td className="px-2 py-1 font-mono text-slate-500">
+                      {s.DisplayVersion || ""}
+                    </td>
+                    <td className="px-2 py-1 text-slate-500">
+                      {s.Publisher || ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function Inventory() {
   const [found, setFound] = useState<ToolItem[]>([]);
   const [missing, setMissing] = useState<ToolItem[]>([]);
@@ -65,6 +223,7 @@ export function Inventory() {
 
   return (
     <div className="space-y-6" data-testid="inventory-page">
+      {" "}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white">
@@ -89,7 +248,6 @@ export function Inventory() {
           Refresh
         </Button>
       </div>
-
       {error && (
         <Card className="bg-red-950/30 border-red-900">
           <CardContent className="pt-4 text-sm text-red-300">
@@ -97,7 +255,6 @@ export function Inventory() {
           </CardContent>
         </Card>
       )}
-
       {CATEGORY_ORDER.map((cat) => {
         const present = byCategory(found, cat);
         const absent = byCategory(missing, cat);
@@ -175,6 +332,7 @@ export function Inventory() {
           </Card>
         );
       })}
+      <SysinfoSection />
     </div>
   );
 }
