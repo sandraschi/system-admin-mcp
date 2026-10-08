@@ -322,6 +322,30 @@ class TestMinidumpPure:
         assert result["status"] == "error"
 
 
+class TestTaskbarOps:
+    async def test_taskbar_windows_shape(self):
+        result = await pm.system_admin(operation="list_taskbar_windows")
+        assert result["status"] == "success"
+        assert result["count"] == len(result["windows"])
+        for w in result["windows"]:
+            assert {"hwnd", "title", "pid", "process", "autostart"} <= set(w)
+
+    async def test_tray_icons_shape(self):
+        result = await pm.system_admin(operation="list_tray_icons")
+        assert result["status"] in ("success", "error")
+        if result["status"] == "success":
+            assert result["count"] == len(result["icons"])
+            for icon in result["icons"]:
+                assert {"tooltip", "confidence", "autostart"} <= set(icon)
+
+    def test_tray_rest_endpoint(self):
+        body = client.post(
+            "/api/tools/call", json={"name": "system_admin", "arguments": {"operation": "list_taskbar_windows"}}
+        ).json()
+        assert body["status"] == "success"
+        assert body["result"]["status"] == "success"
+
+
 # --------------------------------------------------------------------------
 # portmanteau dispatch — error paths + watch list (no side effects)
 # --------------------------------------------------------------------------

@@ -21,6 +21,7 @@ import { Services } from "@/pages/services";
 import { Settings } from "@/pages/settings";
 import { Skills } from "@/pages/skills";
 import { Status } from "@/pages/status";
+import { Taskbar } from "@/pages/taskbar";
 import { Tools } from "@/pages/tools";
 import { Volumes } from "@/pages/volumes";
 
@@ -34,6 +35,7 @@ function App() {
           <Route path="/status" element={<Status />} />
           <Route path="/processes" element={<Processes />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/taskbar" element={<Taskbar />} />
           <Route path="/volumes" element={<Volumes />} />
           <Route path="/file-owner" element={<FileOwner />} />
           <Route path="/file-recovery" element={<FileRecovery />} />

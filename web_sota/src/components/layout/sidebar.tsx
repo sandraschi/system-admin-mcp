@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertTriangle,
+  AppWindow,
   Archive,
   BookOpen,
   Bot,
@@ -59,6 +60,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/processes", label: "Processes", icon: Cpu },
       { href: "/services", label: "Services", icon: Cog },
+      { href: "/taskbar", label: "Taskbar", icon: AppWindow },
       { href: "/security", label: "Security", icon: ShieldAlert },
     ],
   },
