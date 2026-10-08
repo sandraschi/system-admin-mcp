@@ -16,6 +16,9 @@ _DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
 _READ_ONLY = ToolAnnotations(readOnlyHint=True)
 _MUTATING = ToolAnnotations()
 from system_admin_mcp.tools.implementations import (
+    airgap_disable,
+    airgap_enable,
+    airgap_status,
     analyze_disk_usage_advanced,
     analyze_minidump,
     analyze_top_folder_sizes,
@@ -32,6 +35,7 @@ from system_admin_mcp.tools.implementations import (
     defragment_disk,
     disk_cleanup,
     get_bugcheck_history,
+    get_defender_status,
     get_event_log,
     get_firmware_posture,
     get_gpu_info,
@@ -43,9 +47,11 @@ from system_admin_mcp.tools.implementations import (
     get_permissions,
     get_recent_event_errors,
     get_reliability_history,
+    get_tailscale_status,
     get_top_resource_processes,
     get_update_status,
     get_volume_info,
+    get_vpn_status,
     health_check,
     list_crash_dumps,
     list_shadow_copies,
@@ -111,6 +117,11 @@ async def manage_filesystem_watch(
     manage_filesystem_watch(operation="stop", path="C:\\Data")
     ```
     """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    if operation in ("start", "stop"):
+        audit_mutation(f"manage_watch_{operation}", {"path": path})
+        require_mutable(f"manage_watch_{operation}")
     try:
         if operation == "start":
             if not path:
@@ -199,6 +210,14 @@ async def system_admin(
             "take_ownership",
             "audit_permissions",
             "modify_acl",
+            # Protection posture (basic status; full mesh mgmt lives elsewhere)
+            "get_defender_status",
+            "get_vpn_status",
+            "get_tailscale_status",
+            # Airgap kill switch (confirm-gated, read-only-blocked)
+            "airgap_status",
+            "airgap_enable",
+            "airgap_disable",
             # Volume Maintenance
             "check_disk_health",
             "analyze_disk_usage",
@@ -296,6 +315,7 @@ async def system_admin(
     filter_status: Annotated[str | None, Field(description="Filter services/processes by status")] = None,
     filter_name: Annotated[str | None, Field(description="Filter by name (services/processes)")] = None,
     include_system: Annotated[bool, Field(description="Include system services in results")] = True,
+    include_established: Annotated[bool, Field(description="Include ESTABLISHED connections in port audit")] = True,
     wait_timeout: Annotated[int, Field(description="Timeout for service start/stop", ge=1)] = 30,
     startup_type: Annotated[str | None, Field(description="Service startup type: Auto, Manual, Disabled")] = None,
     # Process parameters
@@ -312,6 +332,10 @@ async def system_admin(
     # Taskbar parameters
     autohide: Annotated[bool | None, Field(description="Enable/disable taskbar autohide")] = None,
     process_names: Annotated[list[str] | None, Field(description="Process names for taskbar operations")] = None,
+    # Confirm-gated operations (airgap): explicit per-call confirmation, never sticky
+    confirm: Annotated[
+        bool, Field(description="Explicit confirmation for confirm-gated ops (airgap_enable/disable)")
+    ] = False,
 ) -> dict[str, Any]:
     """Comprehensive system administration portmanteau tool.
 
@@ -331,6 +355,12 @@ async def system_admin(
     - remove_permission: Remove specific permission
     - take_ownership: Take ownership of file/folder
     - audit_permissions: Audit security settings
+    - get_defender_status: Defender realtime/signatures posture (basic)
+    - get_vpn_status: Windows VPN profiles + connection state (basic)
+    - get_tailscale_status: Tailscale installed/running/tailnet (basic; full mgmt in tailscale-mcp)
+    - airgap_status: Read-only airgap state (firewall + bluetooth)
+    - airgap_enable: CUT outside links, requires confirm=True every call
+    - airgap_disable: Restore outside links, requires confirm=True every call
     - modify_acl: Modify Access Control List
 
     Volume Maintenance:
@@ -448,7 +478,12 @@ async def system_admin(
         system_admin("find_taskbar_blocking_processes")
         system_admin("set_taskbar_autohide", enabled=True)
     """
+    from system_admin_mcp.mutation_guard import require_mutable
+
     try:
+        # Read-only kill switch: mutating ops refuse before anything executes.
+        # Blocked attempts are already audit-logged inside each implementation.
+        require_mutable(operation)
         # File Recovery operations
         if operation == "scan_volume":
             if not drive:
@@ -498,6 +533,16 @@ async def system_admin(
             if not path:
                 raise ValueError("path parameter required for audit_permissions")
             return audit_permissions(path)
+
+        # Protection posture (basic status reads, no parameters)
+        elif operation == "get_defender_status":
+            return get_defender_status()
+
+        elif operation == "get_vpn_status":
+            return get_vpn_status()
+
+        elif operation == "get_tailscale_status":
+            return get_tailscale_status()
 
         elif operation == "modify_acl":
             if not path:
@@ -570,7 +615,7 @@ async def system_admin(
             return await get_top_resource_processes(max_results if max_results < 50 else 5)
 
         elif operation == "audit_network_ports":
-            return await audit_network_ports(include_system)
+            return await audit_network_ports(include_established)
 
         elif operation == "analyze_top_folder_sizes":
             if not path:
@@ -710,6 +755,15 @@ async def system_admin(
         elif operation == "list_tray_icons":
             return list_tray_icons()
 
+        elif operation == "airgap_status":
+            return airgap_status()
+
+        elif operation == "airgap_enable":
+            return airgap_enable(confirm=confirm)
+
+        elif operation == "airgap_disable":
+            return airgap_disable(confirm=confirm)
+
         else:
             return {
                 "status": "error",
@@ -717,6 +771,10 @@ async def system_admin(
             }
 
     except Exception as e:
+        from system_admin_mcp.mutation_guard import ReadOnlyError, audit_mutation
+
+        if isinstance(e, ReadOnlyError):
+            audit_mutation(operation, {"blocked": "read-only mode"})
         logger.error(f"Error in system_admin operation {operation}: {e}", exc_info=True)
         return {
             "status": "error",

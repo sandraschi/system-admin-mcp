@@ -178,11 +178,18 @@ def scan_volume(
 
 
 @mcp.tool(annotations=_DESTRUCTIVE)
-def recover_file_ntfs(source_path: str, destination_path: str) -> dict[str, Any]:
+def recover_file_ntfs(
+    source_path: Annotated[str, Field(description="Original path of the deleted file")],
+    destination_path: Annotated[str, Field(description="Directory to save the recovered file")],
+) -> dict[str, Any]:
     """Recover a deleted file from NTFS volume.
 
     PORTMANTEAU TARGET: This tool is the primary recovery engine for NTFS.
     """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("recover_file", {"source": source_path, "dest": destination_path})
+    require_mutable("recover_file")
     try:
         source_path = os.path.abspath(source_path)
         destination_path = os.path.abspath(destination_path)
@@ -241,7 +248,7 @@ def recover_file_ntfs(source_path: str, destination_path: str) -> dict[str, Any]
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def validate_recovery(file_path: str) -> dict[str, Any]:
+def validate_recovery(file_path: Annotated[str, Field(description="Recovered file to validate")]) -> dict[str, Any]:
     """Validate recovered file integrity."""
     try:
         if not os.path.exists(file_path):
@@ -294,7 +301,7 @@ def validate_recovery(file_path: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def get_permissions(path: str) -> dict[str, Any]:
+def get_permissions(path: Annotated[str, Field(description="File or folder path")]) -> dict[str, Any]:
     """Get file/folder permissions and ACLs."""
     try:
         path = os.path.abspath(path)
@@ -374,8 +381,17 @@ def get_permissions(path: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_DESTRUCTIVE)
-def set_permissions(path: str, principal: str, rights: str, inheritance: str | None = None) -> dict[str, Any]:
+def set_permissions(
+    path: Annotated[str, Field(description="File or folder path")],
+    principal: Annotated[str, Field(description='User/group, e.g. "DOMAIN\\User"')],
+    rights: Annotated[str, Field(description="Rights: Read, Write, Modify, FullControl")],
+    inheritance: Annotated[str | None, Field(description="Inheritance setting")] = None,
+) -> dict[str, Any]:
     """Set file/folder permissions."""
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("set_permissions", {"path": path, "principal": principal, "rights": rights})
+    require_mutable("set_permissions")
     try:
         if not is_admin():
             return {
@@ -439,8 +455,15 @@ def set_permissions(path: str, principal: str, rights: str, inheritance: str | N
 
 
 @mcp.tool(annotations=_DESTRUCTIVE)
-def remove_permission(path: str, principal: str) -> dict[str, Any]:
+def remove_permission(
+    path: Annotated[str, Field(description="File or folder path")],
+    principal: Annotated[str, Field(description="User/group to remove")],
+) -> dict[str, Any]:
     """Remove specific permission from file/folder."""
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("remove_permission", {"path": path, "principal": principal})
+    require_mutable("remove_permission")
     try:
         if not is_admin():
             return {
@@ -507,8 +530,14 @@ def remove_permission(path: str, principal: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_DESTRUCTIVE)
-def take_ownership(path: str) -> dict[str, Any]:
+def take_ownership(
+    path: Annotated[str, Field(description="File or folder path")],
+) -> dict[str, Any]:
     """Take ownership of file/folder."""
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("take_ownership", {"path": path})
+    require_mutable("take_ownership")
     try:
         if not is_admin():
             return {
@@ -550,7 +579,7 @@ def take_ownership(path: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def audit_permissions(path: str) -> dict[str, Any]:
+def audit_permissions(path: Annotated[str, Field(description="File or folder path to audit")]) -> dict[str, Any]:
     """Audit permissions and identify security issues."""
     try:
         perms = get_permissions(path)
@@ -595,7 +624,7 @@ def audit_permissions(path: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def check_disk_health(drive: str) -> dict[str, Any]:
+def check_disk_health(drive: Annotated[str, Field(description='Drive letter, e.g. "C:"')]) -> dict[str, Any]:
     """Check disk SMART status and health using WMI."""
     try:
         if not WMI_AVAILABLE:
@@ -648,7 +677,7 @@ def check_disk_health(drive: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
+def analyze_disk_usage_advanced(drive: Annotated[str, Field(description='Drive letter, e.g. "C:"')]) -> dict[str, Any]:
     """Advanced disk usage analysis with folder breakdown."""
     try:
         if not drive.endswith(":\\"):
@@ -713,8 +742,18 @@ def analyze_disk_usage_advanced(drive: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_DESTRUCTIVE)
-def disk_cleanup(drive: str, cleanup_targets: list[str] | None = None, dry_run: bool = True) -> dict[str, Any]:
+def disk_cleanup(
+    drive: Annotated[str, Field(description='Drive letter, e.g. "C:"')],
+    cleanup_targets: Annotated[list[str] | None, Field(description="Targets: temp_files, recycle_bin, etc.")] = None,
+    dry_run: Annotated[bool, Field(description="Preview only when true (default)")] = True,
+) -> dict[str, Any]:
     """Clean up disk space by removing temp files and other cleanup targets."""
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    # Dry-run previews stay usable (read-only semantic); only real deletes guard+log.
+    if not dry_run:
+        audit_mutation("disk_cleanup", {"drive": drive, "dry_run": False})
+        require_mutable("disk_cleanup")
     try:
         if not is_admin():
             return {
@@ -808,8 +847,15 @@ def disk_cleanup(drive: str, cleanup_targets: list[str] | None = None, dry_run: 
 
 
 @mcp.tool(annotations=_DESTRUCTIVE)
-def defragment_disk(drive: str, thorough: bool = False) -> dict[str, Any]:
+def defragment_disk(
+    drive: Annotated[str, Field(description='Drive letter, e.g. "D:" (HDDs only)')],
+    thorough: Annotated[bool, Field(description="Thorough (slower) defragmentation")] = False,
+) -> dict[str, Any]:
     """Defragment HDD (HDDs only - do not use on SSDs!)."""
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("defragment_disk", {"drive": drive, "thorough": thorough})
+    require_mutable("defragment_disk")
     try:
         if not is_admin():
             return {
@@ -869,8 +915,14 @@ def defragment_disk(drive: str, thorough: bool = False) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_DESTRUCTIVE)
-def optimize_ssd(drive: str) -> dict[str, Any]:
+def optimize_ssd(
+    drive: Annotated[str, Field(description='Drive letter, e.g. "C:" (SSDs only)')],
+) -> dict[str, Any]:
     """Optimize SSD with TRIM operation."""
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("optimize_ssd", {"drive": drive})
+    require_mutable("optimize_ssd")
     try:
         if not is_admin():
             return {
@@ -1164,7 +1216,11 @@ def get_performance_metrics() -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def get_event_log(log_name: str = "System", level: str | None = None, hours_back: int = 24) -> dict[str, Any]:
+def get_event_log(
+    log_name: Annotated[str, Field(description='Log name: "System", "Application", "Security"')] = "System",
+    level: Annotated[str | None, Field(description='Level filter: "Error", "Warning", "Information"')] = None,
+    hours_back: Annotated[int, Field(description="Hours to look back", ge=1)] = 24,
+) -> dict[str, Any]:
     """Query Windows event logs."""
     try:
         if not is_admin():
@@ -1300,7 +1356,7 @@ def health_check() -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def get_volume_info(drive: str) -> dict[str, Any]:
+def get_volume_info(drive: Annotated[str, Field(description='Drive letter, e.g. "C:"')]) -> dict[str, Any]:
     """Get detailed volume information."""
     try:
         if not drive.endswith(":\\"):
@@ -2186,7 +2242,10 @@ def list_crash_dumps() -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def get_bugcheck_history(days_back: int = 7, max_results: int = 50) -> dict[str, Any]:
+def get_bugcheck_history(
+    days_back: Annotated[int, Field(description="Days to look back", ge=1)] = 7,
+    max_results: Annotated[int, Field(description="Maximum entries", ge=1)] = 50,
+) -> dict[str, Any]:
     """Correlate shutdown/crash events around a GSOD/BSOD.
 
     ## Return Format
@@ -2465,7 +2524,10 @@ def _parse_minidump(data: bytes, max_drivers: int = 40) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def analyze_minidump(dump_path: str | None = None, max_drivers: int = 40) -> dict[str, Any]:
+def analyze_minidump(
+    dump_path: Annotated[str | None, Field(description="Path to .dmp file (auto-detect when omitted)")] = None,
+    max_drivers: Annotated[int, Field(description="Maximum drivers to list", ge=1)] = 40,
+) -> dict[str, Any]:
     """Triage-parse a minidump without WinDbg (pure python, no SDK needed).
 
     ## Return Format
@@ -2547,7 +2609,10 @@ def _find_cdb() -> str | None:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def windbg_analyze(dump_path: str | None = None, timeout_seconds: int = 120) -> dict[str, Any]:
+def windbg_analyze(
+    dump_path: Annotated[str | None, Field(description="Path to .dmp file (auto-detect when omitted)")] = None,
+    timeout_seconds: Annotated[int, Field(description="Debugger timeout", ge=1)] = 120,
+) -> dict[str, Any]:
     """Run WinDbg !analyze -v on a dump via cdb.exe (needs Debugging Tools).
 
     ## Return Format
@@ -3190,7 +3255,9 @@ def get_firmware_posture() -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def audit_scheduled_tasks(max_results: int = 50) -> dict[str, Any]:
+def audit_scheduled_tasks(
+    max_results: Annotated[int, Field(description="Maximum tasks", ge=1)] = 50,
+) -> dict[str, Any]:
     """List scheduled tasks (name, next run, status) via schtasks.
 
     ## Return Format
@@ -3411,7 +3478,10 @@ def list_shadow_copies() -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def audit_drivers(class_filter: str | None = None, max_results: int = 100) -> dict[str, Any]:
+def audit_drivers(
+    class_filter: Annotated[str | None, Field(description="Driver class filter")] = None,
+    max_results: Annotated[int, Field(description="Maximum drivers", ge=1)] = 100,
+) -> dict[str, Any]:
     """Signed driver inventory: device, version, date, provider.
 
     ## Return Format
@@ -3452,7 +3522,10 @@ def audit_drivers(class_filter: str | None = None, max_results: int = 100) -> di
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def get_reliability_history(days_back: int = 7, max_results: int = 50) -> dict[str, Any]:
+def get_reliability_history(
+    days_back: Annotated[int, Field(description="Days to look back", ge=1)] = 7,
+    max_results: Annotated[int, Field(description="Maximum entries", ge=1)] = 50,
+) -> dict[str, Any]:
     """Reliability Monitor records (failures, updates, installs).
 
     ## Return Format
@@ -3501,7 +3574,9 @@ def get_reliability_history(days_back: int = 7, max_results: int = 50) -> dict[s
 
 
 @mcp.tool(annotations=_READ_ONLY)
-def winget_outdated(max_results: int = 30) -> dict[str, Any]:
+def winget_outdated(
+    max_results: Annotated[int, Field(description="Maximum packages", ge=1)] = 30,
+) -> dict[str, Any]:
     """Packages with upgrades available via winget.
 
     ## Return Format
@@ -3600,3 +3675,372 @@ def audit_path_dross() -> dict[str, Any]:
     except Exception as e:
         logger.exception("Error auditing PATH")
         return {"status": "error", "operation": "audit_path_dross", "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Protection posture: Defender / VPN / Tailscale (basic status only)
+# ---------------------------------------------------------------------------
+
+
+def _run_ps_json(script: str, timeout: int = 30) -> Any:
+    """Run a PowerShell snippet returning JSON. Returns parsed payload.
+
+    Raises RuntimeError on non-zero exit or unparseable output so callers can
+    degrade gracefully (e.g. cmdlet absent, access denied).
+    """
+    import json as _json
+
+    proc = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError((proc.stderr or "").strip()[:300] or f"powershell exit {proc.returncode}")
+    out = (proc.stdout or "").strip()
+    if not out:
+        return None
+    try:
+        return _json.loads(out)
+    except ValueError as exc:
+        raise RuntimeError(f"unparseable powershell output: {exc}") from exc
+
+
+def get_defender_status() -> dict[str, Any]:
+    """Basic Microsoft Defender posture: realtime protection, signatures age.
+
+    Read-only WMI/Defender query. Returns {status, realtime_protection,
+    antivirus_enabled, signature_last_updated, quick_scan_age_days} or an
+    error dict when Defender is absent/unreachable — never raises.
+    """
+    try:
+        data = _run_ps_json(
+            "Get-MpComputerStatus | Select-Object -Property "
+            "RealTimeProtectionEnabled, AntivirusEnabled, AntispywareEnabled, "
+            "AntivirusSignatureLastUpdated, QuickScanAge, FullScanAge | ConvertTo-Json -Compress"
+        )
+        if not isinstance(data, dict):
+            raise RuntimeError("unexpected Get-MpComputerStatus shape")
+        return {
+            "status": "success",
+            "operation": "get_defender_status",
+            "realtime_protection": bool(data.get("RealTimeProtectionEnabled", False)),
+            "antivirus_enabled": bool(data.get("AntivirusEnabled", False)),
+            "antispyware_enabled": bool(data.get("AntispywareEnabled", False)),
+            "signature_last_updated": str(data.get("AntivirusSignatureLastUpdated") or ""),
+            "quick_scan_age_days": data.get("QuickScanAge"),
+            "full_scan_age_days": data.get("FullScanAge"),
+        }
+    except Exception as e:
+        logger.debug("defender status failed", exc_info=True)
+        return {"status": "error", "operation": "get_defender_status", "error": str(e)}
+
+
+def get_vpn_status() -> dict[str, Any]:
+    """Basic Windows VPN posture: configured profiles + connection state.
+
+    Lists AllUserConnection profiles (name, tunnel type, server, connected?).
+    Third-party clients (Nord/Proton/etc.) are out of scope — this covers the
+    built-in Windows VPN stack. Never raises.
+    """
+    try:
+        data = _run_ps_json(
+            "Get-VpnConnection -AllUserConnection -ErrorAction SilentlyContinue | "
+            "Select-Object -Property Name, ServerAddress, TunnelType, ConnectionStatus | "
+            "ConvertTo-Json -Compress"
+        )
+        profiles = data if isinstance(data, list) else ([data] if isinstance(data, dict) else [])
+        cleaned = [
+            {
+                "name": str(p.get("Name") or ""),
+                "server": str(p.get("ServerAddress") or ""),
+                "tunnel": str(p.get("TunnelType") or ""),
+                "connected": str(p.get("ConnectionStatus") or "").lower() == "connected",
+            }
+            for p in profiles
+            if isinstance(p, dict)
+        ]
+        return {
+            "status": "success",
+            "operation": "get_vpn_status",
+            "connected": any(p["connected"] for p in cleaned),
+            "count": len(cleaned),
+            "profiles": cleaned,
+        }
+    except Exception as e:
+        logger.debug("vpn status failed", exc_info=True)
+        return {"status": "error", "operation": "get_vpn_status", "error": str(e)}
+
+
+def get_tailscale_status() -> dict[str, Any]:
+    """Basic Tailscale posture: installed, daemon running, tailnet state.
+
+    BASIC ONLY by design — full mesh management lives in tailscale-mcp.
+    Never raises; missing CLI/daemon yields installed/running False with a note.
+    """
+    import shutil
+
+    result: dict[str, Any] = {
+        "status": "success",
+        "operation": "get_tailscale_status",
+        "installed": False,
+        "running": False,
+        "backend_state": "",
+        "tailnet_ips": [],
+        "self_hostname": "",
+        "exit_node": False,
+        "note": "Full Tailscale management lives in tailscale-mcp.",
+    }
+    cli = shutil.which("tailscale")
+    result["installed"] = bool(cli)
+    try:
+        result["running"] = any(
+            p.info.get("name", "").lower() in ("tailscale-ipn.exe", "tailscaled.exe")
+            for p in psutil.process_iter(["name"])
+        )
+    except Exception:
+        logger.debug("tailscale process scan failed", exc_info=True)
+    if not cli:
+        result["note"] = "tailscale CLI not on PATH. " + result["note"]
+        return result
+    try:
+        proc = subprocess.run(
+            [cli, "status", "--json=true"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if proc.returncode != 0:
+            result["note"] = f"tailscale status exit {proc.returncode}. " + result["note"]
+            return result
+        import json as _json
+
+        payload = _json.loads(proc.stdout or "{}")
+        result["backend_state"] = str(payload.get("BackendState") or "")
+        self_node = payload.get("Self") or {}
+        result["tailnet_ips"] = list(self_node.get("TailscaleIPs") or [])
+        result["self_hostname"] = str(self_node.get("HostName") or self_node.get("DNSName") or "")
+        result["exit_node"] = bool((payload.get("ExitNodeStatus") or {}).get("Online"))
+    except Exception as e:
+        logger.debug("tailscale status parse failed", exc_info=True)
+        result["note"] = f"status query failed: {e}. " + result["note"]
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Airgap kill switch: cut all outside links, keep USB HID + loopback
+# ---------------------------------------------------------------------------
+#
+# Design notes (see docs/SECURITY.md):
+# - Network cut = firewall default-outbound BLOCK on all three profiles.
+#   Loopback (127.0.0.1) bypasses Windows Firewall filtering, so THIS
+#   dashboard/backend keeps working while every remote path dies.
+# - Bluetooth cut = stop bthserv + disable Bluetooth adapters.
+# - USB keyboards/mice are HID, untouched by either action.
+# - Prior state snapshots to data/airgap_state.json for exact restore.
+# - Both mutations require confirm=True EVERY call (never sticky) and are
+#   blocked by SYSTEMADMIN_READ_ONLY=1 like all mutating ops.
+
+_AIRGAP_STATE_ENV = "SYSTEMADMIN_AIRGAP_STATE"
+_AIRGAP_STATE_NAME = "airgap_state.json"
+
+
+def _airgap_state_path():
+    from pathlib import Path as _Path
+
+    override = os.getenv(_AIRGAP_STATE_ENV, "").strip()
+    if override:
+        return _Path(override)
+    return _Path(__file__).resolve().parent.parent.parent / "data" / _AIRGAP_STATE_NAME
+
+
+def _airgap_firewall_state() -> dict[str, str]:
+    # .ToString() yields Block/Allow/NotConfigured (ints are ambiguous: 0 ==
+    # NotConfigured, i.e. effective-allow — never compare the raw int).
+    data = _run_ps_json(
+        "Get-NetFirewallProfile | Select-Object -Property Name, "
+        "@{N='Action';E={$_.DefaultOutboundAction.ToString()}} | ConvertTo-Json -Compress"
+    )
+    rows = data if isinstance(data, list) else ([data] if isinstance(data, dict) else [])
+    return {str(r.get("Name") or "?"): str(r.get("Action") or "?") for r in rows if isinstance(r, dict)}
+
+
+def _airgap_bt_state() -> dict[str, Any]:
+    try:
+        svc = _run_ps_json(
+            "Get-Service -Name bthserv -ErrorAction SilentlyContinue | "
+            "Select-Object -Property Status, StartType | ConvertTo-Json -Compress"
+        )
+    except Exception:
+        svc = None
+    try:
+        adapters = _run_ps_json(
+            "Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object {$_.Name -like 'Bluetooth*'} | "
+            "Select-Object -Property Name, Status | ConvertTo-Json -Compress"
+        )
+    except Exception:
+        adapters = None
+    if isinstance(adapters, dict):
+        adapters = [adapters]
+    return {
+        "service": svc if isinstance(svc, dict) else {},
+        "adapters": adapters if isinstance(adapters, list) else [],
+    }
+
+
+def airgap_status() -> dict[str, Any]:
+    """Read-only airgap state: firewall defaults, bluetooth service/adapters.
+
+    airgapped = outbound BLOCK on all three firewall profiles. Loopback is
+    exempt from Windows Firewall, so local dashboard access survives.
+    """
+    try:
+        fw = _airgap_firewall_state()
+        bt = _airgap_bt_state()
+        blocked = [str(v).lower() == "block" for v in fw.values()]
+        airgapped = bool(blocked) and all(blocked)
+        return {
+            "status": "success",
+            "operation": "airgap_status",
+            "airgapped": airgapped,
+            "firewall_outbound": fw,
+            "bluetooth": bt,
+        }
+    except Exception as e:
+        logger.debug("airgap status failed", exc_info=True)
+        return {"status": "error", "operation": "airgap_status", "error": str(e)}
+
+
+def airgap_enable(
+    confirm: Annotated[bool, Field(description="Explicit confirmation (required, every call)")] = False,
+) -> dict[str, Any]:
+    """CUT all outside links: firewall outbound BLOCK + stop Bluetooth.
+
+    Requires confirm=True on every call — never sticky, never implied.
+    USB keyboards/mice (HID) and loopback keep working. Reads prior state
+    first so airgap_disable restores exactly. Blocked in read-only mode.
+    """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("airgap_enable", {"confirm": bool(confirm)})
+    if not confirm:
+        return {
+            "status": "error",
+            "operation": "airgap_enable",
+            "error": "refused: pass confirm=True to cut all outside links (deliberate two-step)",
+        }
+    require_mutable("airgap_enable")
+    try:
+        snapshot = {"firewall": _airgap_firewall_state(), "bluetooth": _airgap_bt_state()}
+        state_path = _airgap_state_path()
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        import json as _json
+
+        state_path.write_text(_json.dumps(snapshot, indent=2), encoding="utf-8")
+        _run_ps_json(
+            "Set-NetFirewallProfile -Profile Domain,Public,Private "
+            "-DefaultOutboundAction Block; 'ok' | ConvertTo-Json -Compress"
+        )
+        try:
+            _run_ps_json(
+                "Stop-Service -Name bthserv -Force -ErrorAction SilentlyContinue; 'ok' | ConvertTo-Json -Compress"
+            )
+        except Exception:
+            logger.debug("bthserv stop failed (may already be stopped)", exc_info=True)
+        try:
+            _run_ps_json(
+                "Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object {$_.Name -like 'Bluetooth*'} | "
+                "Disable-NetAdapter -Confirm:$false -ErrorAction SilentlyContinue; 'ok' | ConvertTo-Json -Compress"
+            )
+        except Exception:
+            logger.debug("bluetooth adapter disable failed", exc_info=True)
+        after = airgap_status()
+        audit_mutation("airgap_enable", {"confirm": True, "result": after.get("status")})
+        return {
+            "status": "success",
+            "operation": "airgap_enable",
+            "message": "outside links cut (firewall outbound BLOCK, bluetooth stopped). Loopback + USB HID unaffected.",
+            "state": after,
+        }
+    except Exception as e:
+        logger.exception("airgap enable failed")
+        audit_mutation("airgap_enable", {"confirm": True, "result": "error", "error": str(e)})
+        return {"status": "error", "operation": "airgap_enable", "error": str(e)}
+
+
+def airgap_disable(
+    confirm: Annotated[bool, Field(description="Explicit confirmation (required, every call)")] = False,
+) -> dict[str, Any]:
+    """Restore outside links from the airgap snapshot (or sane defaults).
+
+    Requires confirm=True on every call. Falls back to Allow/outbound +
+    bthserv auto+start when no snapshot exists. Blocked in read-only mode.
+    """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("airgap_disable", {"confirm": bool(confirm)})
+    if not confirm:
+        return {
+            "status": "error",
+            "operation": "airgap_disable",
+            "error": "refused: pass confirm=True to restore outside links (deliberate two-step)",
+        }
+    require_mutable("airgap_disable")
+    try:
+        import json as _json
+
+        state_path = _airgap_state_path()
+        snapshot: dict[str, Any] = {}
+        if state_path.is_file():
+            try:
+                snapshot = _json.loads(state_path.read_text(encoding="utf-8"))
+            except Exception:
+                snapshot = {}
+        fw = snapshot.get("firewall") or {}
+        for profile in ("Domain", "Public", "Private"):
+            action = str(fw.get(profile, "Allow"))
+            if action.lower() not in ("allow", "block"):
+                action = "Allow"
+            _run_ps_json(
+                f"Set-NetFirewallProfile -Profile {profile} -DefaultOutboundAction {action}; "
+                "'ok' | ConvertTo-Json -Compress"
+            )
+        bt = snapshot.get("bluetooth") or {}
+        svc = bt.get("service") or {}
+        starttype = str(svc.get("StartType") or "Automatic")
+        if starttype not in ("Automatic", "Manual", "Disabled"):
+            starttype = "Automatic"
+        try:
+            _run_ps_json(
+                f"Set-Service -Name bthserv -StartupType {starttype} -ErrorAction SilentlyContinue; "
+                "'ok' | ConvertTo-Json -Compress"
+            )
+            if str(svc.get("Status")) in ("4", "Running"):
+                _run_ps_json(
+                    "Start-Service -Name bthserv -ErrorAction SilentlyContinue; 'ok' | ConvertTo-Json -Compress"
+                )
+        except Exception:
+            logger.debug("bthserv restore failed", exc_info=True)
+        for adapter in bt.get("adapters") or []:
+            name = str((adapter or {}).get("Name") or "")
+            if name:
+                try:
+                    _run_ps_json(
+                        f"Enable-NetAdapter -Name '{name}' -Confirm:$false -ErrorAction SilentlyContinue; "
+                        "'ok' | ConvertTo-Json -Compress"
+                    )
+                except Exception:
+                    logger.debug("adapter restore failed for %s", name, exc_info=True)
+        after = airgap_status()
+        audit_mutation("airgap_disable", {"confirm": True, "result": after.get("status")})
+        return {
+            "status": "success",
+            "operation": "airgap_disable",
+            "message": "outside links restored from snapshot.",
+            "state": after,
+        }
+    except Exception as e:
+        logger.exception("airgap disable failed")
+        audit_mutation("airgap_disable", {"confirm": True, "result": "error", "error": str(e)})
+        return {"status": "error", "operation": "airgap_disable", "error": str(e)}

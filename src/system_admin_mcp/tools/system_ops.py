@@ -131,6 +131,10 @@ async def recover_file(
     recover_file("C:/deleted/file.docx", "D:/Recovery")
     ```
     """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("recover_file", {"source": original_path, "dest": output_dir})
+    require_mutable("recover_file")
     if not is_admin():
         return {
             "status": "error",

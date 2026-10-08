@@ -247,6 +247,10 @@ def start_service(
 
     Returns a dictionary with the operation result.
     """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("start_service", {"service": service_name})
+    require_mutable("start_service")
     try:
         if not is_admin():
             return {
@@ -302,6 +306,10 @@ def stop_service(
 
     Returns a dictionary with the operation result.
     """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("stop_service", {"service": service_name})
+    require_mutable("stop_service")
     try:
         if not is_admin():
             return {
@@ -395,6 +403,10 @@ def set_service_startup(
 
     Returns a dictionary with the operation result.
     """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("set_service_startup", {"service": service_name, "startup": startup_type})
+    require_mutable("set_service_startup")
     try:
         if not is_admin():
             return {
@@ -709,6 +721,10 @@ def kill_process(
 
     Returns a dictionary with the operation result.
     """
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("kill_process", {"pid": pid, "force": force})
+    require_mutable("kill_process")
     try:
         process = psutil.Process(pid)
         process_name = process.name()
@@ -846,6 +862,10 @@ def add_startup_program(
     ```
     """
     try:
+        from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+        audit_mutation("add_startup_program", {"name": name, "location": location})
+        require_mutable("add_startup_program")
         if location == "HKLM" and not is_admin():
             return {
                 "status": "error",
@@ -891,6 +911,10 @@ def remove_startup_program(
     ```
     """
     try:
+        from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+        audit_mutation("remove_startup_program", {"name": name, "location": location})
+        require_mutable("remove_startup_program")
         if location == "HKLM" and not is_admin():
             return {
                 "status": "error",
@@ -982,6 +1006,10 @@ def set_taskbar_autohide(
     ```
     """
     try:
+        from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+        audit_mutation("set_taskbar_autohide", {"enabled": enabled})
+        require_mutable("set_taskbar_autohide")
         # Use PowerShell to set taskbar autohide
         ps_script = f"""
         $regPath = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3"
