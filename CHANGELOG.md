@@ -1,5 +1,13 @@
 
-## [Unreleased] — 2026-10-08 (webapp gap fill Phase 1)
+## [Unreleased] — 2026-10-08 (webapp gap fill Phase 1 + taskbar)
+
+### Added
+- **Taskbar page** (`/taskbar`): `list_taskbar_windows` (47 buttons here:
+  title/process/exe + autostart flags) and `list_tray_icons` (23 icons,
+  exact PID attribution via Win11 tray-host windows + classic toolbar scrape
+  fallback, heuristic confidence levels, autostart flags). Search + autostart-only
+  filter + sidebar entry. Proves the "forgotten autostart app" use case
+  (Wispr Flow found live during development).
 
 ### Added
 - **Metrics card** on status page (`GET /api/metrics`: net I/O + load avg).

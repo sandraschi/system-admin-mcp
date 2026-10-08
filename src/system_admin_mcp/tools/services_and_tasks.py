@@ -3,11 +3,13 @@
 import ctypes
 import logging
 import os
+import struct
 import subprocess
 import time
 import winreg
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import wait as _futures_wait
+from ctypes import wintypes
 from typing import Annotated, Any
 
 import psutil
@@ -1297,3 +1299,390 @@ def forensic_scan() -> dict[str, Any]:
     except Exception as e:
         logger.exception("Error during forensic scan")
         return {"status": "error", "operation": "forensic_scan", "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Taskbar windows + notification-area (tray) icons
+# ---------------------------------------------------------------------------
+
+_TASKBAR_SKIP_CLASSES = frozenset(
+    {
+        "ProgMan",
+        "WorkerW",
+        "Shell_TrayWnd",
+        "Shell_SecondaryTrayWnd",
+        "NotifyIconOverflowWindow",
+        "Windows.UI.Core.CoreWindow",
+        "Xaml_WindowedPopupClass",
+    }
+)
+
+# ToolbarWindow32 control messages (tray icon scraping)
+_TB_BUTTONCOUNT = 0x0418
+_TB_GETBUTTON = 0x0417
+_TB_GETBUTTONTEXTW = 0x044B
+_TBBUTTON_SIZE = 32
+_TBBUTTON_ISTRING_OFFSET = 24
+_TBSTATE_HIDDEN = 0x08
+
+# OpenProcess rights for cross-process toolbar reads (explorer.exe)
+_PROCESS_VM_OPERATION = 0x0008
+_PROCESS_VM_READ = 0x0010
+_PROCESS_VM_WRITE = 0x0020
+_PROCESS_QUERY = 0x0400
+_MEM_COMMIT_RESERVE = 0x3000
+_MEM_RELEASE = 0x8000
+_PAGE_READWRITE = 0x04
+
+
+def _startup_exe_map() -> dict[str, dict[str, Any]]:
+    """Map exe basename (lower) -> startup entry for autostart cross-reference."""
+    mapping: dict[str, dict[str, Any]] = {}
+    try:
+        result = list_startup_programs()
+        entries = result.get("startup_programs") or result.get("programs") or []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            command = str(entry.get("command") or "")
+            # First quoted token or first token is usually the executable.
+            candidate = command.strip()
+            if candidate.startswith('"'):
+                candidate = candidate[1:].split('"', 1)[0]
+            else:
+                candidate = candidate.split(" ", 1)[0].strip().strip('"')
+            base = os.path.basename(candidate).lower()
+            if base:
+                mapping.setdefault(
+                    base,
+                    {
+                        "name": entry.get("name", ""),
+                        "location": entry.get("location", ""),
+                        "command": command[:260],
+                    },
+                )
+    except Exception:
+        logger.debug("startup cross-reference failed", exc_info=True)
+    return mapping
+
+
+def _proc_identity(pid: int) -> tuple[str, str]:
+    """Return (process name, exe path) for a pid; empty strings on failure."""
+    try:
+        proc = psutil.Process(pid)
+        with proc.oneshot():
+            return proc.name() or "", proc.exe() or ""
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        return "", ""
+    except Exception:
+        logger.debug("process identity failed for pid %s", pid, exc_info=True)
+        return "", ""
+
+
+def _autostart_flag(exe: str, startup_map: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    base = os.path.basename(exe or "").lower()
+    entry = startup_map.get(base) if base else None
+    if entry:
+        return {"autostart": True, "startup_name": entry["name"], "startup_location": entry["location"]}
+    return {"autostart": False, "startup_name": "", "startup_location": ""}
+
+
+def list_taskbar_windows(
+    include_untitled: Annotated[bool, Field(description="Include visible windows with empty titles")] = False,
+) -> dict[str, Any]:
+    """List visible taskbar windows with owning process and autostart flags.
+
+    Enumerates top-level windows (EnumWindows): only visible, titled, uncloaked
+    windows are taskbar buttons. Each entry carries pid/process/exe plus whether
+    the owning executable is registered to autostart — the "forgotten app" view.
+    """
+    user32 = ctypes.windll.user32
+    windows: list[dict[str, Any]] = []
+    startup_map = _startup_exe_map()
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def _enum_proc(hwnd, _lparam):
+        try:
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            length = user32.GetWindowTextLengthW(hwnd)
+            if length == 0 and not include_untitled:
+                return True
+            buf = ctypes.create_unicode_buffer(min(length + 1, 512) if length else 2)
+            user32.GetWindowTextW(hwnd, buf, len(buf))
+            title = buf.value or ""
+            if not title and not include_untitled:
+                return True
+            class_buf = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, class_buf, 256)
+            class_name = class_buf.value or ""
+            if class_name in _TASKBAR_SKIP_CLASSES:
+                return True
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            name, exe = _proc_identity(pid.value)
+            entry = {
+                "hwnd": int(hwnd),
+                "title": title[:260],
+                "pid": pid.value,
+                "process": name,
+                "exe": exe,
+                "class_name": class_name,
+            }
+            entry.update(_autostart_flag(exe, startup_map))
+            windows.append(entry)
+        except Exception:
+            logger.debug("taskbar window probe failed", exc_info=True)
+        return True
+
+    try:
+        user32.EnumWindows(_enum_proc, 0)
+    except Exception as e:
+        return {"status": "error", "operation": "list_taskbar_windows", "error": str(e)}
+    windows.sort(key=lambda w: (w["process"] or "").lower())
+    return {"status": "success", "operation": "list_taskbar_windows", "count": len(windows), "windows": windows}
+
+
+def _find_tray_toolbars() -> list[tuple[int, str]]:
+    """Locate notification-area toolbars: (hwnd, area). Best effort."""
+    user32 = ctypes.windll.user32
+    found: list[tuple[int, str]] = []
+
+    def _child(parent: int, class_name: str) -> int:
+        return int(user32.FindWindowExW(parent, 0, class_name, None) or 0)
+
+    tray = int(user32.FindWindowW("Shell_TrayWnd", None) or 0)
+    if tray:
+        notify = _child(tray, "TrayNotifyWnd")
+        if notify:
+            # Win11: toolbar directly under TrayNotifyWnd; Win10: via SysPager.
+            direct = _child(notify, "ToolbarWindow32")
+            if direct:
+                found.append((direct, "main"))
+            else:
+                pager = _child(notify, "SysPager")
+                if pager:
+                    bar = _child(pager, "ToolbarWindow32")
+                    if bar:
+                        found.append((bar, "main"))
+    overflow = int(user32.FindWindowW("NotifyIconOverflowWindow", None) or 0)
+    if overflow:
+        bar = _child(overflow, "ToolbarWindow32")
+        if bar:
+            found.append((bar, "overflow"))
+    return found
+
+
+def _read_tray_buttons(hwnd: int) -> list[dict[str, Any]]:
+    """Scrape button tooltips from a ToolbarWindow32 in explorer.exe.
+
+    There is no public API for tray icons; this uses the documented
+    TB_BUTTONCOUNT/TB_GETBUTTON/TB_GETBUTTONTEXT control messages with
+    cross-process memory. Raises on OpenProcess/virtual-alloc failure so the
+    caller can degrade to a partial result with a note.
+    """
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+    count = int(user32.SendMessageW(hwnd, _TB_BUTTONCOUNT, 0, 0))
+    if count <= 0:
+        return []
+    rights = _PROCESS_VM_OPERATION | _PROCESS_VM_READ | _PROCESS_VM_WRITE | _PROCESS_QUERY
+    proc = kernel32.OpenProcess(rights, False, _tray_toolbar_pid(hwnd))
+    if not proc:
+        raise OSError("OpenProcess on explorer.exe failed (elevation may be required)")
+    buttons: list[dict[str, Any]] = []
+    try:
+        remote_btn = kernel32.VirtualAllocEx(proc, None, _TBBUTTON_SIZE, _MEM_COMMIT_RESERVE, _PAGE_READWRITE)
+        remote_txt = kernel32.VirtualAllocEx(proc, None, 1024, _MEM_COMMIT_RESERVE, _PAGE_READWRITE)
+        if not remote_btn or not remote_txt:
+            raise OSError("VirtualAllocEx in explorer.exe failed")
+        try:
+            for index in range(min(count, 256)):
+                raw = (ctypes.c_ubyte * _TBBUTTON_SIZE)()
+                if not user32.SendMessageW(hwnd, _TB_GETBUTTON, index, remote_btn):
+                    continue
+                read = wintypes.DWORD(0)
+                if not kernel32.ReadProcessMemory(proc, remote_btn, raw, _TBBUTTON_SIZE, ctypes.byref(read)):
+                    continue
+                _bitmap, cmd, state = struct.unpack_from("<iiB", bytes(raw))
+                istring = struct.unpack_from("<q", bytes(raw), _TBBUTTON_ISTRING_OFFSET)[0]
+                length = int(user32.SendMessageW(hwnd, _TB_GETBUTTONTEXTW, cmd, remote_txt))
+                tooltip = ""
+                if length > 0:
+                    tbuf = (ctypes.c_ubyte * 1024)()
+                    if kernel32.ReadProcessMemory(proc, remote_txt, tbuf, 1024, ctypes.byref(read)):
+                        try:
+                            tooltip = bytes(tbuf[: length * 2]).decode("utf-16-le", errors="replace")
+                        except Exception:
+                            tooltip = ""
+                buttons.append(
+                    {
+                        "index": index,
+                        "id_command": int(cmd),
+                        "hidden": bool(state & _TBSTATE_HIDDEN),
+                        "tooltip": tooltip[:260],
+                        "icon_ref": int(istring),
+                    }
+                )
+        finally:
+            kernel32.VirtualFreeEx(proc, remote_btn, 0, _MEM_RELEASE)
+            kernel32.VirtualFreeEx(proc, remote_txt, 0, _MEM_RELEASE)
+    finally:
+        kernel32.CloseHandle(proc)
+    return buttons
+
+
+def _tray_toolbar_pid(hwnd: int) -> int:
+    user32 = ctypes.windll.user32
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return pid.value
+
+
+# Win11 24H2+ hosts tray icons in per-app top-level windows instead of the
+# explorer toolbar. These classes identify them (exact PID attribution).
+_TRAY_HOST_PATTERNS = ("NotifyIcon", "TrayIcon", "StatusTray", "SysTrayIcon")
+
+
+def _find_tray_host_windows() -> list[dict[str, Any]]:
+    """Enumerate per-app tray host windows with exact owning PIDs."""
+    user32 = ctypes.windll.user32
+    hosts: list[dict[str, Any]] = []
+    class_buf = ctypes.create_unicode_buffer(256)
+    title_buf = ctypes.create_unicode_buffer(256)
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def _enum_proc(hwnd, _lparam):
+        try:
+            user32.GetClassNameW(hwnd, class_buf, 256)
+            class_name = class_buf.value or ""
+            if not any(p in class_name for p in _TRAY_HOST_PATTERNS):
+                return True
+            if class_name in ("NotifyIconOverflowWindow",):
+                return True
+            user32.GetWindowTextW(hwnd, title_buf, 256)
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            name, exe = _proc_identity(pid.value)
+            hosts.append(
+                {
+                    "hwnd": int(hwnd),
+                    "class_name": class_name,
+                    "title": (title_buf.value or "")[:260],
+                    "pid": pid.value,
+                    "process": name,
+                    "exe": exe,
+                }
+            )
+        except Exception:
+            logger.debug("tray host probe failed", exc_info=True)
+        return True
+
+    try:
+        user32.EnumWindows(_enum_proc, 0)
+    except Exception:
+        logger.debug("tray host enumeration failed", exc_info=True)
+    return hosts
+
+
+def _guess_tray_owner(tooltip: str, table: list[tuple[int, str, str]]) -> tuple[dict[str, Any] | None, str]:
+    """Best-effort attribution of a tray tooltip to a running process.
+
+    table: [(pid, name, exe)]. Returns (identity dict | None, confidence).
+    Tooltips usually name the app; matching is substring-based and honest
+    about uncertainty — never presented as authoritative.
+    """
+    text = (tooltip or "").lower()
+    if not text:
+        return None, "none"
+    best: dict[str, Any] | None = None
+    level = "none"
+    for pid, name, exe in table:
+        base = os.path.basename(exe or name or "").lower()
+        stem = base[:-4] if base.endswith(".exe") else base
+        if len(stem) >= 4 and stem in text:
+            if text.startswith(stem) or stem in text.split(" "):
+                return {"pid": pid, "process": name, "exe": exe}, "high"
+            best = {"pid": pid, "process": name, "exe": exe}
+            level = "medium"
+    return best, level
+
+
+def list_tray_icons(
+    include_main_area: Annotated[
+        bool, Field(description="Include the always-visible tray area (not just overflow)")
+    ] = True,
+) -> dict[str, Any]:
+    """List notification-area (tray) icons with owners and autostart flags.
+
+    Two sources, merged: (1) classic explorer.exe toolbar scraping (pre-24H2
+    shells) with heuristic tooltip attribution; (2) per-app tray host windows
+    (Win11 24H2+, exact PID via GetWindowThreadProcessId). Host-window hits
+    carry confidence "exact"; toolbar guesses carry high/medium. Entries also
+    flag autostart registration — the "forgotten app" view.
+    """
+    note = ""
+    try:
+        toolbars = _find_tray_toolbars()
+    except Exception as e:
+        toolbars = []
+        note = f"toolbar lookup failed: {e}"
+    table: list[tuple[int, str, str]] = []
+    for proc in psutil.process_iter(["pid", "name", "exe"]):
+        try:
+            table.append((proc.pid, proc.info.get("name") or "", proc.info.get("exe") or ""))
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+    startup_map = _startup_exe_map()
+    icons: list[dict[str, Any]] = []
+    for hwnd, area in toolbars:
+        if area == "main" and not include_main_area:
+            continue
+        try:
+            buttons = _read_tray_buttons(hwnd)
+        except Exception as e:
+            note = f"{note} {area} area unreadable: {e}".strip()
+            logger.debug("tray scrape failed for %s area", area, exc_info=True)
+            continue
+        for b in buttons:
+            guess, confidence = _guess_tray_owner(b["tooltip"], table)
+            entry: dict[str, Any] = {
+                "area": area,
+                "index": b["index"],
+                "tooltip": b["tooltip"],
+                "hidden": b["hidden"],
+                "source": "toolbar",
+                "process_guess": guess,
+                "confidence": confidence,
+            }
+            entry.update(_autostart_flag((guess or {}).get("exe", ""), startup_map))
+            icons.append(entry)
+    try:
+        hosts = _find_tray_host_windows()
+    except Exception as e:
+        hosts = []
+        note = f"{note} host enumeration failed: {e}".strip()
+    for h in hosts:
+        guess: dict[str, Any] | None = None
+        if h["pid"]:
+            guess = {"pid": h["pid"], "process": h["process"], "exe": h["exe"]}
+        entry = {
+            "area": "tray",
+            "index": -1,
+            "tooltip": h["title"] or h["process"] or os.path.basename(h["exe"] or ""),
+            "hidden": False,
+            "source": "window",
+            "process_guess": guess,
+            "confidence": "exact" if guess else "none",
+        }
+        entry.update(_autostart_flag(h["exe"], startup_map))
+        icons.append(entry)
+    if not toolbars and hosts:
+        note = f"{note} classic toolbar absent on this shell (Win11 24H2+); host windows used.".strip()
+    status = "success" if icons else "error"
+    result: dict[str, Any] = {"status": status, "operation": "list_tray_icons", "count": len(icons), "icons": icons}
+    if note:
+        result["note"] = note
+    if status == "error" and not note:
+        result["error"] = "no icons found (elevation may be required)"
+    return result

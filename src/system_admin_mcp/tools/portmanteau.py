@@ -73,6 +73,8 @@ from system_admin_mcp.tools.services_and_tasks import (
     list_processes,
     list_services,
     list_startup_programs,
+    list_taskbar_windows,
+    list_tray_icons,
     remove_startup_program,
     set_service_startup,
     set_taskbar_autohide,
@@ -257,6 +259,8 @@ async def system_admin(
             "kill_taskbar_blocking_processes",
             "get_taskbar_settings",
             "set_taskbar_autohide",
+            "list_taskbar_windows",
+            "list_tray_icons",
         ],
         Field(description="The operation to perform (required)"),
     ],
@@ -387,6 +391,8 @@ async def system_admin(
     - kill_taskbar_blocking_processes: Kill processes blocking taskbar
     - get_taskbar_settings: Get current taskbar settings
     - set_taskbar_autohide: Enable/disable taskbar autohide
+    - list_taskbar_windows: Visible taskbar buttons with process + autostart flags
+    - list_tray_icons: Notification-area icons with tooltips + owner guesses
 
     Parameter details live on the signature via Annotated[..., Field(...)];
     only the params each operation needs are required (all default to None
@@ -697,6 +703,12 @@ async def system_admin(
             if autohide is None:
                 raise ValueError("autohide parameter required for set_taskbar_autohide")
             return set_taskbar_autohide(autohide)
+
+        elif operation == "list_taskbar_windows":
+            return list_taskbar_windows()
+
+        elif operation == "list_tray_icons":
+            return list_tray_icons()
 
         else:
             return {
