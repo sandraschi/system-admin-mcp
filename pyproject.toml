@@ -62,6 +62,8 @@ ignore = ["S101", "B008", "S603", "S607", "S106", "RUF012", "S324", "E402", "E50
 "src/system_admin_mcp/user_bridge/bridge.py" = ["T201"]
 "src/system_admin_mcp/elevated_service/service.py" = ["T201"]
 "scripts/smoke_stdio.py" = ["T201"]
+# Vendored fleet CUA harness (v15): prints are its CLI; best-effort probes are test code.
+"scripts/cua-smoke.py" = ["T201", "S110"]
 # Tests legitimately assert (S101) and use bind-address fixtures as data (S104).
 "tests/*" = ["S101", "S104"]
 
@@ -74,4 +76,5 @@ dev = [
     "pyinstaller>=6.22.2",
     "pyright>=1.1.411",
     "pywin32>=311",
+    "pywinauto>=0.6.8",
 ]

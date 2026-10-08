@@ -107,6 +107,12 @@ async def health_check() -> dict[str, Any]:
     }
 
 
+@app.get("/api/v1/health")
+async def health_check_v1() -> dict[str, Any]:
+    """Versioned health alias (fleet CUA template default)."""
+    return await health_check()
+
+
 @app.get("/api/status")
 async def system_status() -> dict[str, Any]:
     """Detailed system and service status."""
