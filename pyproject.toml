@@ -61,6 +61,7 @@ ignore = ["S101", "B008", "S603", "S607", "S106", "RUF012", "S324", "E402", "E50
 # CLI/demo entry points: stderr + __main__ prints are the interface, not server logging.
 "src/system_admin_mcp/user_bridge/bridge.py" = ["T201"]
 "src/system_admin_mcp/elevated_service/service.py" = ["T201"]
+"scripts/smoke_stdio.py" = ["T201"]
 # Tests legitimately assert (S101) and use bind-address fixtures as data (S104).
 "tests/*" = ["S101", "S104"]
 
