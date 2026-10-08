@@ -1,5 +1,6 @@
 import { Settings as SettingsIcon, Shield, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { InstallOllamaButton } from "@/components/InstallOllamaButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -146,12 +147,17 @@ function ProviderCards() {
               </span>
             </div>
             {c.kind === "local" ? (
-              <p className="text-xs text-slate-400">
-                {c.base_url}
-                {c.models?.length
-                  ? ` — ${c.models.length} model${c.models.length === 1 ? "" : "s"}`
-                  : ""}
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400">
+                  {c.base_url}
+                  {c.models?.length
+                    ? ` — ${c.models.length} model${c.models.length === 1 ? "" : "s"}`
+                    : ""}
+                </p>
+                {c.id === "ollama" && !live && (
+                  <InstallOllamaButton onDone={refresh} />
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
                 <div className="flex gap-2">

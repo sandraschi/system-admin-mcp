@@ -233,10 +233,33 @@ export function pickTargetGpu(
 }
 
 export function fitsTarget(model: string, target: GpuInfo | null): boolean {
-  if (!target || !target.vramMb) return true;
+  if (!target?.vramMb) return true;
   const minVram = MODEL_TIER_MIN_VRAM_MB[model];
   if (minVram === undefined) return true;
   return target.vramMb >= minVram;
+}
+
+/** One-click engine install (allowlisted only, background job on the backend). */
+export async function startInstall(
+  engine: string,
+): Promise<{ engine: string; started: boolean; reason?: string }> {
+  const r = await fetch(`${API_BASE}/api/llm/install`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ engine }),
+  });
+  if (!r.ok) throw new Error(`/api/llm/install: HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function pollInstallStatus(
+  engine: string,
+): Promise<{ engine: string; state: string; output?: string }> {
+  const r = await fetch(
+    `${API_BASE}/api/llm/install/status?engine=${encodeURIComponent(engine)}`,
+  );
+  if (!r.ok) throw new Error(`/api/llm/install/status: HTTP ${r.status}`);
+  return r.json();
 }
 
 /** Resident-first default: loaded beats installed; unfit models skipped. */

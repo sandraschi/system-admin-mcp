@@ -1,6 +1,7 @@
 import { Activity, Cpu, HardDrive, Server, Shield, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { InstallOllamaButton } from "@/components/InstallOllamaButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLlmStore, useLlmUsable } from "@/store/llm";
 
@@ -128,14 +129,20 @@ export function Dashboard() {
       </div>
 
       {llmStatus === "ready" && !llmUsable && (
-        <Link
-          to="/settings"
+        <div
           data-testid="onboarding-cue"
-          className="block rounded-2xl border border-red-700/60 bg-red-950/40 p-4 text-sm text-red-200 hover:bg-red-900/30"
+          className="rounded-2xl border border-red-700/60 bg-red-950/40 p-4 text-sm text-red-200 space-y-3"
         >
-          <strong>No usable AI provider.</strong> Start Ollama (:11434) or LM
-          Studio (:1234), or paste a cloud key in Settings — then chat works.
-        </Link>
+          <p>
+            <strong>No usable AI provider.</strong> Start Ollama (:11434) or LM
+            Studio (:1234), paste a cloud key in{" "}
+            <Link to="/settings" className="underline hover:text-red-100">
+              Settings
+            </Link>{" "}
+            — then chat works.
+          </p>
+          <InstallOllamaButton />
+        </div>
       )}
 
       {/* KPI Cards */}

@@ -4,6 +4,7 @@ import {
   Cpu,
   Database,
   HardDrive,
+  Network,
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
@@ -38,8 +39,18 @@ interface StatusData {
   system?: StatusSystem;
 }
 
+interface MetricsData {
+  cpu_count?: number;
+  load_average?: number[];
+  network?: {
+    bytes_sent?: number;
+    bytes_recv?: number;
+  };
+}
+
 export function Status() {
   const [stats, setStats] = useState<StatusData | null>(null);
+  const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchStatus = useCallback(async () => {
@@ -49,6 +60,10 @@ export function Status() {
       if (res.ok) {
         const data = await res.json();
         setStats(data);
+      }
+      const mres = await fetch(`${API_BASE}/api/metrics`);
+      if (mres.ok) {
+        setMetrics(await mres.json());
       }
     } catch {
       // ignore fetch errors
@@ -190,6 +205,27 @@ export function Status() {
                 {formatUptime(stats.uptime ?? 0)}
               </p>
               <CardDescription>Service running</CardDescription>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="bg-slate-900/50 border-slate-800 backdrop-blur-xl"
+            data-testid="metrics-card"
+          >
+            <CardHeader className="flex flex-row items-center gap-2 pb-2">
+              <Network className="w-5 h-5 text-orange-500" />
+              <CardTitle className="text-white text-lg">Network I/O</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xl font-bold text-white">
+                ↓ {formatBytes(metrics?.network?.bytes_recv ?? 0)}
+              </p>
+              <CardDescription>
+                ↑ {formatBytes(metrics?.network?.bytes_sent ?? 0)} sent
+                {metrics?.load_average
+                  ? ` · load ${metrics.load_average.map((v) => v.toFixed(2)).join(" / ")}`
+                  : ""}
+              </CardDescription>
             </CardContent>
           </Card>
         </div>
