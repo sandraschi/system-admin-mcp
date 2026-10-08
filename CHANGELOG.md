@@ -1,5 +1,30 @@
 
-## [Unreleased] — 2026-10-08 (webapp gap fill Phase 1 + taskbar)
+## [Unreleased] — 2026-10-08 (safety: read-only mode, audit log, airgap)
+
+### Added
+- **Mutation guardrails** (`mutation_guard.py`): `SYSTEMADMIN_READ_ONLY=1`
+  kill switch (dispatch + function level, dry-run previews stay usable),
+  JSONL mutation audit log (`logs/mutations.log`, blocked attempts included).
+- **Airgap kill switch**: `airgap_status/enable/disable` ops (confirm=True
+  every call, read-only-blocked) — firewall outbound BLOCK + bluetooth stop,
+  loopback/USB-HID survive, snapshot restore. Big red two-step button on the
+  Security page. Full threat model + auth roadmap in new `docs/SECURITY.md`.
+- **Safety tests**: `tests/test_safety.py` (11 tests, never mutates).
+
+### Fixed
+- H8 closure gaps: remaining plain-signature tools now Annotated
+  (verify: every tool param carries a description); falsy-zero firewall parse
+  bug (`0 or "?"`); `audit_network_ports` dispatch passed the wrong flag.
+
+### Added
+- **Protection posture** (basic): `get_defender_status` (realtime/signatures),
+  `get_vpn_status` (Windows VPN profiles), `get_tailscale_status`
+  (installed/running/tailnet — full mesh stays in tailscale-mcp).
+  New `GET /api/protection` bundle + Security page card.
+- **Network ports**: new `GET /api/network-ports` (was dispatch-broken:
+  wrapper passed the wrong flag — fixed) + searchable Security table.
+- **Inventory sysinfo**: hardware/OS/performance rows + searchable installed
+  software (266 entries here) via existing portmanteau ops.
 
 ### Added
 - **Taskbar page** (`/taskbar`): `list_taskbar_windows` (47 buttons here:

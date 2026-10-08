@@ -83,3 +83,5 @@ reports/
 
 # LLM provider keys (0600 keystore, never committed; env vars win)
 data/llm_keys.json
+# Airgap snapshots (machine state, never committed)
+data/airgap_state.json
