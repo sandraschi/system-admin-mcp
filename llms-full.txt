@@ -1,6 +1,6 @@
 # System Admin MCP — Full Agent Reference
 
-> FastMCP 3.2 server for elevated Windows system administration. 40+ operations across file recovery, security/permissions, disk/volume maintenance, system diagnostics, services, processes, startup/taskbar management, and agentic workflows. **Run as Administrator.**
+> FastMCP 3.2 server for elevated Windows system administration. 40+ operations across file recovery, security/permissions, disk/volume maintenance, system diagnostics, services, processes, startup/taskbar management, protection posture, airgap, and agentic workflows. **Run as Administrator.** Safety: `SYSTEMADMIN_READ_ONLY=1` blocks all mutations; every mutation is audit-logged (`logs/mutations.log`); airgap ops need `confirm=True` every call. Full model: `docs/SECURITY.md`.
 
 ## Quick Links
 
@@ -9,7 +9,7 @@
 - AGENTS.md: [AGENTS.md](AGENTS.md)
 - Quickstart: [docs/quickstart.md](docs/quickstart.md)
 - API reference: [docs/api/README.md](docs/api/README.md)
-- Version: 0.3.0
+- Version: 0.4.0
 - Ports: 10860 (webapp frontend), 10861 (API backend / MCP HTTP)
 - Dual transport: stdio (Claude Desktop default) / streamable-http (`MCP_TRANSPORT=http`)
 - Admin required: YES — many operations check `IsUserAnAdmin()` internally
@@ -117,6 +117,19 @@ Single tool with `operation` discriminator. All admin operations go through this
 | `kill_taskbar_blocking_processes` | Kill processes blocking taskbar autohide. | `process_names`, `force` |
 | `get_taskbar_settings` | Get current taskbar state: autohide enabled?, locked?, always on top? | — |
 | `set_taskbar_autohide` | Enable or disable taskbar autohide. | `autohide` |
+| `list_taskbar_windows` | Visible taskbar buttons with title, PID, process, exe + autostart flags (the "forgotten app" view). | `include_untitled` |
+| `list_tray_icons` | Notification-area icons: tooltips + owner guesses (exact PIDs via Win11 host windows, toolbar scrape fallback) + autostart flags. | `include_main_area` |
+
+#### Protection Posture (basic status; full mesh mgmt lives elsewhere)
+
+| Operation | Description | Key Parameters |
+|-----------|-------------|---------------|
+| `get_defender_status` | Defender realtime protection + signature age (read-only; no downgrade op exists). | — |
+| `get_vpn_status` | Windows VPN profiles + connection state. | — |
+| `get_tailscale_status` | Tailscale installed/running/tailnet state (basic; full mgmt in tailscale-mcp). | — |
+| `airgap_status` | Read-only airgap state (firewall defaults + bluetooth). | — |
+| `airgap_enable` | CUT outside links (firewall BLOCK + bluetooth stop). Requires `confirm=True` every call; read-only-blocked. | `confirm` |
+| `airgap_disable` | Restore outside links from snapshot. Requires `confirm=True` every call. | `confirm` |
 
 ### Standalone Tools
 

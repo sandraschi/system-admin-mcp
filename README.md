@@ -44,11 +44,13 @@ See [Quickstart](docs/quickstart.md) for full setup.
 |------|-----------|
 | **System Health** | CPU/RAM/disk metrics, event logs, hardware inventory, installed software |
 | **File Recovery** | Scan NTFS MFT, recover deleted files, validate integrity |
-| **Security** | View/set/audit NTFS permissions, take ownership, network port audit |
+| **Security** | View/set/audit NTFS permissions, take ownership, network port audit, Defender/VPN/Tailscale posture, red-button Airgap |
 | **Disks** | SMART health, defrag (HDD), TRIM (SSD), cleanup, folder size analysis |
 | **Services** | List/start/stop, change startup type, paginated |
 | **Processes** | List/sort/analyze/kill, paginated, sortable by CPU/Memory/Name/PID |
-| **Startup & Taskbar** | Manage startup programs, toggle autohide, find blockers |
+| **Startup & Taskbar** | Manage startup programs, toggle autohide, find blockers, taskbar buttons + tray icons with autostart flags |
+| **AI Chat** | Local (Ollama/LM Studio) + 13 cloud providers via backend proxy, streaming, resident-first GPU placement |
+| **Safety** | Read-only mode (`SYSTEMADMIN_READ_ONLY=1`), mutation audit log, confirm-gated Airgap (see `docs/SECURITY.md`) |
 | **Agentic** | Let AI autonomously diagnose and fix issues (SEP-1577 sampling) |
 
 All operations go through a single `system_admin` tool — one tool, 40+ operations.
@@ -78,7 +80,7 @@ just web              # Backend API
 just web-frontend     # Frontend dev server
 ```
 
-Pages: Dashboard, Status, Processes (paginated, sortable), Services (paginated), Volumes, File Owner, File Recovery, Logs, Tools, Apps, Elevated, Chat, Settings, Help.
+Pages: Dashboard, Status, Processes (paginated, sortable), Services (paginated), Taskbar (buttons + tray + autostart), Volumes, File Owner, File Recovery, Logs, Tools, Apps, Elevated, Chat, Settings, Help.
 
 ---
 
