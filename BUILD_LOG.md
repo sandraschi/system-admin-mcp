@@ -2,6 +2,21 @@
 
 Running record for native builds (fleet NSIS gate requires this file).
 
+## 2026-10-08 — full pipeline green (Goliath)
+
+Command: `powershell -NoProfile -ExecutionPolicy Bypass -File native/build.ps1`
+Result: **PASS**. Full log: `C:\Users\sandr\AppData\Local\Temp\opencode\nsis2.log`.
+
+- [1/4] Frontend (web_sota): bun install + tsc + `bun run build` (Taskbar,
+  protection, Airgap UI included).
+- [2/4] PyInstaller backend from project `.venv`: 32.9 MB (Gate 0 pass).
+- [3/4] Frozen smoke test PASSED (`:11999 /api/health` 200 — covers new
+  guard/airgap/protection modules in the frozen exe).
+- [4/4] NSIS `System Admin MCP_0.1.0_x64-setup.exe` (36.7 MB) staged to dist/.
+- Harness note: the tool runner reported `ChildProcess.kill` on the 25-min
+  call, but the build itself completed (log ends "=== Build complete ===").
+  Trust the log + fresh timestamps, not the runner status.
+
 ## 2026-10-07 — full pipeline green (Goliath)
 
 Command: `powershell -NoProfile -ExecutionPolicy Bypass -File native/build.ps1`
