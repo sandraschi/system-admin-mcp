@@ -66,7 +66,7 @@ logger.info(f"Initialized with {len(registered_tools)} registered tools: {regist
 app = FastAPI(
     title="System Admin MCP Server",
     description="Elevated system operations and monitoring API",
-    version="0.1.0",
+    version="0.4.0",
 )
 
 # Add CORS middleware - fleet standard: explicit origins + unconditional regex
@@ -116,7 +116,7 @@ async def system_status() -> dict[str, Any]:
 
     return {
         "service": "system-admin-mcp",
-        "version": "0.1.0",
+        "version": "0.4.0",
         "status": "healthy",
         "uptime": int(time.time() - START_TIME),
         "system": {

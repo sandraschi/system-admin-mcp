@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastMCP):
     from system_admin_mcp.tools.monitoring import watcher_manager
 
-    logger.info("Initializing System Admin MCP v0.3.0...")
+    logger.info("Initializing System Admin MCP v0.4.0...")
 
     _ = watcher_manager  # ensure loaded
 
@@ -60,10 +60,10 @@ async def lifespan(app: FastMCP):
 # FastMCP 3.2 instance
 mcp = FastMCP(
     "system-admin-mcp",
-    version="0.3.0",
+    version="0.4.0",
     lifespan=lifespan,
     instructions=(
-        "SOTA v0.3.0: Windows System Administration Hub - "
+        "SOTA v0.4.0: Windows System Administration Hub - "
         "elevated ops, file recovery, security, diagnostics, services, processes. "
         "Full FastMCP 3.2 conformance: sampling, skills, prompts, prefab UI."
     ),

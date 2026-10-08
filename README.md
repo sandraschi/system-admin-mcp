@@ -12,6 +12,8 @@
 
 **Windows system administration, through AI.** File recovery, security, disk maintenance, diagnostics, services, processes — all accessible via MCP (Claude Desktop, Cursor, etc.) and a React web dashboard.
 
+> **Download the installer:** [latest release](https://github.com/sandraschi/system-admin-mcp/releases) (`system-admin-mcp-0.4.0-setup.exe`) — no Python needed, backend embedded. For Claude Desktop without installing: attach `system-admin-mcp-0.4.0.mcpb` from the same release.
+
 > **⚠️ Administrator privileges required.** Disk operations, service management, file recovery, and permission changes need elevation. Run your terminal as Administrator before starting the server.
 
 ```json
