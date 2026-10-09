@@ -185,6 +185,15 @@ def recover_file_ntfs(
     """Recover a deleted file from NTFS volume.
 
     PORTMANTEAU TARGET: This tool is the primary recovery engine for NTFS.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "recover_file", ...}` with
+    source/destination paths and recovered file size.
+
+    ## Examples
+    ```python
+    recover_file_ntfs("C:/deleted/file.docx", "D:/Recovery/")
+    ```
     """
     from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
 
@@ -249,7 +258,17 @@ def recover_file_ntfs(
 
 @mcp.tool(annotations=_READ_ONLY)
 def validate_recovery(file_path: Annotated[str, Field(description="Recovered file to validate")]) -> dict[str, Any]:
-    """Validate recovered file integrity."""
+    """Validate recovered file integrity.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "validate_recovery", ...}` with
+    existence/size/readability verdict.
+
+    ## Examples
+    ```python
+    validate_recovery("D:/Recovery/file.docx")
+    ```
+    """
     try:
         if not os.path.exists(file_path):
             return {
@@ -302,7 +321,17 @@ def validate_recovery(file_path: Annotated[str, Field(description="Recovered fil
 
 @mcp.tool(annotations=_READ_ONLY)
 def get_permissions(path: Annotated[str, Field(description="File or folder path")]) -> dict[str, Any]:
-    """Get file/folder permissions and ACLs."""
+    """Get file/folder permissions and ACLs.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "get_permissions", ...}` with
+    owner, inherited/explicit entries, and access control entries.
+
+    ## Examples
+    ```python
+    get_permissions("C:/Windows")
+    ```
+    """
     try:
         path = os.path.abspath(path)
 
@@ -387,7 +416,17 @@ def set_permissions(
     rights: Annotated[str, Field(description="Rights: Read, Write, Modify, FullControl")],
     inheritance: Annotated[str | None, Field(description="Inheritance setting")] = None,
 ) -> dict[str, Any]:
-    """Set file/folder permissions."""
+    """Set file/folder permissions.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "set_permissions", ...}` with
+    the applied grant summary.
+
+    ## Examples
+    ```python
+    set_permissions("D:/Shared", "DOMAIN\\User", "Read")
+    ```
+    """
     from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
 
     audit_mutation("set_permissions", {"path": path, "principal": principal, "rights": rights})
@@ -459,7 +498,17 @@ def remove_permission(
     path: Annotated[str, Field(description="File or folder path")],
     principal: Annotated[str, Field(description="User/group to remove")],
 ) -> dict[str, Any]:
-    """Remove specific permission from file/folder."""
+    """Remove specific permission from file/folder.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "remove_permission", ...}` with
+    the removal summary.
+
+    ## Examples
+    ```python
+    remove_permission("D:/Shared", "DOMAIN\\User")
+    ```
+    """
     from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
 
     audit_mutation("remove_permission", {"path": path, "principal": principal})
@@ -533,7 +582,17 @@ def remove_permission(
 def take_ownership(
     path: Annotated[str, Field(description="File or folder path")],
 ) -> dict[str, Any]:
-    """Take ownership of file/folder."""
+    """Take ownership of file/folder.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "take_ownership", ...}` with
+    the new owner record.
+
+    ## Examples
+    ```python
+    take_ownership("C:/Windows")
+    ```
+    """
     from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
 
     audit_mutation("take_ownership", {"path": path})
@@ -580,7 +639,17 @@ def take_ownership(
 
 @mcp.tool(annotations=_READ_ONLY)
 def audit_permissions(path: Annotated[str, Field(description="File or folder path to audit")]) -> dict[str, Any]:
-    """Audit permissions and identify security issues."""
+    """Audit permissions and identify security issues.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "audit_permissions", ...}` with
+    all entries, effective access, inheritance analysis, and concerns.
+
+    ## Examples
+    ```python
+    audit_permissions("D:/Shared")
+    ```
+    """
     try:
         perms = get_permissions(path)
         if perms.get("status") != "success":
@@ -625,7 +694,17 @@ def audit_permissions(path: Annotated[str, Field(description="File or folder pat
 
 @mcp.tool(annotations=_READ_ONLY)
 def check_disk_health(drive: Annotated[str, Field(description='Drive letter, e.g. "C:"')]) -> dict[str, Any]:
-    """Check disk SMART status and health using WMI."""
+    """Check disk SMART status and health using WMI.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "check_disk_health", ...}` with
+    SMART status, filesystem errors, and partition info.
+
+    ## Examples
+    ```python
+    check_disk_health("C:")
+    ```
+    """
     try:
         if not WMI_AVAILABLE:
             return {
@@ -678,7 +757,17 @@ def check_disk_health(drive: Annotated[str, Field(description='Drive letter, e.g
 
 @mcp.tool(annotations=_READ_ONLY)
 def analyze_disk_usage_advanced(drive: Annotated[str, Field(description='Drive letter, e.g. "C:"')]) -> dict[str, Any]:
-    """Advanced disk usage analysis with folder breakdown."""
+    """Advanced disk usage analysis with folder breakdown.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "analyze_disk_usage", ...}` with
+    per-category usage breakdown.
+
+    ## Examples
+    ```python
+    analyze_disk_usage_advanced("C:")
+    ```
+    """
     try:
         if not drive.endswith(":\\"):
             drive = drive.rstrip(":") + ":\\"
@@ -747,7 +836,17 @@ def disk_cleanup(
     cleanup_targets: Annotated[list[str] | None, Field(description="Targets: temp_files, recycle_bin, etc.")] = None,
     dry_run: Annotated[bool, Field(description="Preview only when true (default)")] = True,
 ) -> dict[str, Any]:
-    """Clean up disk space by removing temp files and other cleanup targets."""
+    """Clean up disk space by removing temp files and other cleanup targets.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "disk_cleanup", ...}` with
+    per-target freed bytes and dry-run preview support.
+
+    ## Examples
+    ```python
+    disk_cleanup("C:", ["temp_files", "recycle_bin"], dry_run=True)
+    ```
+    """
     from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
 
     # Dry-run previews stay usable (read-only semantic); only real deletes guard+log.
@@ -851,7 +950,17 @@ def defragment_disk(
     drive: Annotated[str, Field(description='Drive letter, e.g. "D:" (HDDs only)')],
     thorough: Annotated[bool, Field(description="Thorough (slower) defragmentation")] = False,
 ) -> dict[str, Any]:
-    """Defragment HDD (HDDs only - do not use on SSDs!)."""
+    """Defragment HDD (HDDs only - do not use on SSDs!).
+
+    ## Return Format
+    `{status: "success" | "error", operation: "defragment_disk", ...}` with
+    the defragmentation summary.
+
+    ## Examples
+    ```python
+    defragment_disk("D:")
+    ```
+    """
     from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
 
     audit_mutation("defragment_disk", {"drive": drive, "thorough": thorough})
@@ -918,7 +1027,17 @@ def defragment_disk(
 def optimize_ssd(
     drive: Annotated[str, Field(description='Drive letter, e.g. "C:" (SSDs only)')],
 ) -> dict[str, Any]:
-    """Optimize SSD with TRIM operation."""
+    """Optimize SSD with TRIM operation.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "optimize_ssd", ...}` with
+    the TRIM optimization summary.
+
+    ## Examples
+    ```python
+    optimize_ssd("C:")
+    ```
+    """
     from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
 
     audit_mutation("optimize_ssd", {"drive": drive})
@@ -957,7 +1076,17 @@ def optimize_ssd(
 
 @mcp.tool(annotations=_READ_ONLY)
 def get_hardware_info() -> dict[str, Any]:
-    """Get comprehensive hardware information using WMI and psutil."""
+    """Get comprehensive hardware information using WMI and psutil.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "get_hardware_info", ...}` with
+    CPU, RAM, motherboard, GPU, disk, and adapter details.
+
+    ## Examples
+    ```python
+    get_hardware_info()
+    ```
+    """
     try:
         hw_info: dict[str, Any] = {"status": "success", "operation": "get_hardware_info"}
 
@@ -1049,7 +1178,17 @@ def get_hardware_info() -> dict[str, Any]:
 
 @mcp.tool(annotations=_READ_ONLY)
 def get_os_info() -> dict[str, Any]:
-    """Get operating system information."""
+    """Get operating system information.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "get_os_info", ...}` with
+    version, build, edition, install date, and boot info.
+
+    ## Examples
+    ```python
+    get_os_info()
+    ```
+    """
     try:
         os_info: dict[str, Any] = {"status": "success", "operation": "get_os_info"}
 
@@ -1094,7 +1233,17 @@ def get_os_info() -> dict[str, Any]:
 
 @mcp.tool(annotations=_READ_ONLY)
 def get_installed_software() -> dict[str, Any]:
-    """Get list of installed software from registry."""
+    """Get list of installed software from registry.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "get_installed_software", ...}`
+    with name, version, publisher, and install date per entry.
+
+    ## Examples
+    ```python
+    get_installed_software()
+    ```
+    """
     try:
         # Query registry for installed software
         ps_script = """
@@ -1143,7 +1292,17 @@ def get_installed_software() -> dict[str, Any]:
 
 @mcp.tool(annotations=_READ_ONLY)
 def get_performance_metrics() -> dict[str, Any]:
-    """Get real-time performance metrics."""
+    """Get real-time performance metrics.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "get_performance_metrics", ...}`
+    with CPU usage, memory, and disk I/O counters.
+
+    ## Examples
+    ```python
+    get_performance_metrics()
+    ```
+    """
     try:
         # CPU metrics
         cpu_percent = psutil.cpu_percent(interval=1, percpu=True)
@@ -1221,7 +1380,17 @@ def get_event_log(
     level: Annotated[str | None, Field(description='Level filter: "Error", "Warning", "Information"')] = None,
     hours_back: Annotated[int, Field(description="Hours to look back", ge=1)] = 24,
 ) -> dict[str, Any]:
-    """Query Windows event logs."""
+    """Query Windows event logs.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "get_event_log", ...}` with
+    timestamped events (id, source, message).
+
+    ## Examples
+    ```python
+    get_event_log("System", "Error", 24)
+    ```
+    """
     try:
         if not is_admin():
             return {
@@ -1307,7 +1476,17 @@ def get_event_log(
 
 @mcp.tool(annotations=_READ_ONLY)
 def health_check() -> dict[str, Any]:
-    """Perform comprehensive system health check."""
+    """Perform comprehensive system health check.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "health_check", ...}` with
+    CPU, RAM, and disk health verdicts.
+
+    ## Examples
+    ```python
+    health_check()
+    ```
+    """
     try:
         health = {
             "status": "success",
@@ -1357,7 +1536,17 @@ def health_check() -> dict[str, Any]:
 
 @mcp.tool(annotations=_READ_ONLY)
 def get_volume_info(drive: Annotated[str, Field(description='Drive letter, e.g. "C:"')]) -> dict[str, Any]:
-    """Get detailed volume information."""
+    """Get detailed volume information.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "get_volume_info", ...}` with
+    capacity, used/free space, filesystem, and cluster size.
+
+    ## Examples
+    ```python
+    get_volume_info("C:")
+    ```
+    """
     try:
         if not drive.endswith(":\\"):
             drive = drive.rstrip(":") + ":\\"
@@ -1595,8 +1784,14 @@ async def get_top_resource_processes(
 async def check_system_health_status() -> dict[str, Any]:
     """Check system uptime and detect pending reboots from registry.
 
-    Returns:
-        Dictionary with system health and reboot status
+    ## Return Format
+    `{status: "success" | "error", operation: "check_system_health_status", ...}`
+    with uptime, reboot-pending flag, and resource thresholds.
+
+    ## Examples
+    ```python
+    check_system_health_status()
+    ```
     """
     try:
         # Uptime

@@ -2,6 +2,9 @@
 
 import ctypes
 import logging
+import os
+import signal
+import threading
 from typing import Annotated, Any
 
 from pydantic import Field
@@ -22,10 +25,10 @@ try:
     from system_admin_mcp.user_bridge import UserBridge
 except ImportError as e:
     logger.warning(f"Failed to import UserBridge: {e}. Bridge operations will not be available.")
-    UserBridge = None  # type: ignore
+    UserBridge = None  # type: ignore[reportAssignmentType]
 except Exception as e:
     logger.warning(f"Failed to import UserBridge: {e}. Bridge operations will not be available.")
-    UserBridge = None  # type: ignore
+    UserBridge = None  # type: ignore[reportAssignmentType]
 
 # Initialize user bridge lazily to avoid startup errors
 _bridge = None
@@ -62,8 +65,13 @@ def is_admin() -> bool:
 async def list_volumes() -> list[dict]:
     """List all available volumes on the system.
 
-    Returns:
-        List of dictionaries containing volume information
+    ## Return Format
+    `{status: "success", volumes: [...]}` — list of dicts with volume information.
+
+    ## Examples
+    ```python
+    list_volumes()
+    ```
     """
     import win32api
     import win32file
@@ -208,8 +216,13 @@ async def get_process_info(pid: Annotated[int, Field(description="Process ID")])
 async def ping() -> dict:
     """Check if the System Admin MCP service is responsive.
 
-    Returns:
-        Dictionary with status information
+    ## Return Format
+    `{status: "success" | "error", message: ..., service_installed: ..., service_running: ...}`.
+
+    ## Examples
+    ```python
+    ping()
+    ```
     """
     bridge = get_bridge()
     if bridge is None:
@@ -241,8 +254,13 @@ async def ping() -> dict:
 async def get_system_info() -> dict:
     """Get system information from the service.
 
-    Returns:
-        Dictionary containing system information
+    ## Return Format
+    Dict with OS/hardware/environment details (delegates to the user bridge).
+
+    ## Examples
+    ```python
+    get_system_info()
+    ```
     """
     try:
         if _bridge is None:
@@ -404,3 +422,28 @@ async def status(
     except Exception as e:
         logger.error(f"Error getting status: {e}")
         return f"Error getting status: {e}"
+
+
+@mcp.tool(annotations=_DESTRUCTIVE)
+def shutdown(
+    confirm: Annotated[bool, Field(description="Must be True — acknowledges the server process will exit")] = False,
+) -> dict[str, Any]:
+    """Gracefully stop the MCP server process (self-termination).
+
+    Mirrors `POST /api/shutdown`: responds immediately, then SIGTERMs the
+    process after 500 ms so in-flight responses flush.
+
+    ## Return Format
+    `{status: "shutting_down"}` on accept; `{status: "error", message: ...}`
+    when confirm is not True.
+
+    ## Examples
+    ```python
+    shutdown(confirm=True)
+    ```
+    """
+    if not confirm:
+        return {"status": "error", "message": "Pass confirm=True to shut down the server."}
+    logger.warning("Server shutdown requested via shutdown tool")
+    threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
+    return {"status": "shutting_down"}

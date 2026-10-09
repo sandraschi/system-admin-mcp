@@ -776,8 +776,13 @@ def kill_process(
 def list_startup_programs() -> dict[str, Any]:
     """List programs that start with Windows.
 
-    Returns:
-        Dictionary with startup programs list
+    ## Return Format
+    `{status: "success" | "error", ...}` with the startup programs list.
+
+    ## Examples
+    ```python
+    list_startup_programs()
+    ```
     """
     try:
         startup_programs = []
@@ -903,7 +908,7 @@ def remove_startup_program(
     """Remove a program from Windows startup.
 
     ## Return Format
-    `{status: "success" | "error", ...}` with the operation result.
+    `{status: "success" | "error", ...}` with the removal result.
 
     ## Examples
     ```python
@@ -958,8 +963,14 @@ def remove_startup_program(
 def get_taskbar_settings() -> dict[str, Any]:
     """Get current taskbar settings.
 
-    Returns:
-        Dictionary with taskbar settings
+    ## Return Format
+    `{status: "success" | "error", operation: "get_taskbar_settings", ...}`
+    with autohide and lock flags.
+
+    ## Examples
+    ```python
+    get_taskbar_settings()
+    ```
     """
     try:
         # Read taskbar settings from registry
