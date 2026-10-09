@@ -1,21 +1,21 @@
 # System Admin MCP
 
-> FastMCP 3.2 server for elevated Windows system administration. Run as Administrator.
+> FastMCP 3.4 server for elevated Windows system administration. Run as Administrator.
+
+> Full reference: [llms-full.txt](llms-full.txt) — complete tool/operation catalog, REST endpoints, env vars, ports.
 
 ## Quick start
 
-```
-uvx system-admin-mcp
-```
-
-Or from source: `uv sync && uv run system-admin-mcp`
+> No registry package: `uvx system-admin-mcp` does NOT work (no PyPI release).
+> Install from source: `git clone …; cd system-admin-mcp; just bootstrap; just serve`.
 
 ## Key files
 
-- [README.md](README.md) — overview, features, FastMCP 3.2 capabilities table
+- [README.md](README.md) — overview, features, FastMCP 3.4 capabilities table
+- [INSTALL.md](INSTALL.md) — install, setup, troubleshooting (read before installing)
 - [AGENTS.md](AGENTS.md) — architecture, tool list, agent rules, file patterns
-- [justfile](justfile) — task runner: `just dev`, `just test`, `just lint`, `just mcpb-pack`
-- [pyproject.toml](pyproject.toml) — deps: `fastmcp[tasks]>=3.2.0,<4`, `pywin32`, `psutil`, `wmi`, `prefab-ui>=0.14.0`
+- [justfile](justfile) — task runner: `just dev`, `just test`, `just lint`, `just certify`, `just mcpb-pack` (via fleet.just)
+- [pyproject.toml](pyproject.toml) — deps: `fastmcp[tasks]>=3.4.4,<4`, `pywin32`, `psutil`, `wmi`, `prefab-ui>=0.14.0`
 - [docs/quickstart.md](docs/quickstart.md) — end-user setup guide
 - [docs/api/README.md](docs/api/README.md) — REST API endpoints
 
@@ -32,7 +32,7 @@ Or from source: `uv sync && uv run system-admin-mcp`
 - `src/system_admin_mcp/tools/agentic_system_workflow.py` — SEP-1577 sampling workflows
 - `src/system_admin_mcp/tools/monitoring.py` — watchdog file watcher
 - `src/system_admin_mcp/tools/prefab/` — 4 Prefab UI cards
-- `web_sota/` — React 19 + Vite dashboard (14 pages)
+- `web_sota/` — React 19 + Vite dashboard (20 pages, incl. Inbox + Chat + Apps Hub)
 
 ## Portmanteau pattern
 

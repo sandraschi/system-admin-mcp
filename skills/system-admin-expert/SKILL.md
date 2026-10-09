@@ -64,11 +64,61 @@ This skill provides operational logic and safe-mode patterns for managing Window
 
 ---
 
+## New Since v0.4.0 (2026-10)
+
+### Airgap kill switch
+- Ops: `airgap_status` / `airgap_enable` / `airgap_disable` — every call needs
+  `confirm=True`; blocked when `SYSTEMADMIN_READ_ONLY=1`.
+- Effect: firewall outbound BLOCK + bluetooth stop; loopback/USB-HID survive.
+- Always `airgap_status` first, snapshot state, then enable; restore after.
+
+### Taskbar forensics
+- `list_taskbar_windows` (title/process/exe + autostart flags) and
+  `list_tray_icons` (exact PID attribution, confidence levels) prove the
+  "forgotten autostart app" case. Filter autostart-only to find culprits.
+
+### Protection posture
+- `get_defender_status` (realtime/signatures), `get_vpn_status` (profiles),
+  `get_tailscale_status` (installed/running/tailnet). Full mesh stays in
+  tailscale-mcp. Bundle endpoint: `GET /api/protection`.
+
+### Crash postmortem
+- `list_crash_dumps`, `get_bugcheck_history`, `analyze_minidump`,
+  `windbg_analyze` (needs Debugging Tools). Endpoints under `/api/crash/*`.
+
+### LLM stack (fleet VI.10)
+- 16 providers (3 local + 13 cloud) via `llm_providers.py`; 0600 keystore
+  (`data/llm_keys.json`, env wins); endpoints `/api/llm/*` (providers, models,
+  test, settings, chat + stream, onboarding, install, gpus, ollama-state).
+- Chat page streams SSE and is skill-first (this skill + personality compose
+  the system preprompt). Keys never touch the browser.
+
+### Safety model
+- `SYSTEMADMIN_READ_ONLY=1` kill switch (dispatch + function level, dry-run
+  previews stay usable); JSONL mutation audit log (`logs/mutations.log`,
+  blocked attempts included); Inbox page (`/inbox`, `GET /api/inbox`)
+  surfaces critical event-log errors + blocked mutations + reboot state.
+
+---
+
+## Troubleshooting
+- **Tool returns `admin_required`**: re-run the terminal as Administrator; most
+  recovery/defrag/service/ownership ops refuse without elevation.
+- **Ollama chat 500s**: the local engine itself is at fault — verify with a
+  direct `POST 127.0.0.1:11434/api/chat` before blaming the proxy.
+- **Port already bound**: `start.ps1` clears zombies via the fleet engine;
+  naked fallback: stop the process on 10861, then restart.
+- **Read-only surprises**: `SYSTEMADMIN_READ_ONLY=1` blocks every mutation;
+  unset it (or use `dry_run=True` previews) to proceed.
+
+---
+
 ## Port Reference
 - Web dashboard: **10860** (frontend), **10861** (backend API)
 - MCP transport: stdio (Claude Desktop) or HTTP port 10861
+- Native operator ports: **11239/11240** (side-by-side with web ports)
 
 ---
 
 *Author: Sandra Schipal (Vienna, AT)*
-*Industrial Grade v0.3.0 — FastMCP 3.2 Full Conformance*
+*Industrial Grade v0.4.0 — FastMCP 3.4 Full Conformance*

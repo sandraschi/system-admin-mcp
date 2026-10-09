@@ -1,6 +1,6 @@
 # System Admin MCP — Full Agent Reference
 
-> FastMCP 3.2 server for elevated Windows system administration. 40+ operations across file recovery, security/permissions, disk/volume maintenance, system diagnostics, services, processes, startup/taskbar management, protection posture, airgap, and agentic workflows. **Run as Administrator.** Safety: `SYSTEMADMIN_READ_ONLY=1` blocks all mutations; every mutation is audit-logged (`logs/mutations.log`); airgap ops need `confirm=True` every call. Full model: `docs/SECURITY.md`.
+> FastMCP 3.4 server for elevated Windows system administration. 40+ operations across file recovery, security/permissions, disk/volume maintenance, system diagnostics, services, processes, startup/taskbar management, protection posture, airgap, and agentic workflows. **Run as Administrator.** Safety: `SYSTEMADMIN_READ_ONLY=1` blocks all mutations; every mutation is audit-logged (`logs/mutations.log`); airgap ops need `confirm=True` every call. Full model: `docs/SECURITY.md`.
 
 ## Quick Links
 
@@ -148,6 +148,7 @@ Single tool with `operation` discriminator. All admin operations go through this
 | `get_system_info` | OS + hardware summary from service. | — |
 | `help` | Multi-level help system. `level`: basic/intermediate/advanced. `topic`: file_recovery/security/volume/diagnostics. | `level`, `topic` |
 | `status` | Server status: service installed, running, tool count. `level`: basic/intermediate/advanced. `focus`: tools/service/system. | `level`, `focus` |
+| `shutdown` | Graceful self-termination (SIGTERM after 500 ms). Requires `confirm=True`. Mirrors `POST /api/shutdown`. | `confirm` |
 
 ### Prefab UI Cards (app=True)
 
@@ -227,7 +228,7 @@ system_admin(operation="set_taskbar_autohide", autohide=True)
 
 ```
 src/system_admin_mcp/
-├── app.py                 # FastMCP 3.2 instance + lifespan (skills, prefab)
+├── app.py                 # FastMCP 3.4 instance + lifespan (skills, prefab)
 ├── main.py                # Entry point (--web flag for HTTP, else stdio)
 ├── server.py              # FastAPI backend (20+ REST endpoints)
 ├── transport.py           # Dual transport (stdio/streamable-http)
@@ -264,6 +265,8 @@ src/system_admin_mcp/
 | `GET /api/skills` | List skills from `skills/` directory |
 | `GET /api/v1/diagnostics` | Tool list + system info (CUA-NSIS smoke test) |
 | `POST /api/shutdown` | Graceful server termination |
+| `GET /api/capabilities` | Fleet capability descriptor (service, version, tools, transports) |
+| `GET /api/inbox` | Attention feed: critical event-log errors, blocked mutations, reboot state, crash dumps |
 
 ## Environment Variables
 
@@ -272,6 +275,11 @@ src/system_admin_mcp/
 | `MCP_TRANSPORT` | `http` for streamable HTTP (default: stdio) |
 | `MCP_PORT` | HTTP port override (default: 10861) |
 | `WEBAPP_PORT` | FastAPI backend port (default: 10861) |
+| `PORT` | Same as WEBAPP_PORT (fallback) |
+| `SYSTEMADMIN_READ_ONLY` | `1` blocks every mutation (kill switch); dry-run previews still work |
+| `SYSTEMADMIN_LLM_KEYSTORE` | 0600 LLM key store path (default: `data/llm_keys.json`) |
+| `SYSTEMADMIN_LOG_FILE` | Extra file log (auto-set for frozen builds) |
+| `SYSTEMADMIN_TAURI` | `1` forces web mode (native wrapper) |
 | `SYSADMIN_PREFAB_APPS` | Set to `0` to disable Prefab UI tools |
 | `MCP_BRIDGE_URLS` | Comma-separated remote MCP URLs for proxy |
 
