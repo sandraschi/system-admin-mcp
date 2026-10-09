@@ -68,6 +68,22 @@
     {"name": "audit_network_ports", "description": "List all processes listening on network ports."},
     {"name": "get_top_resource_processes", "description": "Find top processes consuming CPU and memory."},
     {"name": "check_system_health_status", "description": "Check system health status with warnings."},
-    {"name": "analyze_top_folder_sizes", "description": "Find the top largest folders on a drive by size."}
+    {"name": "analyze_top_folder_sizes", "description": "Find the top largest folders on a drive by size."},
+    {"name": "list_crash_dumps", "description": "Inventory kernel crash artefacts and dump configuration."},
+    {"name": "get_bugcheck_history", "description": "Correlate shutdown/crash events around a GSOD/BSOD."},
+    {"name": "analyze_minidump", "description": "Triage-parse a minidump without WinDbg (pure python, no SDK needed)."},
+    {"name": "windbg_analyze", "description": "Run WinDbg !analyze -v on a dump via cdb.exe (needs Debugging Tools)."},
+    {"name": "audit_admin_toolbox", "description": "Inventory admin-relevant toolbox apps: dev, local AI, tcom, office, admin."},
+    {"name": "get_firmware_posture", "description": "Firmware and virtualization posture: SVM, TPM, Secure Boot, VBS, BIOS."},
+    {"name": "audit_scheduled_tasks", "description": "List scheduled tasks (name, next run, status) via schtasks."},
+    {"name": "get_update_status", "description": "Windows Update status: last install, pending reboot, uptime."},
+    {"name": "audit_local_admins", "description": "Local users and Administrators group membership."},
+    {"name": "audit_smb_shares", "description": "SMB shares (name, path, description) and open sessions."},
+    {"name": "list_shadow_copies", "description": "VSS shadow copies (backup/restore points) via WMI."},
+    {"name": "audit_drivers", "description": "Signed driver inventory: device, version, date, provider."},
+    {"name": "get_reliability_history", "description": "Reliability Monitor records (failures, updates, installs)."},
+    {"name": "winget_outdated", "description": "Packages with upgrades available via winget."},
+    {"name": "audit_path_dross", "description": "Machine + user PATH audit: missing dirs, duplicates, file counts."},
+    {"name": "shutdown", "description": "Gracefully stop the MCP server process (self-termination, confirm-gated)."}
   ]
 }

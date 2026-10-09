@@ -145,6 +145,117 @@ async def system_status() -> dict[str, Any]:
     }
 
 
+@app.get("/api/capabilities")
+async def api_capabilities() -> dict[str, Any]:
+    """Standard fleet capability descriptor (WEBAPP_STANDARDS §1.4)."""
+    try:
+        tools = await mcp.list_tools()
+        tool_names = [t.name for t in tools]
+    except Exception as e:
+        logger.warning(f"Capabilities tool listing failed: {e}")
+        tool_names = []
+    return {
+        "service": "system-admin-mcp",
+        "version": "0.4.0",
+        "transports": ["stdio", "streamable-http"],
+        "tool_count": len(tool_names),
+        "tools": tool_names,
+        "rest": {
+            "health": "/api/health",
+            "status": "/api/status",
+            "diagnostics": "/api/v1/diagnostics",
+            "skills": "/api/skills",
+            "shutdown": "/api/shutdown",
+        },
+        "features": {
+            "prefab_ui": True,
+            "prompts": True,
+            "resources": True,
+            "sampling": True,
+            "requires_admin": True,
+        },
+    }
+
+
+@app.get("/api/inbox")
+async def api_inbox() -> dict[str, Any]:
+    """Attention feed for the Inbox page: critical errors, blocked mutations,
+    pending reboot, and crash-dump counts. Every source degrades to an empty
+    section with an error note — never a silent hang."""
+    import json as _json
+
+    sections: dict[str, Any] = {}
+
+    try:
+        res = await _run_tool("get_recent_event_errors", log_type="System", count=10)
+        events = res.get("events", []) if isinstance(res, dict) else []
+        sections["critical_errors"] = [
+            {
+                "time": e.get("time"),
+                "source": e.get("source"),
+                "id": e.get("id"),
+                "type": e.get("type"),
+                "message": (e.get("message") or "")[:300],
+            }
+            for e in events
+            if isinstance(e, dict)
+        ][:10]
+    except Exception as e:
+        sections["critical_errors"] = []
+        sections["critical_errors_error"] = str(e)
+
+    try:
+        from system_admin_mcp.mutation_guard import audit_log_path
+
+        blocked: list[dict[str, Any]] = []
+        path = audit_log_path()
+        if path.is_file():
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-200:]
+            for line in lines:
+                try:
+                    rec = _json.loads(line)
+                except Exception:
+                    logger.debug("Skipping unparsable audit-log line", exc_info=True)
+                    continue
+                blob = _json.dumps(rec, default=str).lower()
+                if "block" in blob or "denied" in blob or "read-only" in blob or "readonly" in blob:
+                    blocked.append(rec)
+        sections["blocked_mutations"] = blocked[-20:]
+    except Exception as e:
+        sections["blocked_mutations"] = []
+        sections["blocked_mutations_error"] = str(e)
+
+    try:
+        res = await _run_tool("check_system_health_status")
+        sections["health"] = (
+            {
+                "pending_reboot": res.get("pending_reboot", res.get("reboot_required", False)),
+                "uptime": res.get("uptime", res.get("uptime_hours")),
+                "status": res.get("status", res.get("health")),
+            }
+            if isinstance(res, dict)
+            else {"raw": str(res)[:300]}
+        )
+    except Exception as e:
+        sections["health"] = {}
+        sections["health_error"] = str(e)
+
+    try:
+        res = await _run_tool("list_crash_dumps")
+        if isinstance(res, dict):
+            sections["crash_dumps"] = {
+                "minidumps": len(res.get("minidumps", []) or []),
+                "has_memory_dmp": bool((res.get("memory_dmp") or {}).get("exists", res.get("memory_dmp"))),
+            }
+        else:
+            sections["crash_dumps"] = {"raw": str(res)[:300]}
+    except Exception as e:
+        sections["crash_dumps"] = {}
+        sections["crash_dumps_error"] = str(e)
+
+    return {"status": "ok", "sections": sections}
+
+
 @app.get("/api/tools")
 async def list_mcp_tools() -> list[dict[str, Any]]:
     """List available MCP tools for the frontend analyzer."""
