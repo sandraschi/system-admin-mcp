@@ -1,1 +1,10 @@
-{"commit": "c6267efd208614ba236a33d9de8a1324cad1388c", "host": "Goliath", "report": "docs/assess-reports/2026-10-07.md", "score_after": 100, "score_after_note": "self-assessed (unverified) - cold context authoritative; cloud+gpu round", "score_before": 0, "timestamp": "2026-10-08T00:40:54.9014967+02:00"}
+{
+  "score_before_raw": -19,
+  "score_after": 70,
+  "commit": "bd0a6b70564295fcd683fe298c29031343bca6b0",
+  "score_before": 0,
+  "timestamp": "2026-10-09T10:10:53.3740605+02:00",
+  "score_after_note": "self-assessed (unverified)",
+  "host": "GOLIATH",
+  "report": "reports/assess-2026-10-09.md + docs/assess-reports/2026-10-09.md"
+}
