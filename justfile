@@ -41,6 +41,9 @@ check: lint test
 certify:
     Set-Location '{{justfile_directory()}}'; uv run ruff check src/; uv run ruff format src/ --check; uv run pyright src/; uv run pytest tests/ -q; Set-Location '{{justfile_directory()}}\web_sota'; & "$env:USERPROFILE\.bun\bin\bun.exe" run build; & "$env:USERPROFILE\.bun\bin\bun.exe" run biome:ci
 
+# CI parity gate (mirrors .github/workflows/ci.yml) — run before pushing
+ci: certify
+
 # --- Testing ---
 
 # Run all tests
