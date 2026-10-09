@@ -37,6 +37,10 @@ format: fix
 # Run all quality checks (lint + test)
 check: lint test
 
+# Certify: full gate suite (lint + types + tests + frontend) in one command
+certify:
+    Set-Location '{{justfile_directory()}}'; uv run ruff check src/; uv run ruff format src/ --check; uv run pyright src/; uv run pytest tests/ -q; Set-Location '{{justfile_directory()}}\web_sota'; & "$env:USERPROFILE\.bun\bin\bun.exe" run build; & "$env:USERPROFILE\.bun\bin\bun.exe" run biome:ci
+
 # --- Testing ---
 
 # Run all tests

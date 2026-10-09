@@ -8,6 +8,18 @@
     "diagnostics_path": "/api/v1/diagnostics",
     "feature_smoke_path": "/api/status",
     "window_title_re": "System Admin MCP",
+    "nav_routes": [
+        {"label": "Overview", "path": "/"},
+        {"label": "Inbox", "path": "/inbox"},
+        {"label": "Chat", "path": "/chat"},
+        {"label": "MCP Tools", "path": "/tools"},
+        {"label": "Status", "path": "/status"},
+        {"label": "Processes", "path": "/processes"},
+        {"label": "Services", "path": "/services"},
+        {"label": "Volumes", "path": "/volumes"},
+        {"label": "Logs", "path": "/logs"},
+        {"label": "Settings", "path": "/settings"}
+    ],
     "nsis_glob": "native/target/release/bundle/nsis/System Admin MCP_*_x64-setup.exe",
     "bridge_ok_text": "System Admin",
     "uninstall_registry_filter": "*System Admin*"

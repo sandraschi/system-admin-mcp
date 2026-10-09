@@ -25,6 +25,8 @@ build/
 target/
 htmlcov/
 *.bak
+*.bak.*
+data/
 *.mcpb
 .coverage
 coverage.xml
