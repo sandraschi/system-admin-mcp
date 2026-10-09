@@ -171,10 +171,10 @@ try:
     from system_admin_mcp.user_bridge import UserBridge
 except ImportError as e:
     logger.warning(f"Failed to import UserBridge: {e}. Bridge operations will not be available.")
-    UserBridge = None  # type: ignore
+    UserBridge = None  # type: ignore[reportAssignmentType]
 except Exception as e:
     logger.warning(f"Failed to import UserBridge: {e}. Bridge operations will not be available.")
-    UserBridge = None  # type: ignore
+    UserBridge = None  # type: ignore[reportAssignmentType]
 
 # Initialize user bridge lazily to avoid startup errors
 _bridge = None

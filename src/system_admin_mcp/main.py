@@ -1,6 +1,7 @@
 """Main entry point for the System Admin MCP service."""
 
 import logging
+import os
 import sys
 from typing import Any
 
@@ -12,6 +13,16 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     stream=sys.stderr,  # Use stderr for logging (stdout is for MCP protocol)
 )
+# Frozen file log (path set by run_server.py): persists uvicorn + app logs
+# where they can be diagnosed instead of vanishing into a null stderr.
+_log_file = os.getenv("SYSTEMADMIN_LOG_FILE")
+if _log_file:
+    try:
+        _fh = logging.FileHandler(_log_file, encoding="utf-8")
+        _fh.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        logging.getLogger().addHandler(_fh)
+    except Exception:
+        logging.getLogger(__name__).debug("Could not attach frozen file log", exc_info=True)
 logger = logging.getLogger(__name__)
 
 # Import the FastMCP instance
@@ -47,8 +58,8 @@ except Exception as e:
 def create_app(config: dict[str, Any] | None = None) -> FastMCP:
     """Create and configure the MCP application.
 
-    Args:
-        config: Optional configuration dictionary (not used in FastMCP 2.13+)
+    The optional config mapping is accepted for forward compatibility and
+    currently unused (tools self-register via @mcp.tool() on import).
 
     Returns:
         Configured FastMCP instance
@@ -83,10 +94,16 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="System Admin MCP server")
     parser.add_argument("--web", action="store_true", help="Start the FastAPI web server")
+    parser.add_argument(
+        "--http", action="store_true", help="Start the FastAPI web server (alias for --web, used by `just serve`)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=None, help="Web server port (default: WEBAPP_PORT/PORT env or 10861)"
+    )
     args = parser.parse_args()
 
-    if args.web or os.getenv("SYSTEMADMIN_TAURI", "").lower() in ("1", "true", "yes"):
-        port = int(os.getenv("WEBAPP_PORT", os.getenv("PORT", "10861")))
+    if args.web or args.http or os.getenv("SYSTEMADMIN_TAURI", "").lower() in ("1", "true", "yes"):
+        port = args.port or int(os.getenv("WEBAPP_PORT", os.getenv("PORT", "10861")))
         logger.info(f"Starting FastAPI web server on port {port}...")
         uvicorn.run("system_admin_mcp.server:app", host="0.0.0.0", port=port, reload=True)  # noqa: S104
     else:
