@@ -294,8 +294,13 @@ class TestServerRest:
         assert isinstance(body["known"], list)
         assert isinstance(body["experimental"], list)
         assert body["count"] == len(body["known"])
-        names = {a["name"] for a in body["known"]}
-        assert "system-admin-mcp" in names
+        if body.get("registry"):
+            # Fleet checkout present (dev machine): self must be registered.
+            names = {a["name"] for a in body["known"]}
+            assert "system-admin-mcp" in names
+        else:
+            # Bare checkout (CI runner): endpoint degrades honestly.
+            assert "registry not found" in body.get("note", "")
 
     def test_network_ports(self):
         body = client.get("/api/network-ports").json()
