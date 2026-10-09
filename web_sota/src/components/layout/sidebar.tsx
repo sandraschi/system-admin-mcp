@@ -13,6 +13,7 @@ import {
   FileText,
   HardDrive,
   HelpCircle,
+  Inbox,
   LayoutDashboard,
   LayoutGrid,
   Package,
@@ -48,6 +49,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: null,
     items: [
       { href: "/", label: "Overview", icon: LayoutDashboard },
+      { href: "/inbox", label: "Inbox", icon: Inbox },
       { href: "/chat", label: "Chat", icon: Bot },
       { href: "/tools", label: "MCP Tools", icon: Terminal },
       { href: "/skills", label: "Skills", icon: BookOpen },

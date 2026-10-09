@@ -1,4 +1,41 @@
 
+## [Unreleased] — 2026-10-09 (assfix: install docs, inbox, tool-surface gaps)
+
+### Added
+- **Inbox page** (`/inbox`, `GET /api/inbox`): genuine attention feed — critical
+  event-log errors, blocked mutations (audit-log scan), reboot state, crash-dump
+  counts. Loading/error/empty states, refresh, sidebar entry, CUA nav route.
+- **MCP `shutdown` tool** (confirm-gated, mirrors `POST /api/shutdown`).
+- **`GET /api/capabilities`** fleet descriptor (service, version, tools, transports).
+- **`just certify`**: ruff + format-check + pyright + pytest + frontend build + biome.
+- **Chat is skill-first**: loads `GET /api/skills` on mount; skill + personality
+  compose the system preprompt (personalities were previously selector-only).
+- **`--http`/`--port` CLI flags**: `just serve` (`system-admin-mcp --http`) exited 2.
+
+### Fixed
+- **Install docs overhaul (issue #1)**: removed false `uvx system-admin-mcp`
+  claims (no registry release — installer/MCPB/from-source only); winget blocks
+  carry `--accept-*` flags; every command executed 2026-10-09; env-vars table;
+  README stack section; llms.txt links llms-full.txt; mcd project README synced.
+- **Tool docstrings**: `## Return Format` + `## Examples` on all 40
+  implementations.py, 5 services, 10 system_ops tools (was 20/40).
+- **Ruff S110/S112**: frozen boot-log `except: pass` blocks now log with
+  `exc_info`; 6 bare `# type: ignore` carry error codes (pyright still 0).
+- **CUA config**: `nav_routes` matching the real sidebar (was nav-walk skip).
+- **Skill refresh**: `SKILL.md` covers airgap/taskbar/protection/crash/LLM-stack
+  + troubleshooting section (was stale since 2026-04).
+- **`.mcpbignore`**: added `*.bak.*` + `data/`; deleted 8 stale `.bak` files.
+
+### Deferred (open, with reasons)
+- 2 live-Ollama tests fail: the Ollama engine itself HTTP-500s every model
+  (direct `POST 127.0.0.1:11434/api/chat` repros; `ollama ps` empty) — engine
+  fault, not repo code. Re-run when the engine is healthy.
+- `output_schema=` + dialogic `{success,message}` envelope: return-shape tests
+  lock current envelopes; needs a migration pass, not drive-by edits.
+- Font tokens (`text-xs`, `text-slate-400/500`, ~200 hits): needs a design-token
+  pass with browser verification; new inbox.tsx ships clean.
+- Antigravity skill + Tauri zoom/shortcuts: LOW, single-channel gaps.
+
 ## [Unreleased] — 2026-10-08 (safety: read-only mode, audit log, airgap)
 
 ### Added

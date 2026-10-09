@@ -12,6 +12,7 @@ import { Dashboard } from "@/pages/dashboard";
 import { FileOwner } from "@/pages/file-owner";
 import { FileRecovery } from "@/pages/file-recovery";
 import { Help } from "@/pages/help";
+import { InboxPage } from "@/pages/inbox";
 import { Inventory } from "@/pages/inventory";
 import Logs from "@/pages/logs";
 import { Maintenance } from "@/pages/maintenance";
@@ -31,6 +32,7 @@ function App() {
       <AppLayout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/inbox" element={<InboxPage />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/status" element={<Status />} />
           <Route path="/processes" element={<Processes />} />

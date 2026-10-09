@@ -78,6 +78,29 @@ export function Chat() {
   const loadLlm = useLlmStore((s) => s.load);
   const msgIdRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Skill-first: skill content loads on mount and becomes the base system
+  // preprompt (personality appended), per chat_skills_prefab_standard §1.2.
+  const [skillPreprompt, setSkillPreprompt] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/skills");
+        if (!r.ok) return;
+        const body = (await r.json()) as {
+          skills?: { name?: string; description?: string }[];
+        };
+        const first = body.skills?.[0]?.description ?? "";
+        if (!cancelled && first) setSkillPreprompt(first);
+      } catch {
+        // Skill load is best-effort; chat works without it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(messages));
@@ -116,9 +139,20 @@ export function Chat() {
       },
     ]);
     const wire = history.map((m) => ({ role: m.role, content: m.content }));
+    const systemParts = [
+      skillPreprompt,
+      PERSONALITIES[personality] ?? "",
+    ].filter((p) => p.trim().length > 0);
+    const wireWithSystem =
+      systemParts.length > 0
+        ? [
+            { role: "system" as const, content: systemParts.join("\n\n") },
+            ...wire,
+          ]
+        : wire;
     try {
       let acc = "";
-      await streamChat(provider, model, wire, (token) => {
+      await streamChat(provider, model, wireWithSystem, (token) => {
         acc += token;
         const snapshot = acc;
         setMessages((prev) =>
@@ -143,7 +177,7 @@ export function Chat() {
         ),
       );
     }
-  }, [input, messages, provider, model]);
+  }, [input, messages, provider, model, personality, skillPreprompt]);
 
   const exportChat = () => {
     const text = messages
