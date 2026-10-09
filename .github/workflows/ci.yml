@@ -29,7 +29,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies
-        run: uv sync --dev
+        run: uv sync --all-extras
 
       - name: Ruff lint
         run: uv run ruff check src/
@@ -76,7 +76,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies
-        run: uv sync --dev
+        run: uv sync --all-extras
 
       - name: Run tests with coverage
         run: uv run python -m pytest --cov=src --cov-report=xml --cov-report=term-missing -q --maxfail=10 --tb=short
