@@ -4,6 +4,14 @@ use backend::{BackendProcess, spawn_backend};
 use tauri::{Emitter, Manager};
 
 fn main() {
+    // Force the Blink accessibility tree so UI automation (pywinauto CUA
+    // release gate) and screen readers see web content as UIA elements.
+    // WebView2 honors this env var natively; Tauri v2 has no config key
+    // for browser args, so the env var IS the mechanism. Must precede Builder.
+    std::env::set_var(
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "--force-renderer-accessibility",
+    );
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
