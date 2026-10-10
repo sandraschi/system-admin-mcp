@@ -104,8 +104,21 @@ def main() -> None:
 
     if args.web or args.http or os.getenv("SYSTEMADMIN_TAURI", "").lower() in ("1", "true", "yes"):
         port = args.port or int(os.getenv("WEBAPP_PORT", os.getenv("PORT", "10861")))
-        logger.info(f"Starting FastAPI web server on port {port}...")
-        uvicorn.run("system_admin_mcp.server:app", host="0.0.0.0", port=port, reload=True)  # noqa: S104
+        # Reload policy: ON for dev loops (unfrozen `just web`), OFF when frozen.
+        # Rationale: in a frozen exe the watchfiles reloader spins forever on
+        # the bundle layout and the server never binds (measured 2026-10-08:
+        # endless "changes detected", zero listens). Frozen sidecars always
+        # run single-process (also avoids orphaned watcher children on kill).
+        # Override: SYSTEMADMIN_RELOAD=1 forces on, =0 forces off.
+        reload_env = os.getenv("SYSTEMADMIN_RELOAD", "").strip()
+        if reload_env == "1":
+            use_reload = True
+        elif reload_env == "0":
+            use_reload = False
+        else:
+            use_reload = not getattr(sys, "frozen", False)
+        logger.info(f"Starting FastAPI web server on port {port} (reload={use_reload})...")
+        uvicorn.run("system_admin_mcp.server:app", host="0.0.0.0", port=port, reload=use_reload)  # noqa: S104
     else:
         app = create_app()
         run_server(app, server_name="system-admin-mcp")
