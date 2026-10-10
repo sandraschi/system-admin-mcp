@@ -6,6 +6,10 @@
 
 !define MCP_REG_NAME "system-admin-mcp"
 !define MCP_REG_EXE "system-admin-mcp-backend.exe"
+; Resolve the vendored include relative to THIS file: makensis resolves bare
+; !include names against its CWD (Tauri's target dir), not the including
+; script — without this the bundle step fails with "could not find".
+!addincludedir "${__FILEDIR__}"
 !include "mcp-clients.nsh"
 
 !macro KillProcesses
