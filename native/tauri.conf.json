@@ -13,7 +13,8 @@
 				"title": "System Admin MCP",
 				"width": 1280,
 				"height": 860,
-				"resizable": true
+				"resizable": true,
+				"additionalBrowserArguments": "--force-renderer-accessibility"
 			}
 		],
 		"security": {
