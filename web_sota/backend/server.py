@@ -1,10 +1,14 @@
 """Logging backend for the webapp dashboard."""
+
 from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from web_sota.backend.routes.logging import router as logging_router
+
 from web_sota.backend.log_buffer import activity_log
+from web_sota.backend.routes.logging import router as logging_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,13 +20,16 @@ async def lifespan(app: FastAPI):
     yield
     activity_log.info("server", "Logging backend stopped")
 
+
 app = FastAPI(title="system-admin-mcp-logging", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(logging_router)
 
+
 @app.get("/api/llm/providers")
 async def llm_providers():
     import httpx
+
     result = {}
     for name, url in [("ollama", "http://127.0.0.1:11434/api/tags"), ("lm_studio", "http://127.0.0.1:1234/v1/models")]:
         try:
@@ -40,4 +47,3 @@ async def llm_providers():
     if not any(result.values()):
         result["ollama"] = [{"name": "llama3.2:3b"}]
     return result
-
