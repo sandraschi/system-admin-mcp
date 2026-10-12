@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -488,17 +489,17 @@ async def system_admin(
         if operation == "scan_volume":
             if not drive:
                 raise ValueError("drive parameter required for scan_volume")
-            return scan_volume(drive, file_pattern, max_results)
+            return await asyncio.to_thread(scan_volume, drive, file_pattern, max_results)
 
         elif operation == "recover_file":
             if not source_path or not destination_path:
                 raise ValueError("source_path and destination_path required for recover_file")
-            return recover_file_ntfs(source_path, destination_path)
+            return await asyncio.to_thread(recover_file_ntfs, source_path, destination_path)
 
         elif operation == "validate_recovery":
             if not destination_path:
                 raise ValueError("destination_path required for validate_recovery")
-            return validate_recovery(destination_path)
+            return await asyncio.to_thread(validate_recovery, destination_path)
 
         elif operation == "batch_recover":
             # Batch recovery - recover multiple files
@@ -506,7 +507,7 @@ async def system_admin(
                 raise ValueError("source_path and destination_path required for batch_recover")
             # For now, attempt single file recovery
             # Full batch recovery would require a list of files
-            return recover_file_ntfs(source_path, destination_path)
+            return await asyncio.to_thread(recover_file_ntfs, source_path, destination_path)
 
         # Security Management operations
         elif operation == "get_permissions":
@@ -542,7 +543,7 @@ async def system_admin(
             return get_vpn_status()
 
         elif operation == "get_tailscale_status":
-            return get_tailscale_status()
+            return await asyncio.to_thread(get_tailscale_status)
 
         elif operation == "modify_acl":
             if not path:
@@ -562,22 +563,22 @@ async def system_admin(
         elif operation == "analyze_disk_usage":
             if not drive:
                 raise ValueError("drive parameter required for analyze_disk_usage")
-            return analyze_disk_usage_advanced(drive)
+            return await asyncio.to_thread(analyze_disk_usage_advanced, drive)
 
         elif operation == "disk_cleanup":
             if not drive:
                 raise ValueError("drive parameter required for disk_cleanup")
-            return disk_cleanup(drive, cleanup_targets, dry_run)
+            return await asyncio.to_thread(disk_cleanup, drive, cleanup_targets, dry_run)
 
         elif operation == "defragment_disk":
             if not drive:
                 raise ValueError("drive parameter required for defragment_disk")
-            return defragment_disk(drive, thorough)
+            return await asyncio.to_thread(defragment_disk, drive, thorough)
 
         elif operation == "optimize_ssd":
             if not drive:
                 raise ValueError("drive parameter required for optimize_ssd")
-            return optimize_ssd(drive)
+            return await asyncio.to_thread(optimize_ssd, drive)
 
         elif operation == "get_volume_info":
             if not drive:
@@ -592,7 +593,7 @@ async def system_admin(
             return get_os_info()
 
         elif operation == "get_installed_software":
-            return get_installed_software()
+            return await asyncio.to_thread(get_installed_software)
 
         elif operation == "get_performance_metrics":
             return get_performance_metrics()
@@ -638,7 +639,7 @@ async def system_admin(
             return analyze_minidump(dump_path, max_results)
 
         elif operation == "windbg_analyze":
-            return windbg_analyze(dump_path, timeout_seconds)
+            return await asyncio.to_thread(windbg_analyze, dump_path, timeout_seconds)
 
         elif operation == "audit_admin_toolbox":
             return audit_admin_toolbox()
@@ -647,7 +648,7 @@ async def system_admin(
             return get_firmware_posture()
 
         elif operation == "audit_scheduled_tasks":
-            return audit_scheduled_tasks(max_results)
+            return await asyncio.to_thread(audit_scheduled_tasks, max_results)
 
         elif operation == "get_update_status":
             return get_update_status()
@@ -668,16 +669,16 @@ async def system_admin(
             return get_reliability_history(days_back, max_results)
 
         elif operation == "winget_outdated":
-            return winget_outdated(max_results)
+            return await asyncio.to_thread(winget_outdated, max_results)
 
         elif operation == "audit_path_dross":
             return audit_path_dross()
 
         elif operation == "get_gpu_info":
-            return get_gpu_info()
+            return await asyncio.to_thread(get_gpu_info)
 
         elif operation == "get_gpu_processes":
-            return get_gpu_processes()
+            return await asyncio.to_thread(get_gpu_processes)
 
         # Windows Services operations
         elif operation == "list_services":
@@ -747,7 +748,7 @@ async def system_admin(
         elif operation == "set_taskbar_autohide":
             if autohide is None:
                 raise ValueError("autohide parameter required for set_taskbar_autohide")
-            return set_taskbar_autohide(autohide)
+            return await asyncio.to_thread(set_taskbar_autohide, autohide)
 
         elif operation == "list_taskbar_windows":
             return list_taskbar_windows()

@@ -9,6 +9,7 @@ data dir (or env vars, which win). SYSTEMADMIN_LLM_KEYSTORE overrides the path
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -1082,7 +1083,9 @@ def register_llm_routes(app) -> None:
 
     @app.get("/api/llm/gpus")
     async def api_llm_gpus() -> dict[str, Any]:
-        gpus = [{"index": g["index"], "name": g["name"], "vramMb": g["total_mb"]} for g in gpu_vram()]
+        gpus = [
+            {"index": g["index"], "name": g["name"], "vramMb": g["total_mb"]} for g in await asyncio.to_thread(gpu_vram)
+        ]
         return {"gpus": gpus}
 
     @app.get("/api/llm/ollama/state")
