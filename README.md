@@ -65,12 +65,14 @@ See [INSTALL.md](INSTALL.md) for prerequisites, installer/MCPB options, and trou
 | **Disks** | SMART health, defrag (HDD), TRIM (SSD), cleanup, folder size analysis |
 | **Services** | List/start/stop, change startup type, paginated |
 | **Processes** | List/sort/analyze/kill, paginated, sortable by CPU/Memory/Name/PID |
+| **RAM Weeder** | Rule-based leak finder (orphaned test engines, duplicate apps, forgotten game windows, shell debris, unregistered dev servers), memory-pressure levels, confirmed kills, unattended sweep for orphaned headless engines only. See [docs/RAM_WEEDER.md](docs/RAM_WEEDER.md) |
 | **Startup & Taskbar** | Manage startup programs, toggle autohide, find blockers, taskbar buttons + tray icons with autostart flags |
 | **AI Chat** | Local (Ollama/LM Studio) + 13 cloud providers via backend proxy, streaming, resident-first GPU placement |
 | **Safety** | Read-only mode (`SYSTEMADMIN_READ_ONLY=1`), mutation audit log, confirm-gated Airgap (see `docs/SECURITY.md`) |
 | **Agentic** | Let AI autonomously diagnose and fix issues (SEP-1577 sampling) |
 
-All operations go through a single `system_admin` tool — one tool, 40+ operations.
+Admin operations go through the `system_admin` portmanteau tool (40+ operations); the
+RAM weeder is its own tool, `ram_weeder_tool` (scan / kill / sweep).
 
 ---
 
@@ -97,7 +99,7 @@ just web              # Backend API
 just web-frontend     # Frontend dev server
 ```
 
-Pages: Dashboard, Inbox (attention feed), Status, Processes (paginated, sortable), Services (paginated), Taskbar (buttons + tray + autostart), Volumes, File Owner, File Recovery, Logs, Tools, Apps, Elevated, Chat, Settings, Help.
+Pages: Dashboard, Inbox (attention feed), Status, Processes (paginated, sortable), RAM Weeder, Services (paginated), Taskbar (buttons + tray + autostart), Volumes, File Owner, File Recovery, Logs, Tools, Apps, Elevated, Chat, Settings, Help.
 
 ---
 

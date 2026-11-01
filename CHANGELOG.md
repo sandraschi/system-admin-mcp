@@ -1,4 +1,16 @@
 
+## [Unreleased] - 2026-10-31 (RAM weeder)
+
+### Added
+- **RAM weeder** (`tools/ram_weeder.py`, MCP `ram_weeder_tool`, REST `/api/weeder/*`,
+  page `/weeder`, `scripts/weeder_sweep.py`): rule-based leak detection
+  (`orphan_engine`, `orphan_dev`, `duplicate_app`, `duplicate_game`, `orphan_game`,
+  `stale_headless`, `shell_debris`, `unregistered_port`), memory-pressure levels,
+  confirmed kills with identity re-check and whole-tree termination, unattended sweep
+  limited to orphaned headless engines. Protect list + `SYSTEMADMIN_WEEDER_PROTECT`.
+  `weed_kill` is in `MUTATING_OPS` (read-only mode blocks it; audit-logged).
+  Docs: `docs/RAM_WEEDER.md`. 19 unit tests (`tests/test_ram_weeder.py`).
+
 ## [Unreleased] — 2026-10-09 (assfix: install docs, inbox, tool-surface gaps)
 
 ### Added

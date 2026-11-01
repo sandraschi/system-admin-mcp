@@ -67,6 +67,7 @@ skills/
 
 | Tool | Purpose |
 |------|---------|
+| `ram_weeder_tool` | Rule-based leaked-process finder: `scan` (report), `kill` (approved pids, `confirm=True`), `sweep` (orphaned headless engines only). See docs/RAM_WEEDER.md |
 | `manage_filesystem_watch` | Background directory monitoring (watchdog) |
 | `get_comprehensive_diagnostics` | Full health + processes + events + volume audit |
 | `agentic_system_workflow` | SEP-1577 sampling-driven multi-step admin workflow |
