@@ -25,6 +25,7 @@ import { Status } from "@/pages/status";
 import { Taskbar } from "@/pages/taskbar";
 import { Tools } from "@/pages/tools";
 import { Volumes } from "@/pages/volumes";
+import { Weeder } from "@/pages/weeder";
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/status" element={<Status />} />
           <Route path="/processes" element={<Processes />} />
+          <Route path="/weeder" element={<Weeder />} />
           <Route path="/services" element={<Services />} />
           <Route path="/taskbar" element={<Taskbar />} />
           <Route path="/volumes" element={<Volumes />} />

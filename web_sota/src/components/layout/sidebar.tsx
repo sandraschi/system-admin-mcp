@@ -21,6 +21,7 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Sprout,
   Terminal,
   Wrench,
 } from "lucide-react";
@@ -61,6 +62,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Manage",
     items: [
       { href: "/processes", label: "Processes", icon: Cpu },
+      { href: "/weeder", label: "RAM Weeder", icon: Sprout },
       { href: "/services", label: "Services", icon: Cog },
       { href: "/taskbar", label: "Taskbar", icon: AppWindow },
       { href: "/security", label: "Security", icon: ShieldAlert },
