@@ -70,6 +70,8 @@ MUTATING_OPS = frozenset(
         # Airgap (network + bluetooth kill switch)
         "airgap_enable",
         "airgap_disable",
+        # RAM weeder (scan and sweep dry runs stay read-only usable)
+        "weed_kill",
     }
 )
 

@@ -31,6 +31,7 @@ try:
         portmanteau,  # noqa: F401
         services_and_tasks,  # noqa: F401
         system_ops,
+        weeder_tool,  # noqa: F401
     )
 
     logger.info("Tool modules imported successfully via relative paths")
@@ -490,6 +491,47 @@ async def api_shutdown() -> dict[str, Any]:
     """Gracefully stop the server (agent/self-termination endpoint)."""
     threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
     return {"status": "shutting_down"}
+
+
+# --- RAM weeder (see tools/ram_weeder.py) -------------------------------------------
+
+
+@app.get("/api/weeder/scan")
+async def api_weeder_scan() -> dict[str, Any]:
+    """Memory pressure plus leak candidates. Read-only."""
+    from system_admin_mcp.tools import ram_weeder
+
+    try:
+        return await asyncio.to_thread(ram_weeder.scan)
+    except Exception as e:
+        logger.exception("weeder scan failed")
+        return {"status": "error", "operation": "weed_scan", "error": str(e)}
+
+
+@app.post("/api/weeder/kill")
+async def api_weeder_kill(request: Request) -> dict[str, Any]:
+    """Kill approved candidates: body {"targets": [{"pid", "create_time"}], "confirm": true}."""
+    from system_admin_mcp.mutation_guard import ReadOnlyError
+    from system_admin_mcp.tools import ram_weeder
+
+    body = await request.json()
+    try:
+        return await asyncio.to_thread(ram_weeder.kill, body.get("targets") or [], bool(body.get("confirm")))
+    except ReadOnlyError as e:
+        return {"status": "error", "operation": "weed_kill", "error": str(e)}
+
+
+@app.post("/api/weeder/sweep")
+async def api_weeder_sweep(request: Request) -> dict[str, Any]:
+    """Orphaned headless engines only. Body {"apply": false} previews."""
+    from system_admin_mcp.mutation_guard import ReadOnlyError
+    from system_admin_mcp.tools import ram_weeder
+
+    body = await request.json()
+    try:
+        return await asyncio.to_thread(ram_weeder.sweep, bool(body.get("apply")))
+    except ReadOnlyError as e:
+        return {"status": "error", "operation": "weed_sweep", "error": str(e)}
 
 
 async def _run_tool(name: str, **kwargs: Any) -> Any:
