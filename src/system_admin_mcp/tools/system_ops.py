@@ -1,11 +1,12 @@
 """System operations tools for the System Admin MCP."""
 
+import asyncio
 import ctypes
 import logging
 import os
 import signal
 import threading
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
@@ -447,3 +448,70 @@ def shutdown(
     logger.warning("Server shutdown requested via shutdown tool")
     threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
     return {"status": "shutting_down"}
+
+
+@mcp.tool(annotations=_READ_ONLY)
+async def get_ram_map(
+    detailed: Annotated[
+        bool,
+        Field(description="Include per-priority standby lists (0-7) and kernel handle/thread counts"),
+    ] = False,
+) -> dict[str, Any]:
+    """Get native Windows physical memory breakdown (RAMMap equivalent).
+
+    Reports exact page counts and sizes: Active, Standby (priorities 0-7), Modified,
+    Modified-No-Write, Zeroed, Free, System Cache, Kernel Paged/Nonpaged pools, and Commit Limits.
+    Uses direct NTDLL system calls (< 1ms).
+
+    ## Return Format
+    `{status: "success", operation: "get_ram_map", categories: {...}, standby_priorities_mb?: {...}}`
+
+    ## Examples
+    ```python
+    get_ram_map(detailed=True)
+    ```
+    """
+    from system_admin_mcp.tools import native_memory
+
+    info = native_memory.query_nt_memory_info(detailed=detailed)
+    if info:
+        return info
+    return {"status": "error", "message": "Native NT memory inspection not available on this platform"}
+
+
+@mcp.tool(annotations=_DESTRUCTIVE)
+async def purge_standby_memory(
+    target: Annotated[
+        Literal["standby", "working_sets", "modified", "priority0"],
+        Field(description="Target to empty: 'standby' (all standby lists), 'working_sets', 'modified', or 'priority0'"),
+    ] = "standby",
+    confirm: Annotated[bool, Field(description="Must be True to execute")] = False,
+) -> dict[str, Any]:
+    """Purge or empty Windows memory lists (RAMMap Empty equivalent).
+
+    Replicates RAMMap's 'Empty Standby List', 'Empty Working Sets', 'Empty Modified Page List',
+    or 'Empty Priority 0 Standby List' via NtSetSystemInformation. Requires elevated Administrator rights.
+
+    ## Return Format
+    `{status: "success" | "error", operation: "purge_standby_memory", target: str, freed_mb?: float, message: str}`
+
+    ## Examples
+    ```python
+    purge_standby_memory(target="standby", confirm=True)
+    ```
+    """
+    if not confirm:
+        return {
+            "status": "error",
+            "operation": "purge_standby_memory",
+            "message": "Pass confirm=True to execute memory purge operation.",
+        }
+
+    from system_admin_mcp.mutation_guard import audit_mutation, require_mutable
+
+    audit_mutation("purge_standby_memory", {"target": target})
+    require_mutable("purge_standby_memory")
+
+    from system_admin_mcp.tools import native_memory
+
+    return await asyncio.to_thread(native_memory.execute_memory_purge, target)

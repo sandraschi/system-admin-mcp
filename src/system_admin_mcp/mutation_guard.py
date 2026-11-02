@@ -72,6 +72,8 @@ MUTATING_OPS = frozenset(
         "airgap_disable",
         # RAM weeder (scan and sweep dry runs stay read-only usable)
         "weed_kill",
+        # RAM purge
+        "purge_standby_memory",
     }
 )
 
